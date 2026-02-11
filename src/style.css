@@ -1,0 +1,92 @@
+.board-background {
+  background-color: #1f232b;
+  border-radius: 12px;
+  transition: background-color 180ms ease-in-out;
+}
+
+.color-chip-frame {
+  border: 1px solid alpha(currentColor, 0.35);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.game-mode-emoji-button {
+  font-size: 2.25rem;
+  min-width: 56px;
+  min-height: 48px;
+  padding: 0;
+}
+
+.game-mode-emoji-button.game-mode-selected {
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 2px @accent_color;
+  background-color: alpha(@accent_bg_color, 0.18);
+}
+
+.board-color-menu-button {
+  padding: 6px 8px;
+}
+
+.game-settings-menu-icon {
+  font-size: 1.35rem;
+}
+
+.tableau-selected-card {
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 2px @accent_color;
+}
+
+.waste-selected-card {
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 2px @accent_color;
+}
+
+.tableau-selected-empty {
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 2px alpha(@accent_color, 0.8);
+  background-color: alpha(@accent_bg_color, 0.08);
+}
+
+.card-slot {
+  border: 1px solid alpha(currentColor, 0.2);
+  border-radius: 8px;
+  background-color: alpha(currentColor, 0.03);
+}
+
+.slot-emoji {
+  font-size: 2.4rem;
+  opacity: 0.75;
+}
+
+.status-line {
+  font-weight: 600;
+  min-height: 2.6em;
+}
+
+.stats-line,
+.dim-label {
+  opacity: 0.8;
+}
+
+entry.seed-winnable {
+  background-color: alpha(#2ecc71, 0.22);
+  border-color: alpha(#2ecc71, 0.85);
+}
+
+entry.seed-unwinnable {
+  background-color: alpha(#e74c3c, 0.22);
+  border-color: alpha(#e74c3c, 0.85);
+}
+
+.hint-invert {
+  transition: filter 240ms ease, background-color 240ms ease, color 240ms ease;
+  filter: invert(1);
+  background-color: alpha(@accent_bg_color, 0.18);
+  color: @accent_color;
+}
+
+.drag-return {
+  transition: transform 260ms cubic-bezier(0.22, 0.8, 0.24, 1), opacity 260ms ease;
+  transform: translateY(-12px) scale(1.03);
+  opacity: 0.86;
+}

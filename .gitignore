@@ -1,0 +1,7 @@
+/target/
+/build-dir/
+/.flatpak-builder/
+/.gnome-builder/
+*.swp
+*.swo
+.DS_Store

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Cardthropic
+Exec=cardthropic
+Icon=io.codeberg.emviolet.cardthropic
+Terminal=false
+Type=Application
+Categories=Game;CardGame;GTK;
+Keywords=solitaire;cards;klondike;gtk;
+StartupNotify=true
+StartupWMClass=cardthropic

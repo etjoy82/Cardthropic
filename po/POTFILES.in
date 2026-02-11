@@ -1,0 +1,6 @@
+# List of source files containing translatable strings.
+# Please keep this file sorted alphabetically.
+data/io.codeberg.emviolet.cardthropic.desktop.in
+data/io.codeberg.emviolet.cardthropic.metainfo.xml.in
+data/io.codeberg.emviolet.cardthropic.gschema.xml
+src/window.ui

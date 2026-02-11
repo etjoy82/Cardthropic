@@ -1,0 +1,767 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="Adw" version="1.0"/>
+  <template class="CardthropicWindow" parent="AdwApplicationWindow">
+    <property name="title" translatable="yes">Cardthropic</property>
+    <property name="default-width">960</property>
+    <property name="default-height">640</property>
+    <property name="resizable">True</property>
+    <property name="content">
+      <object class="AdwToolbarView">
+        <child type="top">
+          <object class="AdwHeaderBar">
+            <child type="start">
+              <object class="GtkBox">
+                <property name="spacing">6</property>
+                <child>
+                  <object class="GtkButton" id="help_button">
+                    <property name="label">❓</property>
+                    <property name="tooltip-text" translatable="yes">Help</property>
+                    <property name="has-frame">False</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child type="end">
+              <object class="GtkBox">
+                <property name="spacing">6</property>
+                <child>
+                  <object class="GtkMenuButton" id="board_color_menu_button">
+                    <property name="tooltip-text" translatable="yes">Board color</property>
+                    <property name="has-frame">True</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkMenuButton" id="game_settings_menu_button">
+                    <property name="label">🥇</property>
+                    <property name="tooltip-text" translatable="yes">Game Settings</property>
+                    <property name="has-frame">False</property>
+                    <style>
+                      <class name="game-settings-menu-icon"/>
+                    </style>
+                    <property name="popover">
+                      <object class="GtkPopover" id="game_settings_popover">
+                        <child>
+                          <object class="GtkBox" id="game_settings_content_box">
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">6</property>
+                            <property name="margin-top">8</property>
+                            <property name="margin-bottom">8</property>
+                            <property name="margin-start">8</property>
+                            <property name="margin-end">8</property>
+                            <property name="width-request">220</property>
+                          </object>
+                        </child>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkMenuButton" id="main_menu_button">
+                    <property name="primary">True</property>
+                    <property name="icon-name">open-menu-symbolic</property>
+                    <property name="tooltip-text" translatable="yes">Main Menu</property>
+                    <property name="popover">
+                      <object class="GtkPopoverMenu" id="main_menu_popover">
+                        <property name="menu-model">primary_menu</property>
+                      </object>
+                    </property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+        <property name="content">
+          <object class="GtkScrolledWindow">
+            <property name="hscrollbar-policy">automatic</property>
+            <property name="vscrollbar-policy">automatic</property>
+            <property name="min-content-width">0</property>
+            <property name="min-content-height">0</property>
+            <property name="vexpand">True</property>
+            <child>
+              <object class="GtkBox" id="board_box">
+                <property name="orientation">vertical</property>
+                <property name="spacing">10</property>
+                <property name="margin-top">14</property>
+                <property name="margin-bottom">14</property>
+                <property name="margin-start">14</property>
+                <property name="margin-end">14</property>
+                <property name="vexpand">True</property>
+                <style>
+                  <class name="board-background"/>
+                </style>
+                <child>
+                  <object class="GtkBox">
+                    <property name="spacing">8</property>
+                    <child>
+                      <object class="GtkButton" id="seed_random_button">
+                        <property name="label">🎲</property>
+                        <property name="tooltip-text" translatable="yes">Start Random Deal</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="seed_rescue_button">
+                        <property name="label">🛟</property>
+                        <property name="tooltip-text" translatable="yes">Find and Start Winnable Deal</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="seed_winnable_button">
+                        <property name="label" translatable="yes">W?</property>
+                        <property name="tooltip-text" translatable="yes">Check if Seed is Winnable</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="seed_repeat_button">
+                        <property name="label">🔁</property>
+                        <property name="tooltip-text" translatable="yes">Deal Again from Current Seed</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkComboBoxText" id="seed_combo">
+                        <property name="has-entry">True</property>
+                        <property name="width-request">1</property>
+                        <property name="hexpand">True</property>
+                        <property name="tooltip-text" translatable="yes">Deal seed</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="seed_go_button">
+                        <property name="label" translatable="yes">Go</property>
+                        <property name="tooltip-text" translatable="yes">Start Deal from Seed</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">2</property>
+                    <child>
+                      <object class="GtkLabel" id="stats_label">
+                        <property name="xalign">0</property>
+                        <style>
+                          <class name="stats-line"/>
+                        </style>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="status_label">
+                        <property name="xalign">0</property>
+                        <property name="yalign">0</property>
+                        <property name="hexpand">True</property>
+                        <property name="wrap">True</property>
+                        <property name="wrap-mode">word-char</property>
+                        <property name="max-width-chars">120</property>
+                        <style>
+                          <class name="status-line"/>
+                        </style>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkBox">
+                    <property name="spacing">6</property>
+                    <property name="halign">start</property>
+                    <child>
+                      <object class="GtkButton" id="undo_button">
+                        <property name="icon-name">edit-undo-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">Undo</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="redo_button">
+                        <property name="icon-name">edit-redo-symbolic</property>
+                        <property name="tooltip-text" translatable="yes">Redo</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="auto_hint_button">
+                        <property name="label">🪄</property>
+                        <property name="tooltip-text" translatable="yes">Wave Magic Wand</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="cyclone_shuffle_button">
+                        <property name="label">🌀</property>
+                        <property name="tooltip-text" translatable="yes">Cyclone Shuffle Tableau</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="peek_button">
+                        <property name="label">🫣</property>
+                        <property name="tooltip-text" translatable="yes">Peek</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkFrame">
+                    <child>
+                      <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">10</property>
+                        <property name="margin-top">12</property>
+                        <property name="margin-bottom">12</property>
+                        <property name="margin-start">12</property>
+                        <property name="margin-end">12</property>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="spacing">16</property>
+                            <child>
+                              <object class="GtkBox" id="stock_heading_box">
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label" translatable="yes">Stock</property>
+                                    <property name="xalign">0.5</property>
+                                    <style>
+                                      <class name="dim-label"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox" id="waste_heading_box">
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label" translatable="yes">Waste</property>
+                                    <property name="xalign">0.5</property>
+                                    <style>
+                                      <class name="dim-label"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="hexpand">True</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox" id="foundations_heading_box">
+                                <property name="halign">end</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label" translatable="yes">Foundations</property>
+                                    <property name="xalign">0.5</property>
+                                    <style>
+                                      <class name="dim-label"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="spacing">16</property>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">4</property>
+                                <property name="valign">start</property>
+                                <child>
+                                  <object class="GtkPicture" id="stock_picture">
+                                    <property name="width-request">70</property>
+                                    <property name="height-request">108</property>
+                                    <property name="can-shrink">True</property>
+                                    <property name="content-fit">contain</property>
+                                    <style>
+                                      <class name="card-slot"/>
+                                    </style>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="stock_label">
+                                    <property name="xalign">0</property>
+                                    <property name="halign">start</property>
+                                    <style>
+                                      <class name="dim-label"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">4</property>
+                                <property name="valign">start</property>
+                                <child>
+                                  <object class="GtkOverlay" id="waste_overlay">
+                                    <child>
+                                      <object class="GtkPicture" id="waste_picture">
+                                        <property name="width-request">70</property>
+                                        <property name="height-request">108</property>
+                                        <property name="can-shrink">True</property>
+                                        <property name="content-fit">contain</property>
+                                        <style>
+                                          <class name="card-slot"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child type="overlay">
+                                      <object class="GtkPicture" id="waste_picture_1">
+                                        <property name="can-shrink">True</property>
+                                        <property name="content-fit">contain</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="visible">False</property>
+                                        <style>
+                                          <class name="card-slot"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child type="overlay">
+                                      <object class="GtkPicture" id="waste_picture_2">
+                                        <property name="can-shrink">True</property>
+                                        <property name="content-fit">contain</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="visible">False</property>
+                                        <style>
+                                          <class name="card-slot"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child type="overlay">
+                                      <object class="GtkPicture" id="waste_picture_3">
+                                        <property name="can-shrink">True</property>
+                                        <property name="content-fit">contain</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="visible">False</property>
+                                        <style>
+                                          <class name="card-slot"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child type="overlay">
+                                      <object class="GtkPicture" id="waste_picture_4">
+                                        <property name="can-shrink">True</property>
+                                        <property name="content-fit">contain</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="visible">False</property>
+                                        <style>
+                                          <class name="card-slot"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child type="overlay">
+                                      <object class="GtkPicture" id="waste_picture_5">
+                                        <property name="can-shrink">True</property>
+                                        <property name="content-fit">contain</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="visible">False</property>
+                                        <style>
+                                          <class name="card-slot"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child type="overlay">
+                                      <object class="GtkBox" id="waste_placeholder_box">
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="width-request">70</property>
+                                        <property name="height-request">108</property>
+                                        <child>
+                                          <object class="GtkLabel" id="waste_placeholder_label">
+                                            <property name="label">🃏</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="vexpand">True</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="waste_label">
+                                    <property name="visible">True</property>
+                                    <property name="xalign">0</property>
+                                    <property name="halign">start</property>
+                                    <style>
+                                      <class name="dim-label"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="hexpand">True</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="spacing">8</property>
+                                <property name="halign">end</property>
+                                <property name="valign">start</property>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">4</property>
+                                    <child>
+                                      <object class="GtkOverlay">
+                                        <child>
+                                          <object class="GtkPicture" id="foundation_picture_1">
+                                            <property name="width-request">70</property>
+                                            <property name="height-request">108</property>
+                                            <property name="can-shrink">True</property>
+                                            <property name="content-fit">contain</property>
+                                            <style>
+                                              <class name="card-slot"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child type="overlay">
+                                          <object class="GtkLabel" id="foundation_placeholder_1">
+                                            <property name="label">♣️</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel" id="foundation_label_1">
+                                        <property name="visible">False</property>
+                                        <property name="xalign">0.5</property>
+                                        <style>
+                                          <class name="dim-label"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">4</property>
+                                    <child>
+                                      <object class="GtkOverlay">
+                                        <child>
+                                          <object class="GtkPicture" id="foundation_picture_2">
+                                            <property name="width-request">70</property>
+                                            <property name="height-request">108</property>
+                                            <property name="can-shrink">True</property>
+                                            <property name="content-fit">contain</property>
+                                            <style>
+                                              <class name="card-slot"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child type="overlay">
+                                          <object class="GtkLabel" id="foundation_placeholder_2">
+                                            <property name="label">♦️</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel" id="foundation_label_2">
+                                        <property name="visible">False</property>
+                                        <property name="xalign">0.5</property>
+                                        <style>
+                                          <class name="dim-label"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">4</property>
+                                    <child>
+                                      <object class="GtkOverlay">
+                                        <child>
+                                          <object class="GtkPicture" id="foundation_picture_3">
+                                            <property name="width-request">70</property>
+                                            <property name="height-request">108</property>
+                                            <property name="can-shrink">True</property>
+                                            <property name="content-fit">contain</property>
+                                            <style>
+                                              <class name="card-slot"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child type="overlay">
+                                          <object class="GtkLabel" id="foundation_placeholder_3">
+                                            <property name="label">♥️</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel" id="foundation_label_3">
+                                        <property name="visible">False</property>
+                                        <property name="xalign">0.5</property>
+                                        <style>
+                                          <class name="dim-label"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">4</property>
+                                    <child>
+                                      <object class="GtkOverlay">
+                                        <child>
+                                          <object class="GtkPicture" id="foundation_picture_4">
+                                            <property name="width-request">70</property>
+                                            <property name="height-request">108</property>
+                                            <property name="can-shrink">True</property>
+                                            <property name="content-fit">contain</property>
+                                            <style>
+                                              <class name="card-slot"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child type="overlay">
+                                          <object class="GtkLabel" id="foundation_placeholder_4">
+                                            <property name="label">♠️</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel" id="foundation_label_4">
+                                        <property name="visible">False</property>
+                                        <property name="xalign">0.5</property>
+                                        <style>
+                                          <class name="dim-label"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkFrame">
+                    <property name="label" translatable="yes">Tableau</property>
+                    <property name="vexpand">True</property>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">8</property>
+                        <property name="margin-top">12</property>
+                        <property name="margin-bottom">12</property>
+                        <property name="margin-start">12</property>
+                        <property name="margin-end">12</property>
+                        <property name="vexpand">True</property>
+                        <child>
+                          <object class="GtkScrolledWindow" id="tableau_scroller">
+                            <property name="hscrollbar-policy">automatic</property>
+                            <property name="vscrollbar-policy">automatic</property>
+                            <property name="min-content-width">0</property>
+                            <property name="min-content-height">60</property>
+                            <property name="vexpand">True</property>
+                            <child>
+                              <object class="GtkBox" id="tableau_row">
+                                <property name="spacing">4</property>
+                                <property name="halign">start</property>
+                                <property name="valign">start</property>
+                                <property name="hexpand">False</property>
+                                <property name="vexpand">False</property>
+                                <property name="homogeneous">False</property>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_1">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_2">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_3">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_4">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_5">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_6">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_7">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </property>
+      </object>
+    </property>
+  </template>
+  <menu id="primary_menu">
+    <section>
+      <item>
+        <attribute name="custom">game-mode-row</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Start Random Deal</attribute>
+        <attribute name="action">win.random-seed</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Winnable Deal</attribute>
+        <attribute name="action">win.winnable-seed</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Draw</attribute>
+        <attribute name="action">win.draw</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Undo</attribute>
+        <attribute name="action">win.undo</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Redo</attribute>
+        <attribute name="action">win.redo</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Wave Magic Wand</attribute>
+        <attribute name="action">win.play-hint-move</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Rapid Wand</attribute>
+        <attribute name="action">win.rapid-wand</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Cyclone Shuffle Tableau</attribute>
+        <attribute name="action">win.cyclone-shuffle</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Peek</attribute>
+        <attribute name="action">win.peek</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Smart Move</attribute>
+        <attribute name="action">win.smart-move</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_APM Graph</attribute>
+        <attribute name="action">win.apm-graph</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Help</attribute>
+        <attribute name="action">win.help</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_About Cardthropic</attribute>
+        <attribute name="action">app.about</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Quit</attribute>
+        <attribute name="action">app.quit</attribute>
+      </item>
+    </section>
+  </menu>
+</interface>

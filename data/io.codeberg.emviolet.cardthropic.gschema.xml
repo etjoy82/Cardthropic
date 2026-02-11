@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="cardthropic">
+	<schema id="io.codeberg.emviolet.cardthropic" path="/io/codeberg/emviolet/cardthropic/">
+		<key name="board-color" type="s">
+			<default>'#1f232b'</default>
+			<summary>Board background color</summary>
+			<description>Hex color used for the game board background.</description>
+		</key>
+	</schema>
+</schemalist>
