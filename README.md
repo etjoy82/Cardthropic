@@ -149,6 +149,34 @@ flatpak install ./cardthropic.flatpak
 flatpak run io.codeberg.emviolet.cardthropic
 ```
 
+### Ubuntu (GNOME Software + Flatpak)
+
+1. Follow the official Flathub setup guide for Ubuntu:  
+   <https://flathub.org/setup/Ubuntu>
+2. Ensure GNOME Software Flatpak integration is installed:
+
+```bash
+sudo apt install flatpak gnome-software-plugin-flatpak
+```
+
+3. Log out/in (or reboot) so GNOME Software loads Flatpak support.
+4. Add Flathub and install the GNOME runtime dependency:
+
+```bash
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install -y flathub org.gnome.Platform//48
+```
+
+5. Add Cardthropic remote and install:
+
+```bash
+flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/cardthropic-flatpak/
+flatpak update --user --appstream cardthropic
+flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
+```
+
+Snap package note: Flatpak is the only supported package right now. A Snap package may be added in the future.
+
 ## For Developers
 
 ### Rust local run
