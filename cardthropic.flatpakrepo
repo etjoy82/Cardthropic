@@ -1,0 +1,9 @@
+[Flatpak Repo]
+Title=Cardthropic Flatpak Repository
+Comment=Official Cardthropic Flatpak repository
+Description=Install Cardthropic with full AppStream metadata (license, screenshots, updates).
+Homepage=https://codeberg.org/emviolet/Cardthropic
+Icon=https://emviolet.codeberg.page/Cardthropic-flatpak/icons/128x128/io.codeberg.emviolet.cardthropic.png
+Url=https://emviolet.codeberg.page/Cardthropic-flatpak/
+DefaultBranch=master
+NoEnumerate=false

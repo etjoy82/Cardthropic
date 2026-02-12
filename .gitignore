@@ -1,7 +1,14 @@
+# Rust
 /target/
+
+# Flatpak / local build artifacts
 /build-dir/
+/build-repo/
+/SHA256SUMS
 /.flatpak-builder/
 /.gnome-builder/
+
+# Editor / OS noise
 *.swp
 *.swo
 .DS_Store

@@ -1,90 +1,221 @@
 # Cardthropic
 
-Cardthropic is a Libadwaita + Rust GNOME Solitaire app focused on Klondike.
+Cardthropic is a modern GNOME solitaire app built with Rust, GTK4, and Libadwaita.
+It currently ships a full Klondike experience, with architecture already prepared for more variants.
 
-Current project version: `0.2.1`
+![Cardthropic 0.3 screenshot](data/screenshots/cardthropic-0.3-screenshot.png)
 
-## Changelog
+Current version: `0.3.0`
+License: `GPL-3.0-or-later`
 
-### 0.2.1 - 2026-02-11
+## Why Cardthropic
 
-- Fixed tableau column pixel-shift jitter when moves changed empty/non-empty piles.
-- Added `Rapid Wand` (`Ctrl+Shift+Space`) and middle-click wand trigger (non-stackable timed burst).
-- Fixed Builder + installed Flatpak dock/taskbar icon resolution by aligning runtime mapping and packaging assets.
+Cardthropic is designed to feel native on GNOME while still being playful and experimental:
 
-### 0.2.0 - 2026-02-11
+- Emoji-first controls for fast visual scanning.
+- Seed-first gameplay for reproducible runs.
+- Strong automation tooling (wand, rapid wand, robot mode).
+- Adaptive board layout tuned for small and large viewports.
+- Zero network permission at runtime in Flatpak.
 
-- Initial public preview with Klondike gameplay and adaptive layout.
+## Implemented Features
 
-## Highlights
+### Core Klondike
 
-- Native GTK4/Libadwaita desktop UI.
-- Drag-and-drop Klondike gameplay with clickable alternatives.
+- Full Klondike deal, move, foundation, tableau, draw/recycle flow.
+- Draw modes: Deal 1, 2, 3, 4, 5.
+- Smart Move modes: Double Click, Single Click, Disabled.
 - Undo/redo history.
-- Magic Wand autoplay system (`🪄`).
-- Seeded deals with in-window seed controls.
-- Winnability checks and winnable-seed generation.
-- Persistent seed history with plays/wins tracking.
-- Adaptive card sizing across common desktop viewports.
-- Tableau column layout stabilized to eliminate pixel shifting when piles become empty/non-empty.
-- Shared game-mode scaffold for Klondike, Spider, and FreeCell (Klondike engine implemented first).
+- Drag-and-drop and click-driven movement.
+- Keyboard navigation across stock, waste, foundations, and tableau.
 
-## Controls
+### Automation
 
-- Click stock to draw.
-- Click waste once to select it for manual placement.
-- Double-click waste to trigger Smart Move auto-play (when Smart Move is enabled).
-- Click tableau cards/runs to select and move.
-- Double-click any tableau card/run to trigger Smart Move when enabled.
-- Drag waste or tableau runs onto tableau/foundation targets.
-- `Undo` / `Redo` via toolbar buttons or keyboard shortcuts.
-- `Ctrl+Y` redoes the last undone move.
-- `🪄` waves the magic wand and plays the current best move.
-- `🌀` cyclone-shuffles all tableau cards while preserving each column's face-up/face-down shape.
-- `🫣` Peek: for 3 seconds, tableau face-up cards are hidden and face-down cards are revealed.
-- `Smart Move` (hamburger checkbox) controls double-click auto moves and waste auto-play.
-- `Ctrl+Space` waves the magic wand.
-- `F2` toggles Smart Move.
-- `F3` triggers Peek.
-- `F5` triggers Cyclone Shuffle Tableau.
-- `Ctrl+R` starts a random seeded game.
-- `Ctrl+Shift+R` starts a winnable seeded game search.
-- `F1` opens About Cardthropic.
+- `🪄` Wave Magic Wand: plays the best next move.
+- `⚡` Rapid Wand: burst of wand actions over time.
+- `🌀` Cyclone Shuffle Tableau: shuffles tableau cards while preserving each column's face-up/face-down geometry.
+- `🫣` Peek: temporary reveal mode.
+- `🤖` Robot Mode:
+  - runs wand actions every 250ms,
+  - auto-deals new seeds when stuck/lost,
+  - stops when a win is reached,
+  - supports precomputed solver-line playback when available.
 
-## Seed Tools
+### Seed and Winnability System
 
-- `🎲` starts a new random seeded game.
-- `🛟` starts a new winnable seeded game.
-- Seed field is editable and also supports selecting prior seeds.
-- `Is Seed W?` checks the current seed and reports analysis in the status line.
+- Seed input and quick actions:
+  - `🎲` random deal,
+  - `🛟` find/start winnable deal,
+  - `W?` test current seed,
+  - `🔁` redeal current seed,
+  - `Go` launch typed seed.
+- Persisted seed history with per-seed stats:
+  - Plays,
+  - Wins,
+  - Recency ordering.
+- Seed history capacity controls:
+  - stored history cap: `10,000`,
+  - dropdown cap: `250` most recent.
 
-## Appearance
+### Telemetry and Session Persistence
 
-- Hamburger menu includes a board-color picker with swatches.
-- Hamburger menu includes quick game-mode buttons (`🥇` Klondike, `🕷️` Spider, `🗽` FreeCell).
-- Header bar includes a game-mode emoji settings menu that changes with the active game.
-- Curated themes (`Felt`, `Slate`, `Sunset`, `Ocean`) are available in the same picker.
-- `Reset Default` restores the default board color.
-- Board color changes animate smoothly.
+- Replaces score with APM (actions per minute).
+- Time/APM stop on win.
+- APM sampled every 5 seconds.
+- `APM Graph` dialog for in-session performance visualization.
+- Full game session resume on relaunch (seed, mode, board state, timer, moves).
 
-## Build
+### UI/UX
 
-### Cargo
+- Native Libadwaita header + menu model.
+- Dedicated in-app Help dialog with live shortcut labels.
+- Fullscreen toggle support.
+- Board color control with presets/swatches and persistent preferences.
+- Custom app icon integrated for desktop/dock/Flatpak metadata.
+- Responsive layout with minimum window safeguards.
+
+## Shortcuts
+
+- `F1` Help
+- `F11` Toggle Fullscreen
+- `Space` Draw
+- `Ctrl+Z` Undo
+- `Ctrl+Y` Redo
+- `Ctrl+Space` Wave Magic Wand
+- `Ctrl+Shift+Space` Rapid Wand
+- `F3` Peek
+- `F5` Cyclone Shuffle Tableau
+- `F6` Robot Mode
+- `Ctrl+R` Start Random Deal
+- `Ctrl+Shift+R` Start Winnable Deal Search
+- `Ctrl+Q` Quit
+
+## Game Modes
+
+Cardthropic already includes mode scaffolding for:
+
+- `🥇` Klondike (implemented)
+- `🕷️` Spider (UI scaffold ready)
+- `🗽` FreeCell (UI scaffold ready)
+
+The engine is being refactored to let additional variants plug in without rewriting the whole window layer.
+
+## Architecture Snapshot
+
+The codebase has been heavily modularized to support long-term maintainability.
+
+### `src/game/`
+
+- `types.rs` shared domain types.
+- `setup.rs` game initialization and draw/recycle setup.
+- `klondike_moves.rs` move legality and move application.
+- `solver.rs` guided/exhaustive winnability and solver-line generation.
+- `session_codec.rs` session serialization/deserialization.
+- `tests.rs` game logic tests.
+
+### `src/window/`
+
+Window behavior is split into focused modules (`actions_*`, `drag`, `input`, `render`, `seed`, `robot`, `hints`, `menu`, `dialogs`, etc.) instead of a monolithic UI file.
+
+### `src/engine/`
+
+- `moves.rs` hint/solver move mapping.
+- `robot.rs` robot playback helpers.
+- `seed_history.rs` persistent seed stats store.
+- `game_mode.rs` variant runtime seam for future solitaire engines.
+
+## Get Cardthropic (Recommended)
+
+Cardthropic is best installed from the official Flatpak repository so GNOME Software can show full metadata (license, releases, screenshots, updates).
+
+### Option A: One-click via `.flatpakrepo` (GNOME Software)
+
+1. Download `cardthropic.flatpakrepo` from releases.
+2. Open it with GNOME Software.
+3. Enable the Cardthropic remote and install Cardthropic.
+
+### Option B: Terminal (Flatpak remote)
+
+```bash
+flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/cardthropic-flatpak/
+flatpak update --user --appstream cardthropic
+flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
+flatpak run io.codeberg.emviolet.cardthropic
+```
+
+### Fallback: Direct bundle install
+
+If you only have `cardthropic.flatpak`:
+
+```bash
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install ./cardthropic.flatpak
+flatpak run io.codeberg.emviolet.cardthropic
+```
+
+## For Developers
+
+### Rust local run
 
 ```bash
 cargo check
 cargo run
 ```
 
-### GNOME Builder / Meson
+### Flatpak local developer workflow
 
-This repository includes Meson and Flatpak metadata for GNOME-style development.
+```bash
+scripts/flatpak/bootstrap.sh
+scripts/flatpak/build-install.sh
+scripts/flatpak/run.sh
+```
 
-### Dev Runtime
+### Publish/update Flatpak repo (Codeberg Pages)
 
-- Flatpak development is pinned to stable GNOME runtime `org.gnome.Platform//48`.
-- Using the stable runtime avoids drag-related GTK warnings seen on `master`.
+```bash
+scripts/flatpak-repo/master.sh
+```
 
-## Project Status
+## Packaging and Safety Notes
 
-Cardthropic is actively developed. Core Klondike play is in place, and ongoing work is focused on polishing responsiveness, ergonomics, and Circle-readiness.
+- Runtime app id: `io.codeberg.emviolet.cardthropic`
+- Flatpak runtime: `org.gnome.Platform//48`
+- Flathub is required as the runtime source for end-user bundle installs.
+- Project license metadata is set to GPLv3+ in AppStream.
+- Runtime permissions intentionally avoid network access.
+- Rendering defaults to software-safe settings for VM/dev stability.
+
+## Development Status
+
+Cardthropic is actively developed and already highly playable in Klondike.
+
+Current focus:
+
+- continue engine/window decoupling,
+- add Spider and FreeCell on top of the new variant seams,
+- keep UX fast, native, and maintainable as feature count grows.
+
+## Releasing
+
+For a step-by-step source + Flatpak release process, see:
+
+- `RELEASE.md`
+
+## Changelog
+
+### 0.3.0 (2026-02-12)
+
+- Major internal modularization pass for maintainability and multi-variant growth.
+- Expanded automation and Smart Move behavior with wand-aligned logic.
+- Added release screenshot and refreshed Flatpak/AppStream metadata.
+- GPLv3+ metadata now explicitly surfaced for software centers.
+
+### 0.2.1 (2026-02-11)
+
+- Fixed tableau pixel-shift jitter.
+- Added Rapid Wand automation.
+- Finalized icon mapping for Builder + Flatpak dock/taskbar resolution.
+
+### 0.2.0 (2026-02-11)
+
+- Initial public preview with Klondike gameplay and adaptive layout.

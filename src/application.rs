@@ -51,10 +51,11 @@ mod imp {
             obj.set_accels_for_action("win.draw", &["space"]);
             obj.set_accels_for_action("win.undo", &["<primary>z"]);
             obj.set_accels_for_action("win.redo", &["<primary>y"]);
+            obj.set_accels_for_action("win.toggle-fullscreen", &["F11"]);
             obj.set_accels_for_action("win.play-hint-move", &["<primary>space"]);
             obj.set_accels_for_action("win.rapid-wand", &["<primary><shift>space"]);
-            obj.set_accels_for_action("win.smart-move", &["F2"]);
             obj.set_accels_for_action("win.peek", &["F3"]);
+            obj.set_accels_for_action("win.robot-mode", &["F6"]);
             obj.set_accels_for_action("win.cyclone-shuffle", &["F5"]);
         }
     }

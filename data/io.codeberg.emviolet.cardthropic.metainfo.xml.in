@@ -28,6 +28,11 @@
       winnability checks, board themes, and persistent seed history.
     </p>
   </description>
+  <screenshots>
+    <screenshot type="default">
+      <image type="source" width="991" height="1018">https://codeberg.org/emviolet/cardthropic/raw/branch/main/data/screenshots/cardthropic-0.3-screenshot.png</image>
+    </screenshot>
+  </screenshots>
   <content_rating type="oars-1.1">
     <content_attribute id="violence-cartoon">none</content_attribute>
     <content_attribute id="violence-fantasy">none</content_attribute>
@@ -51,6 +56,11 @@
     <content_attribute id="social-location">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.3.0" date="2026-02-12">
+      <description>
+        <p>Gameplay polish update with smarter automation, expanded controls, persistent sessions, and refreshed Flatpak metadata/screenshots.</p>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-02-11">
       <description>
         <p>Polish update: fixed tableau pixel-shift jitter, added Rapid Wand automation, and corrected dock/taskbar icon resolution for Builder and Flatpak installs.</p>

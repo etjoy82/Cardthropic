@@ -21,8 +21,10 @@
 mod application;
 mod config;
 mod deck;
+mod engine;
 mod game;
 mod window;
+mod winnability;
 
 use self::application::CardthropicApplication;
 use self::window::CardthropicWindow;

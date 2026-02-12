@@ -32,13 +32,23 @@
 }
 
 .tableau-selected-card {
-  border-radius: 9px;
-  box-shadow: inset 0 0 0 2px @accent_color;
+  border-radius: 8px;
+  transition: box-shadow 140ms ease, filter 140ms ease;
+  filter: brightness(0.72) saturate(1.28) contrast(1.08);
+  box-shadow:
+    inset 0 0 0 3px alpha(#ffffff, 0.96),
+    inset 0 0 0 6px @accent_color,
+    inset 0 0 0 8px alpha(#ffffff, 0.24);
 }
 
 .waste-selected-card {
-  border-radius: 9px;
-  box-shadow: inset 0 0 0 2px @accent_color;
+  border-radius: 8px;
+  transition: box-shadow 140ms ease, filter 140ms ease;
+  filter: brightness(0.74) saturate(1.22) contrast(1.06);
+  box-shadow:
+    inset 0 0 0 3px alpha(#ffffff, 0.94),
+    inset 0 0 0 6px @accent_color,
+    inset 0 0 0 8px alpha(#ffffff, 0.22);
 }
 
 .tableau-selected-empty {
@@ -47,10 +57,39 @@
   background-color: alpha(@accent_bg_color, 0.08);
 }
 
+.keyboard-focus-card {
+  transition: box-shadow 120ms ease, filter 120ms ease;
+  filter: brightness(0.78) saturate(1.24) contrast(1.08);
+  box-shadow:
+    inset 0 0 0 2px #0d1020,
+    inset 0 0 0 5px #ffffff,
+    inset 0 0 0 8px #3dd9ff;
+}
+
+.keyboard-focus-empty {
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 3px #3dd9ff;
+  background-color: alpha(#3dd9ff, 0.12);
+}
+
 .card-slot {
   border: 1px solid alpha(currentColor, 0.2);
   border-radius: 8px;
   background-color: alpha(currentColor, 0.03);
+}
+
+.card-slot:drop(active) {
+  border: 1px solid alpha(currentColor, 0.2);
+  box-shadow: none;
+  outline: none;
+  background-color: alpha(currentColor, 0.03);
+}
+
+.tableau-drop-target:drop(active) {
+  border: none;
+  box-shadow: none;
+  outline: none;
+  background-color: transparent;
 }
 
 .slot-emoji {

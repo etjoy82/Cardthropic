@@ -4,8 +4,8 @@
   <requires lib="Adw" version="1.0"/>
   <template class="CardthropicWindow" parent="AdwApplicationWindow">
     <property name="title" translatable="yes">Cardthropic</property>
-    <property name="default-width">960</property>
-    <property name="default-height">640</property>
+    <property name="default-width">600</property>
+    <property name="default-height">800</property>
     <property name="resizable">True</property>
     <property name="content">
       <object class="AdwToolbarView">
@@ -18,6 +18,13 @@
                   <object class="GtkButton" id="help_button">
                     <property name="label">❓</property>
                     <property name="tooltip-text" translatable="yes">Help</property>
+                    <property name="has-frame">False</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkButton" id="fullscreen_button">
+                    <property name="label">⛶</property>
+                    <property name="tooltip-text" translatable="yes">Toggle Fullscreen</property>
                     <property name="has-frame">False</property>
                   </object>
                 </child>
@@ -203,6 +210,13 @@
                       <object class="GtkButton" id="peek_button">
                         <property name="label">🫣</property>
                         <property name="tooltip-text" translatable="yes">Peek</property>
+                        <property name="has-frame">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="robot_button">
+                        <property name="label">🤖</property>
+                        <property name="tooltip-text" translatable="yes">Robot Mode</property>
                         <property name="has-frame">False</property>
                       </object>
                     </child>
@@ -743,8 +757,27 @@
         <attribute name="action">win.peek</attribute>
       </item>
       <item>
+        <attribute name="label" translatable="yes">_Robot Mode</attribute>
+        <attribute name="action">win.robot-mode</attribute>
+      </item>
+      <item>
         <attribute name="label" translatable="yes">_Smart Move</attribute>
-        <attribute name="action">win.smart-move</attribute>
+        <link name="submenu">
+          <section>
+            <item>
+              <attribute name="label" translatable="yes">_Double Click</attribute>
+              <attribute name="action">win.smart-move-double-click</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">_Single Click</attribute>
+              <attribute name="action">win.smart-move-single-click</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">_Disabled</attribute>
+              <attribute name="action">win.smart-move-disabled</attribute>
+            </item>
+          </section>
+        </link>
       </item>
       <item>
         <attribute name="label" translatable="yes">_APM Graph</attribute>
@@ -753,6 +786,10 @@
       <item>
         <attribute name="label" translatable="yes">_Help</attribute>
         <attribute name="action">win.help</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Fullscreen</attribute>
+        <attribute name="action">win.toggle-fullscreen</attribute>
       </item>
       <item>
         <attribute name="label" translatable="yes">_About Cardthropic</attribute>
