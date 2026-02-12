@@ -5,7 +5,7 @@ It currently ships a full Klondike experience, with architecture already prepare
 
 ![Cardthropic Logo](/logo-small.png)
 
-Current version: `0.3.0`
+Current version: `0.3.1`
 License: `GPL-3.0-or-later`
 
 ## Why Cardthropic
@@ -230,6 +230,13 @@ For a step-by-step source + Flatpak release process, see:
 - `RELEASE.md`
 
 ## Changelog
+
+### 0.3.1 (2026-02-12)
+
+- Hotfix release for appearance controls and light-mode usability.
+- Added explicit `System Default / Light / Dark` appearance selector in the board color popover.
+- Improved light-mode board color handling so palette choices remain readable with dark text.
+- Smoothed appearance-change interaction by closing the color popover after mode selection.
 
 ### 0.3.0 (2026-02-12)
 

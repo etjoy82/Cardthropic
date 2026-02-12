@@ -318,6 +318,7 @@ mod imp {
         pub last_saved_session: RefCell<String>,
         pub board_color_hex: RefCell<String>,
         pub board_color_preview: RefCell<Option<gtk::DrawingArea>>,
+        pub board_color_swatches: RefCell<Vec<gtk::DrawingArea>>,
         pub board_color_provider: RefCell<Option<gtk::CssProvider>>,
         pub deck: RefCell<Option<AngloDeck>>,
         pub deck_load_attempted: Cell<bool>,
@@ -458,6 +459,7 @@ mod imp {
                 last_saved_session: RefCell::new(String::new()),
                 board_color_hex: RefCell::new(DEFAULT_BOARD_COLOR.to_string()),
                 board_color_preview: RefCell::new(None),
+                board_color_swatches: RefCell::new(Vec::new()),
                 board_color_provider: RefCell::new(None),
                 deck: RefCell::new(None),
                 deck_load_attempted: Cell::new(false),
@@ -670,6 +672,7 @@ const SETTINGS_SCHEMA_ID: &str = "io.codeberg.emviolet.cardthropic";
 const SETTINGS_KEY_BOARD_COLOR: &str = "board-color";
 const SETTINGS_KEY_SMART_MOVE_MODE: &str = "smart-move-mode";
 const SETTINGS_KEY_SAVED_SESSION: &str = "saved-session";
+const SETTINGS_KEY_APPEARANCE_MODE: &str = "appearance-mode";
 const SEED_HISTORY_FILE_NAME: &str = "seed-history.txt";
 const APP_DATA_DIR_NAME: &str = "io.codeberg.emviolet.cardthropic";
 const MAX_SEED_HISTORY_ENTRIES: usize = 10_000;
