@@ -3,7 +3,7 @@
 Cardthropic is a modern GNOME solitaire app built with Rust, GTK4, and Libadwaita.
 It currently ships a full Klondike experience, with architecture already prepared for more variants.
 
-![Cardthropic 0.3 screenshot](data/screenshots/cardthropic-0.3-screenshot.png)
+![Cardthropic Logo](/logo-small.png)
 
 Current version: `0.3.0`
 License: `GPL-3.0-or-later`
@@ -17,6 +17,8 @@ Cardthropic is designed to feel native on GNOME while still being playful and ex
 - Strong automation tooling (wand, rapid wand, robot mode).
 - Adaptive board layout tuned for small and large viewports.
 - Zero network permission at runtime in Flatpak.
+
+![Cardthropic 0.3 screenshot](data/screenshots/cardthropic-0.3-screenshot.png)
 
 ## Implemented Features
 
