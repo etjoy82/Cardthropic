@@ -16,5 +16,10 @@
 			<summary>Saved game session state</summary>
 			<description>Serialized game/session state used for crash-safe resume on next launch.</description>
 		</key>
+		<key name="appearance-mode" type="s">
+			<default>'system'</default>
+			<summary>Appearance mode</summary>
+			<description>Whether Cardthropic follows system theme, or forces light/dark mode.</description>
+		</key>
 	</schema>
 </schemalist>

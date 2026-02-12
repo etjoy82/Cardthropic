@@ -3,9 +3,9 @@
 Cardthropic is a modern GNOME solitaire app built with Rust, GTK4, and Libadwaita.
 It currently ships a full Klondike experience, with architecture already prepared for more variants.
 
-![Cardthropic 0.3 screenshot](data/screenshots/cardthropic-0.3-screenshot.png)
+![Cardthropic Logo](/logo-small.png)
 
-Current version: `0.3.0`
+Current version: `0.3.1`
 License: `GPL-3.0-or-later`
 
 ## Why Cardthropic
@@ -17,6 +17,8 @@ Cardthropic is designed to feel native on GNOME while still being playful and ex
 - Strong automation tooling (wand, rapid wand, robot mode).
 - Adaptive board layout tuned for small and large viewports.
 - Zero network permission at runtime in Flatpak.
+
+![Cardthropic 0.3 screenshot](data/screenshots/cardthropic-0.3-screenshot.png)
 
 ## Implemented Features
 
@@ -126,15 +128,9 @@ Window behavior is split into focused modules (`actions_*`, `drag`, `input`, `re
 
 ## Get Cardthropic (Recommended)
 
-Cardthropic is best installed from the official Flatpak repository so GNOME Software can show full metadata (license, releases, screenshots, updates).
+Cardthropic is best installed from the official Flatpak repository so GNOME Software can show full metadata (license, releases, screenshots, updates). Flathub is required.
 
-### Option A: One-click via `.flatpakrepo` (GNOME Software)
-
-1. Download `cardthropic.flatpakrepo` from releases.
-2. Open it with GNOME Software.
-3. Enable the Cardthropic remote and install Cardthropic.
-
-### Option B: Terminal (Flatpak remote)
+### Option A: Terminal (Flatpak remote)
 
 ```bash
 flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/cardthropic-flatpak/
@@ -152,6 +148,34 @@ flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flat
 flatpak install ./cardthropic.flatpak
 flatpak run io.codeberg.emviolet.cardthropic
 ```
+
+### Ubuntu (GNOME Software + Flatpak)
+
+1. Follow the official Flathub setup guide for Ubuntu:  
+   <https://flathub.org/setup/Ubuntu>
+2. Ensure GNOME Software Flatpak integration is installed:
+
+```bash
+sudo apt install flatpak gnome-software-plugin-flatpak
+```
+
+3. Log out/in (or reboot) so GNOME Software loads Flatpak support.
+4. Add Flathub and install the GNOME runtime dependency:
+
+```bash
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install -y flathub org.gnome.Platform//48
+```
+
+5. Add Cardthropic remote and install:
+
+```bash
+flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/cardthropic-flatpak/
+flatpak update --user --appstream cardthropic
+flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
+```
+
+Snap package note: Flatpak is the only supported package right now. A Snap package may be added in the future.
 
 ## For Developers
 
@@ -202,6 +226,13 @@ For a step-by-step source + Flatpak release process, see:
 - `RELEASE.md`
 
 ## Changelog
+
+### 0.3.1 (2026-02-12)
+
+- Hotfix release for appearance controls and light-mode usability.
+- Added explicit `System Default / Light / Dark` appearance selector in the board color popover.
+- Improved light-mode board color handling so palette choices remain readable with dark text.
+- Smoothed appearance-change interaction by closing the color popover after mode selection.
 
 ### 0.3.0 (2026-02-12)
 
