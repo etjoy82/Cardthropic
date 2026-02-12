@@ -130,13 +130,7 @@ Window behavior is split into focused modules (`actions_*`, `drag`, `input`, `re
 
 Cardthropic is best installed from the official Flatpak repository so GNOME Software can show full metadata (license, releases, screenshots, updates).
 
-### Option A: One-click via `.flatpakrepo` (GNOME Software)
-
-1. Download `cardthropic.flatpakrepo` from releases.
-2. Open it with GNOME Software.
-3. Enable the Cardthropic remote and install Cardthropic.
-
-### Option B: Terminal (Flatpak remote)
+### Option A: Terminal (Flatpak remote)
 
 ```bash
 flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/cardthropic-flatpak/
