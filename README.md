@@ -128,7 +128,7 @@ Window behavior is split into focused modules (`actions_*`, `drag`, `input`, `re
 
 ## Get Cardthropic (Recommended)
 
-Cardthropic is best installed from the official Flatpak repository so GNOME Software can show full metadata (license, releases, screenshots, updates).
+Cardthropic is best installed from the official Flatpak repository so GNOME Software can show full metadata (license, releases, screenshots, updates). Flathub is required.
 
 ### Option A: Terminal (Flatpak remote)
 
