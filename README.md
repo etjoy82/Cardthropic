@@ -102,10 +102,6 @@ Cardthropic already includes mode scaffolding for:
 
 The engine is being refactored to let additional variants plug in without rewriting the whole window layer.
 
-## Known Issues
-
-Currently when the OS is set to light mode, it's hard to read because Cardthropic was designed entirely in dark mode. This is already fixed in the next release coming soon!
-
 ## Architecture Snapshot
 
 The codebase has been heavily modularized to support long-term maintainability.
