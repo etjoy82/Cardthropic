@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation and maintainer release tooling continue to be refined for the alpha testbed workflow.
 
 
+
+## [0.6.1] - 2026-02-13
+
+### Changed
+- TODO: summarize release changes.
+
 ## [0.6.0] - 2026-02-13
 
 ### Changed

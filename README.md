@@ -5,7 +5,7 @@ It currently ships a full Klondike experience, with architecture prepared for mo
 
 ![Cardthropic Logo](/logo-small.png)
 
-Current version: `0.6.0` (alpha channel)
+Current version: `0.6.1` (alpha channel)
 License: `GPL-3.0-or-later`
 
 ![Cardthropic 0.5 screenshot](data/screenshots/cardthropic-0.5-screenshot.png)
