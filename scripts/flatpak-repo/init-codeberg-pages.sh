@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Maintainer-only operational script for Cardthropic.
+# Not intended as a stable public interface for third-party use.
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -17,6 +20,14 @@ REPO_URL=""
 CHECKOUT_DIR="${HOME}/Projects/Cardthropic-flatpak"
 BRANCH="pages"
 
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "${cmd} is required but not installed." >&2
+    exit 1
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo-url) REPO_URL="${2:-}"; shift 2 ;;
@@ -32,6 +43,8 @@ if [[ -z "${REPO_URL}" ]]; then
   usage
   exit 1
 fi
+
+require_cmd git
 
 if [[ ! -d "${CHECKOUT_DIR}/.git" ]]; then
   echo "Cloning ${REPO_URL} -> ${CHECKOUT_DIR}"

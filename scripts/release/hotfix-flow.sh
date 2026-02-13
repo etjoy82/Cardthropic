@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Maintainer-only operational script for Cardthropic.
+# Not intended as a stable public interface for third-party use.
+
 usage() {
   cat <<'EOF'
 Hotfix Release Flow Helper
@@ -9,23 +12,31 @@ This script runs local release sanity checks and prints the exact git/flatpak
 commands for a hotfix branch publish flow.
 
 Usage:
-  scripts/release/hotfix-flow.sh --version <x.y.z> [--with-bundle]
+  scripts/release/hotfix-flow.sh --version <x.y.z> [--skip-bundle]
 
 Options:
   --version <x.y.z>  Required release version (example: 0.3.2)
-  --with-bundle      Also run scripts/flatpak/bundle.sh
+  --skip-bundle      Skip scripts/flatpak/bundle.sh + appstream repo verification
   -h, --help         Show this help
 EOF
 }
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VERSION=""
-WITH_BUNDLE=0
+SKIP_BUNDLE=0
+
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "${cmd} is required but not installed." >&2
+    exit 1
+  fi
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version) VERSION="${2:-}"; shift 2 ;;
-    --with-bundle) WITH_BUNDLE=1; shift ;;
+    --skip-bundle) SKIP_BUNDLE=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
   esac
@@ -39,20 +50,37 @@ fi
 
 cd "${ROOT_DIR}"
 
-echo "[1/4] Running cargo check..."
-cargo check
-
-echo "[2/4] Validating appstream metadata..."
-appstreamcli validate --no-net data/io.codeberg.emviolet.cardthropic.metainfo.xml.in
-
-if [[ "${WITH_BUNDLE}" -eq 1 ]]; then
-  echo "[3/4] Building flatpak bundle..."
-  scripts/flatpak/bundle.sh
-else
-  echo "[3/4] Skipped flatpak bundle build (use --with-bundle to enable)."
+require_cmd cargo
+require_cmd appstreamcli
+require_cmd git
+if [[ "${SKIP_BUNDLE}" -eq 0 ]]; then
+  require_cmd flatpak
+  require_cmd flatpak-builder
+  require_cmd ostree
+  require_cmd gzip
 fi
 
-echo "[4/4] Local status summary:"
+echo "[1/5] Maintainer quality gate..."
+scripts/release/maintainer-gate.sh
+
+echo "[2/5] Validating appstream metadata template..."
+appstreamcli validate --no-net data/io.codeberg.emviolet.cardthropic.metainfo.xml.in
+
+echo "[3/5] Building flatpak bundle..."
+if [[ "${SKIP_BUNDLE}" -eq 0 ]]; then
+  scripts/flatpak/bundle.sh
+else
+  echo "Skipped flatpak bundle build (--skip-bundle)."
+fi
+
+echo "[4/5] Verifying appstream metadata from built repo..."
+if [[ "${SKIP_BUNDLE}" -eq 0 ]]; then
+  scripts/flatpak-repo/verify-appstream.sh --repo "${ROOT_DIR}/build-repo"
+else
+  echo "Skipped appstream repo verification (--skip-bundle)."
+fi
+
+echo "[5/5] Local status summary:"
 git status --short
 
 cat <<EOF

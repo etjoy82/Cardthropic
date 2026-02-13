@@ -35,6 +35,9 @@ scripts/flatpak-repo/master.sh --skip-bundle
 
 # Publish only (skip local test install)
 scripts/flatpak-repo/master.sh --skip-test-remote
+
+# Preview publish actions without executing them
+scripts/flatpak-repo/master.sh --dry-run
 ```
 
 ## Typical Release Flow
@@ -80,6 +83,12 @@ scripts/flatpak-repo/add-test-remote.sh \
 
 ```bash
 scripts/flatpak-repo/verify-appstream.sh --repo "$HOME/Projects/Cardthropic/build-repo"
+```
+
+If needed, pass architecture explicitly:
+
+```bash
+scripts/flatpak-repo/verify-appstream.sh --repo "$HOME/Projects/Cardthropic/build-repo" --arch x86_64
 ```
 
 ## Notes

@@ -52,13 +52,19 @@ pub fn msg_winnability_check_canceled(deal_count: u8) -> String {
     format!("Winnability check canceled (Deal {deal_count}).")
 }
 
+pub fn msg_winnability_check_timed_out(deal_count: u8, seconds: u32, iterations: usize) -> String {
+    format!(
+        "Winnability check timed out after {seconds}s (Deal {deal_count}): no wins found in {iterations} iterations before giving up."
+    )
+}
+
 pub fn msg_winnability_check_stopped_unexpectedly(deal_count: u8) -> String {
     format!("Winnability check stopped unexpectedly (Deal {deal_count}).")
 }
 
 pub fn msg_seed_winnable(seed: u64, deal_count: u8, moves: u32, iterations: usize) -> String {
     format!(
-        "Seed {seed} is winnable for Deal {deal_count} from a fresh deal (solver line: {moves} moves, {iterations} iterations)."
+        "Seed {seed} is winnable for Deal {deal_count} from a fresh deal (solver line: {moves} moves, {iterations} iterations). Use Robot as first action to see win."
     )
 }
 
@@ -86,7 +92,9 @@ pub fn msg_searching_winnable_seed(
 }
 
 pub fn msg_started_winnable_seed(seed: u64, deal_count: u8, tested: u32) -> String {
-    format!("Started Deal {deal_count} winnable game. Seed {seed} (checked {tested} seed(s)).")
+    format!(
+        "Started Deal {deal_count} winnable game. Seed {seed} (checked {tested} seed(s)). Use Robot as first action to see win."
+    )
 }
 
 pub fn msg_no_winnable_seed(start_seed: u64, deal_count: u8, attempts: u32) -> String {

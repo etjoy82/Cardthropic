@@ -21,5 +21,10 @@
 			<summary>Custom userstyle CSS</summary>
 			<description>Optional custom CSS applied on top of Cardthropic board styles.</description>
 		</key>
+		<key name="custom-card-svg" type="s">
+			<default>''</default>
+			<summary>Custom card sheet SVG</summary>
+			<description>Optional SVG card sheet pasted by the user and persisted in settings.</description>
+		</key>
 	</schema>
 </schemalist>

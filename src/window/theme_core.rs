@@ -57,7 +57,7 @@ impl CardthropicWindow {
         self.set_smart_move_mode(smart_move_mode, false, false);
     }
 
-    fn load_app_settings() -> Option<gio::Settings> {
+    pub(super) fn load_app_settings() -> Option<gio::Settings> {
         let source = gio::SettingsSchemaSource::default()?;
         let schema = source.lookup(SETTINGS_SCHEMA_ID, true)?;
         Some(gio::Settings::new_full(

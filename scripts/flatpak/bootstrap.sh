@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Maintainer-only operational script for Cardthropic.
+# Not intended as a stable public interface for third-party use.
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MANIFEST="${ROOT_DIR}/io.codeberg.emviolet.cardthropic.json"
 

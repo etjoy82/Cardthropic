@@ -73,6 +73,7 @@ impl CardthropicWindow {
                         ) {
                             window.arm_robot_solver_anchor_for_current_state(line);
                         }
+                        window.trim_process_memory_if_supported();
                         glib::ControlFlow::Break
                     }
                     Ok(None) => {
@@ -82,6 +83,7 @@ impl CardthropicWindow {
                             start_seed, deal_count, attempts,
                         ));
                         window.render();
+                        window.trim_process_memory_if_supported();
                         glib::ControlFlow::Break
                     }
                     Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
@@ -91,6 +93,7 @@ impl CardthropicWindow {
                         *imp.status_override.borrow_mut() =
                             Some(seed_ops::msg_seed_search_stopped_unexpectedly(deal_count));
                         window.render();
+                        window.trim_process_memory_if_supported();
                         glib::ControlFlow::Break
                     }
                 }

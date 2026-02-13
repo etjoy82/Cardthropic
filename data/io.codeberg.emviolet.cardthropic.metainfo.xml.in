@@ -56,6 +56,15 @@
     <content_attribute id="social-location">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.6.0" date="2026-02-13">
+      <description>
+        <p>Major maintainer workflow hardening: strict shell policy checks, release consistency checks, shell lint policy, and one-command gate targets.</p>
+        <p>Added CI enforcement via Woodpecker to run maintainer-gate in strict mode on push and pull requests.</p>
+        <p>Improved Flatpak release/publish flow with integrated AppStream verification and tighter maintainer-only script conventions.</p>
+        <p>Expanded gameplay/automation reliability with continued solver, robot, and winnability-path improvements.</p>
+        <p>Refined theming and UI behavior, including theme menu/userstyle workflow and rendering/session polish.</p>
+      </description>
+    </release>
     <release version="0.5.1" date="2026-02-13">
       <description>
         <p>Performance and stability hotfix: reduced background CPU/disk churn, improved solver cancellation, and fixed memory growth during long automation runs.</p>

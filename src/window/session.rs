@@ -26,13 +26,14 @@ impl CardthropicWindow {
         if imp.timer_started.get() {
             imp.elapsed_seconds.set(imp.elapsed_seconds.get() + 1);
             self.record_apm_sample_if_due();
-            self.update_stats_label();
             self.mark_session_dirty();
             if let Some(area) = imp.apm_graph_area.borrow().as_ref() {
                 area.queue_draw();
             }
             self.update_apm_graph_chrome();
         }
+        // Keep Mem in the stats row live even when gameplay timer is stopped.
+        self.update_stats_label();
     }
 
     pub(super) fn current_apm(&self) -> f64 {
@@ -180,11 +181,13 @@ impl CardthropicWindow {
         let imp = self.imp();
         let elapsed = imp.elapsed_seconds.get();
         let apm = self.current_apm();
+        let mem = self.current_memory_mib_text();
         imp.stats_label.set_label(&format!(
-            "Moves: {}   APM: {:.1}   Time: {}",
+            "Moves: {}   APM: {:.1}   Time: {}   Mem: {}",
             imp.move_count.get(),
             apm,
-            format_time(elapsed)
+            format_time(elapsed),
+            mem
         ));
     }
 }

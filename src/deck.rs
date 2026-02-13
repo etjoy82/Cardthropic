@@ -10,6 +10,11 @@ use crate::game::{Card, Suit};
 
 #[derive(Debug)]
 pub struct AngloDeck {
+    normal: DeckSheet,
+}
+
+#[derive(Debug)]
+struct DeckSheet {
     sheet: gdk_pixbuf::Pixbuf,
     col_edges: [i32; 14],
     row_edges: [i32; 6],
@@ -21,23 +26,84 @@ const MAX_SCALED_TEXTURE_CACHE_ENTRIES: usize = 512;
 
 impl AngloDeck {
     pub fn load() -> Result<Self, String> {
-        let tree = usvg::Tree::from_data(
-            include_bytes!("../data/cards/anglo.svg"),
-            &usvg::Options::default(),
-        )
-        .map_err(|err| format!("unable to parse embedded anglo.svg: {err}"))?;
+        let normal =
+            DeckSheet::from_svg_bytes(include_bytes!("../data/cards/anglo.svg"), "anglo.svg")?;
+        Ok(Self { normal })
+    }
+
+    pub fn load_with_custom_normal_svg(custom_svg: &str) -> Result<Self, String> {
+        let normal = DeckSheet::from_svg_bytes(custom_svg.as_bytes(), "custom-card-svg")?;
+        Ok(Self { normal })
+    }
+
+    fn card_cell(card: Card) -> (usize, usize) {
+        let row = match card.suit {
+            Suit::Clubs => 0,
+            Suit::Diamonds => 1,
+            Suit::Hearts => 2,
+            Suit::Spades => 3,
+        };
+        let col = usize::from(card.rank.saturating_sub(1).min(12));
+        (row, col)
+    }
+
+    pub fn texture_for_card(&self, card: Card) -> gdk::Texture {
+        let (row, col) = Self::card_cell(card);
+        self.normal.texture_for_cell(row, col)
+    }
+
+    pub fn texture_for_card_scaled(&self, card: Card, width: i32, height: i32) -> gdk::Texture {
+        let (row, col) = Self::card_cell(card);
+        self.normal.texture_for_cell_scaled(row, col, width, height)
+    }
+
+    pub fn pixbuf_for_card_scaled(
+        &self,
+        card: Card,
+        width: i32,
+        height: i32,
+    ) -> gdk_pixbuf::Pixbuf {
+        let (row, col) = Self::card_cell(card);
+        self.normal.pixbuf_for_cell_scaled(row, col, width, height)
+    }
+
+    pub fn back_texture(&self) -> gdk::Texture {
+        self.normal.texture_for_cell(4, 2)
+    }
+
+    pub fn back_texture_scaled(&self, width: i32, height: i32) -> gdk::Texture {
+        self.normal.texture_for_cell_scaled(4, 2, width, height)
+    }
+
+    pub fn back_pixbuf_scaled(&self, width: i32, height: i32) -> gdk_pixbuf::Pixbuf {
+        self.normal.pixbuf_for_cell_scaled(4, 2, width, height)
+    }
+
+    pub fn scaled_cache_len(&self) -> usize {
+        self.normal.scaled_cache_len()
+    }
+
+    pub fn clear_scaled_cache(&self) {
+        self.normal.clear_scaled_cache();
+    }
+}
+
+impl DeckSheet {
+    fn from_svg_bytes(svg: &[u8], name: &str) -> Result<Self, String> {
+        let tree = usvg::Tree::from_data(svg, &usvg::Options::default())
+            .map_err(|err| format!("unable to parse embedded {name}: {err}"))?;
 
         let size = tree.size().to_int_size();
         let width = i32::try_from(size.width())
-            .map_err(|_| "rendered SVG width does not fit i32".to_string())?;
+            .map_err(|_| format!("rendered SVG width for {name} does not fit i32"))?;
         let height = i32::try_from(size.height())
-            .map_err(|_| "rendered SVG height does not fit i32".to_string())?;
+            .map_err(|_| format!("rendered SVG height for {name} does not fit i32"))?;
         let rowstride = width
             .checked_mul(4)
-            .ok_or_else(|| "rowstride overflow while rendering deck".to_string())?;
+            .ok_or_else(|| format!("rowstride overflow while rendering {name}"))?;
 
         let mut pixmap = tiny_skia::Pixmap::new(size.width(), size.height())
-            .ok_or_else(|| "unable to allocate render surface for deck".to_string())?;
+            .ok_or_else(|| format!("unable to allocate render surface for {name}"))?;
         let mut canvas = pixmap.as_mut();
         resvg::render(&tree, tiny_skia::Transform::default(), &mut canvas);
 
@@ -62,56 +128,6 @@ impl AngloDeck {
             texture_cache: RefCell::new(HashMap::new()),
             scaled_texture_cache: RefCell::new(HashMap::new()),
         })
-    }
-
-    pub fn texture_for_card(&self, card: Card) -> gdk::Texture {
-        let row = match card.suit {
-            Suit::Clubs => 0,
-            Suit::Diamonds => 1,
-            Suit::Hearts => 2,
-            Suit::Spades => 3,
-        };
-        let col = usize::from(card.rank.saturating_sub(1).min(12));
-        self.texture_for_cell(row, col)
-    }
-
-    pub fn texture_for_card_scaled(&self, card: Card, width: i32, height: i32) -> gdk::Texture {
-        let row = match card.suit {
-            Suit::Clubs => 0,
-            Suit::Diamonds => 1,
-            Suit::Hearts => 2,
-            Suit::Spades => 3,
-        };
-        let col = usize::from(card.rank.saturating_sub(1).min(12));
-        self.texture_for_cell_scaled(row, col, width, height)
-    }
-
-    pub fn pixbuf_for_card_scaled(
-        &self,
-        card: Card,
-        width: i32,
-        height: i32,
-    ) -> gdk_pixbuf::Pixbuf {
-        let row = match card.suit {
-            Suit::Clubs => 0,
-            Suit::Diamonds => 1,
-            Suit::Hearts => 2,
-            Suit::Spades => 3,
-        };
-        let col = usize::from(card.rank.saturating_sub(1).min(12));
-        self.pixbuf_for_cell_scaled(row, col, width, height)
-    }
-
-    pub fn back_texture(&self) -> gdk::Texture {
-        self.texture_for_cell(4, 2)
-    }
-
-    pub fn back_texture_scaled(&self, width: i32, height: i32) -> gdk::Texture {
-        self.texture_for_cell_scaled(4, 2, width, height)
-    }
-
-    pub fn back_pixbuf_scaled(&self, width: i32, height: i32) -> gdk_pixbuf::Pixbuf {
-        self.pixbuf_for_cell_scaled(4, 2, width, height)
     }
 
     fn texture_for_cell(&self, row: usize, col: usize) -> gdk::Texture {
@@ -185,6 +201,14 @@ impl AngloDeck {
         let height = height.max(1);
         sub.scale_simple(width, height, gdk_pixbuf::InterpType::Bilinear)
             .unwrap_or(sub)
+    }
+
+    pub fn scaled_cache_len(&self) -> usize {
+        self.scaled_texture_cache.borrow().len()
+    }
+
+    fn clear_scaled_cache(&self) {
+        self.scaled_texture_cache.borrow_mut().clear();
     }
 }
 

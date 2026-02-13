@@ -5,7 +5,7 @@ It currently ships a full Klondike experience, with architecture prepared for mo
 
 ![Cardthropic Logo](/logo-small.png)
 
-Current version: `0.5.1`
+Current version: `0.6.0` (alpha channel)
 License: `GPL-3.0-or-later`
 
 ![Cardthropic 0.5 screenshot](data/screenshots/cardthropic-0.5-screenshot.png)
@@ -72,10 +72,12 @@ Custom CSS editor:
 
 Cardthropic is best installed from the official Flatpak repo so GNOME Software can show full metadata (license, releases, screenshots, updates).
 
+Alpha testbed note: this Codeberg distribution is currently an alpha channel. The remote commands below intentionally use an unsigned remote (`--no-gpg-verify`) for this phase.
+
 ### Option A: Flatpak remote
 
 ```bash
-flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/cardthropic-flatpak/
+flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/Cardthropic-flatpak/
 flatpak update --user --appstream cardthropic
 flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
 flatpak run io.codeberg.emviolet.cardthropic
@@ -112,7 +114,7 @@ flatpak install -y flathub org.gnome.Platform//48
 5. Add Cardthropic remote and install:
 
 ```bash
-flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/cardthropic-flatpak/
+flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/Cardthropic-flatpak/
 flatpak update --user --appstream cardthropic
 flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
 ```
@@ -121,14 +123,27 @@ Packaging policy: Official builds are Flatpak-only. Native packages (`.deb`, `.r
 
 ## For Developers
 
-### Rust local run
+Developer tooling policy:
+
+- This Codeberg repository is an **alpha testbed**.
+- Shell scripts under `scripts/` are **maintainer-only operational tooling** for this repo/workflow.
+- Those scripts are not intended as a stable, third-party public interface.
+- CI policy: `.woodpecker.yml` runs `scripts/release/maintainer-gate.sh --strict-tools` on push/PR.
+
+### Contributor workflow (local coding)
 
 ```bash
 cargo check
 cargo run
 ```
 
-### Flatpak local dev workflow
+Optional test run:
+
+```bash
+cargo test -q
+```
+
+### Flatpak local dev workflow (maintainer-oriented)
 
 ```bash
 scripts/flatpak/bootstrap.sh
@@ -136,10 +151,72 @@ scripts/flatpak/build-install.sh
 scripts/flatpak/run.sh
 ```
 
-### Publish/update Flatpak repo (Codeberg Pages)
+### Publish/update Flatpak repo (Codeberg Pages, maintainer-only)
 
 ```bash
 scripts/flatpak-repo/master.sh
+```
+
+Preview publish actions without executing:
+
+```bash
+scripts/flatpak-repo/master.sh --dry-run
+```
+
+### Maintainer quality gate (maintainer-only)
+
+Run this before release/hotfix flows:
+
+```bash
+scripts/release/maintainer-gate.sh
+```
+
+Shortcut:
+
+```bash
+make gate
+```
+
+Shell lint policy is repo-pinned in `.shellcheckrc`.
+
+Fast pre-commit shell lint:
+
+```bash
+scripts/release/lint-shell.sh --strict-tools
+```
+
+Shortcut:
+
+```bash
+make shell-lint-strict
+```
+
+### Hotfix release helper (maintainer-only)
+
+```bash
+scripts/release/hotfix-flow.sh --version X.Y.Z
+```
+
+By default this runs checks, builds a bundle, verifies AppStream metadata from `build-repo`, and then prints git commands.
+
+Skip bundle + repo verification only if needed:
+
+```bash
+scripts/release/hotfix-flow.sh --version X.Y.Z --skip-bundle
+```
+
+### Version bump helper (maintainer-only)
+
+```bash
+scripts/release/bump-version.sh --version X.Y.Z
+```
+
+### Release note finalize helper (maintainer-only)
+
+```bash
+scripts/release/finalize-release-notes.sh --version X.Y.Z \
+  --note "First release note" \
+  --note "Second release note"
 ```
 
 ## Packaging/Safety Notes
@@ -156,43 +233,23 @@ scripts/flatpak-repo/master.sh
 - Engine/window modularization is in active progress for scalable multi-variant growth.
 - Spider and FreeCell scaffolding already exists in the mode system.
 
-## Release Notes
+### Variant Readiness
 
-### 0.5.1 (2026-02-13)
+| Variant | Readiness | Notes |
+|---|---|---|
+| Klondike | Playable | Full gameplay + automation + hinting + persistence |
+| Spider | Scaffolded | Runtime/data model exists; engine/rules integration in progress |
+| FreeCell | Scaffolded | Mode exists as placeholder; gameplay engine not yet implemented |
 
-- Performance and stability hotfix release.
-- Fixed solver/automation memory growth by making parallel winnability work cancelable and joining worker threads cleanly.
-- Added bounded caches for autoplay/loss-analysis state to prevent unbounded retention in long sessions.
-- Reduced background disk writes with debounced session persistence (dirty + delayed flush) while preserving resume safety.
-- Fixed post-robot background CPU churn by replacing per-frame geometry polling with interval polling and canceling stale loss-analysis work.
-- Added card texture caching to reduce repeated texture allocation churn during rapid render/automation loops.
+## Known Constraints
 
-### 0.5.0 (2026-02-13)
+- This Codeberg repository and release channel are an alpha testbed.
+- Flatpak is the only official distribution format for this project at the moment.
+- Remote install path currently uses `--no-gpg-verify` for alpha testing.
+- Internal scripts under `scripts/` are maintainer operations, not a stable public CLI.
 
-- Major post-0.3.1 release with substantial gameplay, architecture, and UX upgrades.
-- Smart Move correctness improvements and stronger solver-aligned move logic.
-- Deep engine/window modularization for long-term maintainability and variant expansion.
-- Theming overhaul: curated preset system, identity themes, and stronger visual direction.
-- New `🎨` theme popover UX with full preset list.
-- Custom CSS editor upgrades:
-  - dark code editor scheme
-  - clipboard actions + shortcuts
-  - editor font-size control
-  - resizable/snap/maximize-capable dialog window
-- Metadata refresh with new screenshot and release details.
+## Changelog
 
-### 0.3.1 (2026-02-12)
-
-- Hotfix release focused on appearance interaction polish.
-
-### 0.3.0 (2026-02-12)
-
-- Gameplay polish update with smarter automation, expanded controls, persistent sessions, and refreshed Flatpak metadata/screenshots.
-
-### 0.2.1 (2026-02-11)
-
-- Polish update: fixed tableau pixel-shift jitter, added Rapid Wand automation, and corrected dock/taskbar icon resolution for Builder and Flatpak installs.
-
-### 0.2.0 (2026-02-11)
-
-- Initial public preview with Klondike gameplay and adaptive layout.
+- `CHANGELOG.md`
+- `RELEASE.md` (maintainer release process)
+- `data/io.codeberg.emviolet.cardthropic.metainfo.xml.in` (AppStream release metadata)

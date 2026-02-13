@@ -18,7 +18,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::thread;
 
@@ -31,12 +31,28 @@ pub struct SeedWinnabilityCheckResult {
     pub moves_to_win: Option<u32>,
     pub hit_state_limit: bool,
     pub solver_line: Option<Vec<SolverMove>>,
+    pub canceled: bool,
 }
 
 pub fn default_find_winnable_attempts() -> u32 {
     thread::available_parallelism()
-        .map(|n| (n.get() * 6).clamp(16, 128) as u32)
-        .unwrap_or(48)
+        .map(|n| (n.get() * 4).clamp(8, 64) as u32)
+        .unwrap_or(24)
+}
+
+fn capped_seed_check_budgets(
+    draw_mode: DrawMode,
+    guided: usize,
+    exhaustive: usize,
+) -> (usize, usize) {
+    let (guided_cap, exhaustive_cap) = match draw_mode {
+        DrawMode::One => (80_000, 120_000),
+        DrawMode::Two => (70_000, 100_000),
+        DrawMode::Three => (60_000, 90_000),
+        DrawMode::Four => (50_000, 80_000),
+        DrawMode::Five => (45_000, 70_000),
+    };
+    (guided.min(guided_cap), exhaustive.min(exhaustive_cap))
 }
 
 pub fn is_seed_winnable(
@@ -46,21 +62,61 @@ pub fn is_seed_winnable(
     exhaustive_budget: usize,
     cancel: &AtomicBool,
 ) -> Option<SeedWinnabilityCheckResult> {
+    let (guided_budget, exhaustive_budget) =
+        capped_seed_check_budgets(draw_mode, guided_budget, exhaustive_budget);
     let mut game = KlondikeGame::new_with_seed(seed);
     game.set_draw_mode(draw_mode);
-    let guided = game.guided_winnability_cancelable(guided_budget, cancel)?;
+    let guided_progress = AtomicUsize::new(0);
+    let Some(guided) =
+        game.guided_winnability_cancelable_with_progress(guided_budget, cancel, &guided_progress)
+    else {
+        return Some(SeedWinnabilityCheckResult {
+            winnable: false,
+            iterations: guided_progress.load(Ordering::Relaxed),
+            moves_to_win: None,
+            hit_state_limit: true,
+            solver_line: None,
+            canceled: true,
+        });
+    };
     if guided.winnable {
-        let solver_line = game.guided_winning_line_cancelable(guided_budget, cancel)?;
+        let Some(solver_line) = game.guided_winning_line_cancelable(guided_budget, cancel) else {
+            return Some(SeedWinnabilityCheckResult {
+                winnable: false,
+                iterations: guided.explored_states,
+                moves_to_win: None,
+                hit_state_limit: true,
+                solver_line: None,
+                canceled: true,
+            });
+        };
         return Some(SeedWinnabilityCheckResult {
             winnable: true,
             iterations: guided.explored_states,
             moves_to_win: guided.win_depth,
             hit_state_limit: guided.hit_state_limit,
             solver_line,
+            canceled: false,
         });
     }
 
-    let exhaustive = game.analyze_winnability_cancelable(exhaustive_budget, cancel)?;
+    let exhaustive_progress = AtomicUsize::new(0);
+    let Some(exhaustive) = game.analyze_winnability_cancelable_with_progress(
+        exhaustive_budget,
+        cancel,
+        &exhaustive_progress,
+    ) else {
+        return Some(SeedWinnabilityCheckResult {
+            winnable: false,
+            iterations: guided
+                .explored_states
+                .saturating_add(exhaustive_progress.load(Ordering::Relaxed)),
+            moves_to_win: None,
+            hit_state_limit: true,
+            solver_line: None,
+            canceled: true,
+        });
+    };
     Some(SeedWinnabilityCheckResult {
         winnable: exhaustive.winnable,
         iterations: guided
@@ -69,6 +125,7 @@ pub fn is_seed_winnable(
         moves_to_win: exhaustive.win_depth,
         hit_state_limit: exhaustive.hit_state_limit,
         solver_line: None,
+        canceled: false,
     })
 }
 
@@ -84,6 +141,7 @@ pub fn find_winnable_seed_parallel(
 
     let worker_count = thread::available_parallelism()
         .map(|n| n.get())
+        .map(|n| n.min(4))
         .unwrap_or(1)
         .min(attempts as usize)
         .max(1);

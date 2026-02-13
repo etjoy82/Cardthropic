@@ -88,18 +88,20 @@
             <property name="min-content-height">0</property>
             <property name="vexpand">True</property>
             <child>
-              <object class="GtkBox" id="board_box">
-                <property name="orientation">vertical</property>
-                <property name="spacing">10</property>
-                <property name="margin-top">14</property>
-                <property name="margin-bottom">14</property>
-                <property name="margin-start">14</property>
-                <property name="margin-end">14</property>
-                <property name="vexpand">True</property>
-                <style>
-                  <class name="board-background"/>
-                </style>
+              <object class="GtkOverlay">
                 <child>
+                  <object class="GtkBox" id="board_box">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">10</property>
+                    <property name="margin-top">14</property>
+                    <property name="margin-bottom">14</property>
+                    <property name="margin-start">14</property>
+                    <property name="margin-end">14</property>
+                    <property name="vexpand">True</property>
+                    <style>
+                      <class name="board-background"/>
+                    </style>
+                    <child>
                   <object class="GtkBox">
                     <property name="spacing">8</property>
                     <child>
@@ -706,6 +708,17 @@
                         </child>
                       </object>
                     </child>
+                  </object>
+                </child>
+                  </object>
+                </child>
+                <child type="overlay">
+                  <object class="GtkFixed" id="motion_layer">
+                    <property name="can-target">False</property>
+                    <property name="hexpand">True</property>
+                    <property name="vexpand">True</property>
+                    <property name="halign">fill</property>
+                    <property name="valign">fill</property>
                   </object>
                 </child>
               </object>

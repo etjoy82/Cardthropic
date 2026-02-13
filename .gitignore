@@ -7,6 +7,8 @@
 /SHA256SUMS
 /.flatpak-builder/
 /.gnome-builder/
+/.tmp.*
+/.tmp.finalize-*
 
 # Editor / OS noise
 *.swp

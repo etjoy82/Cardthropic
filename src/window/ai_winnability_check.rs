@@ -1,6 +1,8 @@
 use super::*;
 use crate::engine::seed_ops;
 
+const SEED_WINNABILITY_TIMEOUT_SECS: u32 = 10;
+
 impl CardthropicWindow {
     pub(super) fn cancel_seed_winnable_check(&self, status: Option<&str>) {
         let imp = self.imp();
@@ -19,6 +21,7 @@ impl CardthropicWindow {
         }
         imp.seed_winnable_button
             .set_label(SEED_WINNABLE_BUTTON_LABEL);
+        self.trim_process_memory_if_supported();
 
         if let Some(message) = status {
             *imp.status_override.borrow_mut() = Some(message.to_string());
@@ -39,6 +42,7 @@ impl CardthropicWindow {
         }
         imp.seed_winnable_button
             .set_label(SEED_WINNABLE_BUTTON_LABEL);
+        self.trim_process_memory_if_supported();
         true
     }
 
@@ -96,6 +100,13 @@ impl CardthropicWindow {
                     imp.seed_check_seconds.set(next);
                     imp.seed_winnable_button
                         .set_label(&format!("Checking {next}s"));
+                    if next >= SEED_WINNABILITY_TIMEOUT_SECS {
+                        if let Some(cancel_flag) = imp.seed_check_cancel.borrow().as_ref() {
+                            cancel_flag.store(true, Ordering::Relaxed);
+                        }
+                        imp.seed_winnable_button.set_label("Stopping...");
+                        return glib::ControlFlow::Continue;
+                    }
                     glib::ControlFlow::Continue
                 }
             ),
@@ -109,6 +120,11 @@ impl CardthropicWindow {
         let draw_mode = self.current_klondike_draw_mode();
         let deal_count = draw_mode.count();
         let profile = self.automation_profile();
+        *self.imp().status_override.borrow_mut() = Some(format!(
+            "W? checking seed {seed} for Deal {deal_count} (up to {}s)...",
+            SEED_WINNABILITY_TIMEOUT_SECS
+        ));
+        self.render();
         thread::spawn(move || {
             let result = winnability::is_seed_winnable(
                 seed,
@@ -145,6 +161,17 @@ impl CardthropicWindow {
                                     .ok()
                                     .flatten();
                             if current_seed != Some(seed) {
+                                return glib::ControlFlow::Break;
+                            }
+
+                            if result.canceled {
+                                *window.imp().status_override.borrow_mut() =
+                                    Some(seed_ops::msg_winnability_check_timed_out(
+                                        deal_count,
+                                        SEED_WINNABILITY_TIMEOUT_SECS,
+                                        result.iterations,
+                                    ));
+                                window.render();
                                 return glib::ControlFlow::Break;
                             }
 
