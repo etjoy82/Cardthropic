@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Maintainer-only operational script for Cardthropic.
+# Not intended as a stable public interface for third-party use.
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -16,6 +19,14 @@ EOF
 REMOTE="cardthropic"
 URL=""
 APP_ID="io.codeberg.emviolet.cardthropic"
+
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "${cmd} is required but not installed." >&2
+    exit 1
+  fi
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,6 +45,7 @@ if [[ -z "${URL}" ]]; then
 fi
 
 URL="${URL%/}/"
+require_cmd flatpak
 
 flatpak remote-delete --user "${REMOTE}" >/dev/null 2>&1 || true
 flatpak remote-add --if-not-exists --user --no-gpg-verify "${REMOTE}" "${URL}"

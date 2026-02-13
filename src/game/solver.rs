@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrdering};
 
 use super::*;
 
@@ -85,6 +85,16 @@ impl KlondikeGame {
         max_states: usize,
         cancel: &AtomicBool,
     ) -> Option<GuidedWinnabilityResult> {
+        let progress = AtomicUsize::new(0);
+        self.guided_winnability_cancelable_with_progress(max_states, cancel, &progress)
+    }
+
+    pub fn guided_winnability_cancelable_with_progress(
+        &self,
+        max_states: usize,
+        cancel: &AtomicBool,
+        progress: &AtomicUsize,
+    ) -> Option<GuidedWinnabilityResult> {
         if cancel.load(AtomicOrdering::Relaxed) {
             return None;
         }
@@ -111,6 +121,8 @@ impl KlondikeGame {
         let mut frontier: BinaryHeap<GuidedNode> = BinaryHeap::new();
         let mut serial = 0_u64;
         let mut generated_states = 1_usize;
+        // Keep total generated nodes bounded to prevent frontier memory spikes.
+        let max_generated_states = max_states.max(1);
         frontier.push(GuidedNode {
             priority: self.state_priority(),
             serial,
@@ -127,6 +139,7 @@ impl KlondikeGame {
             if !visited.insert(state.clone()) {
                 continue;
             }
+            progress.store(visited.len(), AtomicOrdering::Relaxed);
             if state.is_won() {
                 return Some(GuidedWinnabilityResult {
                     winnable: true,
@@ -154,6 +167,15 @@ impl KlondikeGame {
                 let next = successor.state;
                 if visited.contains(&next) {
                     continue;
+                }
+                if generated_states >= max_generated_states {
+                    return Some(GuidedWinnabilityResult {
+                        winnable: false,
+                        explored_states: visited.len(),
+                        generated_states,
+                        win_depth: None,
+                        hit_state_limit: true,
+                    });
                 }
                 serial = serial.wrapping_add(1);
                 generated_states = generated_states.saturating_add(1);
@@ -195,6 +217,8 @@ impl KlondikeGame {
         let mut visited: HashSet<KlondikeGame> = HashSet::new();
         let mut frontier: BinaryHeap<GuidedNode> = BinaryHeap::new();
         let mut serial = 0_u64;
+        let mut generated_states = 1_usize;
+        let max_generated_states = max_states.max(1);
         let initial_hash = self.state_hash();
         let mut parent_by_hash: HashMap<u64, (Option<u64>, Option<SolverMove>)> = HashMap::new();
         parent_by_hash.insert(initial_hash, (None, None));
@@ -246,11 +270,15 @@ impl KlondikeGame {
                 if visited.contains(&next) {
                     continue;
                 }
+                if generated_states >= max_generated_states {
+                    return Some(None);
+                }
                 let next_hash = next.state_hash();
                 parent_by_hash
                     .entry(next_hash)
                     .or_insert((Some(current_hash), Some(successor.solver_move)));
                 serial = serial.wrapping_add(1);
+                generated_states = generated_states.saturating_add(1);
                 frontier.push(GuidedNode {
                     priority: successor.transition_score + next.state_priority()
                         - i64::from(node.depth) * 2,
@@ -282,6 +310,16 @@ impl KlondikeGame {
         max_states: usize,
         cancel: &AtomicBool,
     ) -> Option<WinnabilityResult> {
+        let progress = AtomicUsize::new(0);
+        self.analyze_winnability_cancelable_with_progress(max_states, cancel, &progress)
+    }
+
+    pub fn analyze_winnability_cancelable_with_progress(
+        &self,
+        max_states: usize,
+        cancel: &AtomicBool,
+        progress: &AtomicUsize,
+    ) -> Option<WinnabilityResult> {
         if cancel.load(AtomicOrdering::Relaxed) {
             return None;
         }
@@ -308,6 +346,7 @@ impl KlondikeGame {
         let mut visited: HashSet<KlondikeGame> = HashSet::new();
         let mut frontier: VecDeque<(KlondikeGame, u32)> = VecDeque::new();
         let mut generated_states = 1_usize;
+        let max_generated_states = max_states.max(1);
         frontier.push_back((self.clone(), 0));
 
         while let Some((state, depth)) = frontier.pop_front() {
@@ -317,6 +356,7 @@ impl KlondikeGame {
             if !visited.insert(state.clone()) {
                 continue;
             }
+            progress.store(visited.len(), AtomicOrdering::Relaxed);
 
             if state.is_won() {
                 return Some(WinnabilityResult {
@@ -347,6 +387,15 @@ impl KlondikeGame {
                     return None;
                 }
                 if !visited.contains(&next) {
+                    if generated_states >= max_generated_states {
+                        return Some(WinnabilityResult {
+                            winnable: false,
+                            explored_states: visited.len(),
+                            generated_states,
+                            win_depth: None,
+                            hit_state_limit: true,
+                        });
+                    }
                     generated_states = generated_states.saturating_add(1);
                     frontier.push_back((next, depth + 1));
                 }

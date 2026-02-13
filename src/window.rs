@@ -84,8 +84,12 @@ mod hints;
 mod input;
 #[path = "window/layout.rs"]
 mod layout;
+#[path = "window/memory.rs"]
+mod memory;
 #[path = "window/menu.rs"]
 mod menu;
+#[path = "window/motion.rs"]
+mod motion;
 #[path = "window/parsing.rs"]
 mod parsing;
 #[path = "window/render.rs"]
@@ -250,6 +254,8 @@ mod imp {
         pub game_settings_content_box: TemplateChild<gtk::Box>,
         #[template_child]
         pub board_box: TemplateChild<gtk::Box>,
+        #[template_child]
+        pub motion_layer: TemplateChild<gtk::Fixed>,
         pub game: RefCell<VariantStateStore>,
         pub current_seed: Cell<u64>,
         pub current_seed_win_recorded: Cell<bool>,
@@ -310,6 +316,7 @@ mod imp {
         pub robot_mode_running: Cell<bool>,
         pub robot_mode_timer: RefCell<Option<glib::SourceId>>,
         pub robot_deals_tried: Cell<u32>,
+        pub robot_moves_applied: Cell<u32>,
         pub(super) robot_playback: RefCell<RobotPlayback<HintMove>>,
         pub(super) drag_origin: RefCell<Option<DragOrigin>>,
         pub drag_widgets: RefCell<Vec<gtk::Widget>>,
@@ -395,6 +402,7 @@ mod imp {
                 game_settings_popover: TemplateChild::default(),
                 game_settings_content_box: TemplateChild::default(),
                 board_box: TemplateChild::default(),
+                motion_layer: TemplateChild::default(),
                 game: RefCell::new(VariantStateStore::new(seed)),
                 current_seed: Cell::new(seed),
                 current_seed_win_recorded: Cell::new(false),
@@ -455,6 +463,7 @@ mod imp {
                 robot_mode_running: Cell::new(false),
                 robot_mode_timer: RefCell::new(None),
                 robot_deals_tried: Cell::new(0),
+                robot_moves_applied: Cell::new(0),
                 robot_playback: RefCell::new(RobotPlayback::default()),
                 drag_origin: RefCell::new(None),
                 drag_widgets: RefCell::new(Vec::new()),
@@ -624,13 +633,14 @@ const SETTINGS_KEY_BOARD_COLOR: &str = "board-color";
 const SETTINGS_KEY_SMART_MOVE_MODE: &str = "smart-move-mode";
 const SETTINGS_KEY_SAVED_SESSION: &str = "saved-session";
 const SETTINGS_KEY_CUSTOM_USERSTYLE_CSS: &str = "custom-userstyle-css";
+const SETTINGS_KEY_CUSTOM_CARD_SVG: &str = "custom-card-svg";
 const SEED_HISTORY_FILE_NAME: &str = "seed-history.txt";
 const APP_DATA_DIR_NAME: &str = "io.codeberg.emviolet.cardthropic";
 const MAX_SEED_HISTORY_ENTRIES: usize = 10_000;
 const MAX_SEED_DROPDOWN_ENTRIES: usize = 250;
 const SEED_WINNABLE_BUTTON_LABEL: &str = "W?";
-const MIN_WINDOW_WIDTH: i32 = 600;
-const MIN_WINDOW_HEIGHT: i32 = 700;
+const MIN_WINDOW_WIDTH: i32 = 700;
+const MIN_WINDOW_HEIGHT: i32 = 800;
 const TABLEAU_FACE_UP_STEP_PX: i32 = 24;
 const TABLEAU_FACE_DOWN_STEP_PX: i32 = 12;
 const DEFAULT_BOARD_COLOR: &str = "#1f232b";

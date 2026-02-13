@@ -1,0 +1,12 @@
+steps:
+  maintainer_gate:
+    image: rust:1.84-bookworm
+    commands:
+      - apt-get update
+      - apt-get install -y --no-install-recommends shellcheck ripgrep
+      - scripts/release/maintainer-gate.sh --strict-tools
+
+when:
+  event:
+    - push
+    - pull_request

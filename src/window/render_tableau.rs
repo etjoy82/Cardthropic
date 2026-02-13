@@ -23,6 +23,7 @@ impl CardthropicWindow {
             stack.set_width_request(card_width);
 
             let column = &game.tableau()[idx];
+            let selected_run = *imp.selected_run.borrow();
             let mut y = 0;
             for (card_idx, card) in column.iter().enumerate() {
                 let picture = gtk::Picture::new();
@@ -36,6 +37,9 @@ impl CardthropicWindow {
                 } else {
                     card.face_up
                 };
+                if selected_run.is_some_and(|run| run.col == idx && card_idx >= run.start) {
+                    picture.add_css_class("tableau-selected-card");
+                }
                 let texture = if show_face_up {
                     deck.texture_for_card(*card)
                 } else {

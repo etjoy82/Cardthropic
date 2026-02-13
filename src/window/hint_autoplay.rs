@@ -23,7 +23,7 @@ impl CardthropicWindow {
             self.current_klondike_draw_mode(),
         ) else {
             return HintSuggestion {
-                message: "Auto-play: not available for this game mode yet.".to_string(),
+                message: "Move engine not available for this game mode yet.".to_string(),
                 source: None,
                 target: None,
                 hint_move: None,
@@ -31,7 +31,7 @@ impl CardthropicWindow {
         };
         if game.is_won() {
             return HintSuggestion {
-                message: "Auto-play: game already won.".to_string(),
+                message: "Game already won.".to_string(),
                 source: None,
                 target: None,
                 hint_move: None,
@@ -44,7 +44,7 @@ impl CardthropicWindow {
         {
             return HintSuggestion {
                 message: format!(
-                    "Auto-play: no winning path found from this position (explored {explored_states} states). Game is lost."
+                    "No winning path found from this position (explored {explored_states} states). Game is lost."
                 ),
                 source: None,
                 target: None,
@@ -69,7 +69,7 @@ impl CardthropicWindow {
         if candidates.is_empty() {
             self.start_hint_loss_analysis_if_needed(state_hash);
             return HintSuggestion {
-                message: "Auto-play: no legal moves remain. Game is lost.".to_string(),
+                message: "No legal moves remain. Game is lost.".to_string(),
                 source: None,
                 target: None,
                 hint_move: None,
@@ -86,8 +86,7 @@ impl CardthropicWindow {
         } else {
             self.start_hint_loss_analysis_if_needed(state_hash);
             HintSuggestion {
-                message: "Auto-play: no productive moves remain from this line. Game is lost."
-                    .to_string(),
+                message: "No productive moves remain from this line. Game is lost.".to_string(),
                 source: None,
                 target: None,
                 hint_move: None,
@@ -114,7 +113,7 @@ impl CardthropicWindow {
         };
         if game.is_won() {
             return HintSuggestion {
-                message: "Auto-play: game already won.".to_string(),
+                message: "Game already won.".to_string(),
                 source: None,
                 target: None,
                 hint_move: None,

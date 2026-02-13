@@ -1,6 +1,14 @@
 use super::*;
 
 impl CardthropicWindow {
+    fn wand_status_message(raw: &str) -> String {
+        raw.trim_start()
+            .strip_prefix("Hint:")
+            .map(str::trim_start)
+            .unwrap_or(raw)
+            .to_string()
+    }
+
     #[allow(dead_code)]
     pub(super) fn show_hint(&self) {
         if !self.guard_mode_engine("Hint") {
@@ -20,8 +28,9 @@ impl CardthropicWindow {
         }
         self.clear_hint_effects();
         let suggestion = self.compute_auto_play_suggestion();
+        let wand_message = Self::wand_status_message(&suggestion.message);
         let Some(hint_move) = suggestion.hint_move else {
-            *self.imp().status_override.borrow_mut() = Some(suggestion.message);
+            *self.imp().status_override.borrow_mut() = Some(format!("Wand Wave: {wand_message}"));
             self.render();
             return false;
         };
@@ -31,12 +40,11 @@ impl CardthropicWindow {
         self.imp().auto_playing_move.set(false);
         if changed {
             *self.imp().selected_run.borrow_mut() = None;
-            *self.imp().status_override.borrow_mut() =
-                Some(format!("Auto: {}", suggestion.message));
+            *self.imp().status_override.borrow_mut() = Some(format!("Wand Wave: {wand_message}"));
             self.render();
         } else {
             *self.imp().status_override.borrow_mut() =
-                Some("Auto-hint move was not legal anymore.".to_string());
+                Some("Wand Wave: move was not legal anymore.".to_string());
             self.render();
         }
         changed

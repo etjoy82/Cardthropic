@@ -76,14 +76,6 @@ popover entry {
   color: rgba(226, 243, 255, 0.88);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.96),
-    inset 0 0 0 7px rgba(250, 204, 21, 0.88);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(250, 204, 21, 0.88);
   background-color: rgba(250, 204, 21, 0.12);
@@ -154,14 +146,6 @@ popover entry {
   color: rgba(224, 238, 255, 0.84);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.96),
-    inset 0 0 0 7px rgba(56, 189, 248, 0.74);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(56, 189, 248, 0.74);
   background-color: rgba(56, 189, 248, 0.11);
@@ -226,14 +210,6 @@ popover entry {
   color: rgba(255, 226, 250, 0.84);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.96),
-    inset 0 0 0 7px rgba(236, 72, 153, 0.86);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(236, 72, 153, 0.86);
   background-color: rgba(236, 72, 153, 0.14);
@@ -302,14 +278,6 @@ popover entry {
   color: rgba(244, 244, 244, 0.80);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.94),
-    inset 0 0 0 7px rgba(180, 180, 180, 0.90);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(180, 180, 180, 0.90);
   background-color: rgba(220, 220, 220, 0.10);
@@ -373,14 +341,6 @@ popover entry {
   color: rgba(225, 255, 231, 0.84);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.94),
-    inset 0 0 0 7px rgba(74, 222, 128, 0.84);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(74, 222, 128, 0.84);
   background-color: rgba(74, 222, 128, 0.12);
@@ -452,14 +412,6 @@ popover entry {
   color: rgba(232, 241, 255, 0.90);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.98),
-    inset 0 0 0 7px rgba(255, 108, 138, 0.88);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(255, 108, 138, 0.88);
   background-color: rgba(255, 108, 138, 0.14);
@@ -538,14 +490,6 @@ popover entry {
   color: rgba(230, 240, 255, 0.88);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.97),
-    inset 0 0 0 7px rgba(124, 180, 255, 0.88);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(124, 180, 255, 0.88);
   background-color: rgba(124, 180, 255, 0.14);
@@ -624,14 +568,6 @@ popover entry {
   color: rgba(226, 238, 255, 0.86);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.97),
-    inset 0 0 0 7px rgba(130, 153, 255, 0.88);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(130, 153, 255, 0.88);
   background-color: rgba(130, 153, 255, 0.14);
@@ -711,14 +647,6 @@ popover entry {
   color: rgba(211, 255, 203, 0.82);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(215, 255, 210, 0.95),
-    inset 0 0 0 7px rgba(16, 255, 134, 0.90);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(16, 255, 134, 0.90);
   background-color: rgba(16, 255, 134, 0.12);
@@ -787,14 +715,6 @@ popover entry {
   color: rgba(235, 235, 235, 0.78);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.95),
-    inset 0 0 0 7px rgba(125, 211, 252, 0.88);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(125, 211, 252, 0.88);
   background-color: rgba(125, 211, 252, 0.12);
@@ -855,14 +775,6 @@ popover entry {
   color: rgba(236, 236, 236, 0.78);
 }
 
-.tableau-selected-card,
-.waste-selected-card {
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.94),
-    inset 0 0 0 7px rgba(196, 196, 196, 0.84);
-}
-
-.tableau-selected-empty,
 .keyboard-focus-empty {
   box-shadow: inset 0 0 0 3px rgba(196, 196, 196, 0.84);
   background-color: rgba(196, 196, 196, 0.10);
@@ -1120,7 +1032,7 @@ impl CardthropicWindow {
         editor_font_provider.load_from_string(".userstyle-editor-view { font-size: 13pt; }");
 
         let hint = gtk::Label::new(Some(
-            "Tip: target classes like .board-background, .tableau-selected-card, .waste-selected-card.",
+            "Tip: target classes like .board-background, .card-slot, .keyboard-focus-card.",
         ));
         hint.set_xalign(0.0);
         hint.add_css_class("dim-label");

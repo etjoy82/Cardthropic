@@ -1,0 +1,8 @@
+# Cardthropic shell lint policy (maintainer workflow).
+# Keep this strict; do not add broad exclusions without a documented reason.
+
+# Follow sourced files relative to the script directory if introduced later.
+source-path=SCRIPTDIR
+
+# Standard shellcheck output suitable for logs.
+color=never

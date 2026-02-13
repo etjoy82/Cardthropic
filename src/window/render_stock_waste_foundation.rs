@@ -72,6 +72,7 @@ impl CardthropicWindow {
             game.waste_len(),
         ));
         let show_count = waste_cards.len();
+        let waste_selected = imp.waste_selected.get();
         let waste_fan_step = render_plan::waste_fan_step(card_width);
 
         for picture in &waste_widgets {
@@ -82,6 +83,11 @@ impl CardthropicWindow {
 
         for (idx, card) in waste_cards.iter().copied().enumerate() {
             if let Some(picture) = waste_widgets.get(idx) {
+                if waste_selected && idx + 1 == show_count {
+                    picture.add_css_class("waste-selected-card");
+                } else {
+                    picture.remove_css_class("waste-selected-card");
+                }
                 let texture = deck.texture_for_card_scaled(card, card_width, card_height);
                 picture.set_paintable(Some(&texture));
                 if idx > 0 {
@@ -89,6 +95,9 @@ impl CardthropicWindow {
                 }
                 picture.set_visible(true);
             }
+        }
+        for picture in waste_widgets.iter().skip(show_count) {
+            picture.remove_css_class("waste-selected-card");
         }
         imp.waste_placeholder_label.set_visible(show_count == 0);
     }

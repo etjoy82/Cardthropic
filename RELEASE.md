@@ -1,6 +1,14 @@
 # Cardthropic Release Playbook
 
 This is the repeatable process for publishing a new Cardthropic release (source + Flatpak bundle).
+Current channel: alpha.
+
+Policy:
+
+- This Codeberg repository is an **alpha testbed**.
+- Scripts under `scripts/` are **maintainer-only operational tooling** for this project and workflow.
+- CI must pass `scripts/release/maintainer-gate.sh --strict-tools` on push/PR before merge.
+- Release tags must be signed.
 
 ## 1) Bump Version
 
@@ -8,15 +16,59 @@ Update version strings:
 
 - `Cargo.toml` (`[package].version`)
 - `meson.build` (`project(... version: 'x.y.z' ...)`)
-- `README.md` current version + changelog section
+- `README.md` current version
+- `CHANGELOG.md` latest release entry
 - `data/io.codeberg.emviolet.cardthropic.metainfo.xml.in` release entry
+
+Then verify consistency:
+
+```bash
+scripts/release/check-release-consistency.sh
+```
+
+Or perform the version bump skeleton automatically:
+
+```bash
+scripts/release/bump-version.sh --version X.Y.Z
+```
+
+After writing final release notes, replace placeholders in changelog + AppStream:
+
+```bash
+scripts/release/finalize-release-notes.sh --version X.Y.Z \
+  --note "First release note" \
+  --note "Second release note"
+```
 
 ## 2) Validate Locally
 
 ```bash
-cargo fmt
-cargo check
-cargo test -q
+scripts/release/maintainer-gate.sh
+```
+
+Shortcut:
+
+```bash
+make gate
+```
+
+This gate enforces:
+
+- shell script policy checks
+- release-version consistency checks
+- `shellcheck` lint when available (using repo policy in `.shellcheckrc`)
+- `cargo fmt --check`, `cargo check`, `cargo test -q`
+
+Fast shell-only preflight:
+
+```bash
+scripts/release/lint-shell.sh --strict-tools
+```
+
+Shortcut:
+
+```bash
+make shell-lint-strict
 ```
 
 ## 3) Ensure Flatpak Tooling Is Ready
@@ -59,8 +111,8 @@ flatpak run io.codeberg.emviolet.cardthropic
 
 ```bash
 git add -A
-git commit -m "release: vX.Y.Z"
-git tag vX.Y.Z
+git commit -S -m "release: vX.Y.Z"
+git tag -s vX.Y.Z -m "Cardthropic vX.Y.Z"
 git push origin main --tags
 ```
 
@@ -108,9 +160,28 @@ scripts/flatpak/release.sh
 
 This performs:
 
-- `cargo fmt`
-- `cargo check`
-- `cargo test -q`
+- `scripts/release/maintainer-gate.sh`
 - Flatpak build/install
 - bundle creation (`cardthropic.flatpak`)
 - checksum generation (`SHA256SUMS`)
+
+## Hotfix Helper Flow
+
+For hotfix releases, use:
+
+```bash
+scripts/release/hotfix-flow.sh --version X.Y.Z
+```
+
+Behavior:
+
+- Runs local checks
+- Builds Flatpak bundle (`scripts/flatpak/bundle.sh`)
+- Verifies built repo AppStream metadata (`scripts/flatpak-repo/verify-appstream.sh`)
+- Prints the exact git commands to run next
+
+If you need to skip bundle + repo verification:
+
+```bash
+scripts/release/hotfix-flow.sh --version X.Y.Z --skip-bundle
+```

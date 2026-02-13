@@ -1,6 +1,17 @@
 use super::*;
 use crate::engine::boundary;
 use crate::engine::commands::EngineCommand;
+use crate::game::Suit;
+use crate::window::motion::MotionTarget;
+
+fn foundation_index_for_suit(suit: Suit) -> usize {
+    match suit {
+        Suit::Clubs => 0,
+        Suit::Diamonds => 1,
+        Suit::Hearts => 2,
+        Suit::Spades => 3,
+    }
+}
 
 impl CardthropicWindow {
     pub(super) fn draw_card(&self) -> bool {
@@ -8,6 +19,9 @@ impl CardthropicWindow {
             return false;
         }
         let mode = self.active_game_mode();
+        let should_animate = self.should_play_non_drag_move_animation();
+        let animation_from = self.capture_motion_source(MotionTarget::Stock);
+        let animation_to = self.capture_motion_source(MotionTarget::WasteTop);
         let draw_mode = self.current_klondike_draw_mode();
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
@@ -21,6 +35,14 @@ impl CardthropicWindow {
             *self.imp().status_override.borrow_mut() = Some("Nothing to draw.".to_string());
         }
         self.render();
+        if changed && should_animate {
+            let top_card = boundary::waste_top(&self.imp().game.borrow(), mode);
+            if let (Some(from), Some(to), Some(card)) = (animation_from, animation_to, top_card) {
+                if let Some(texture) = self.glitched_texture_for_card_motion(card) {
+                    self.play_move_animation_to_point(texture, from, to);
+                }
+            }
+        }
         changed
     }
 
@@ -60,6 +82,8 @@ impl CardthropicWindow {
         let generation = imp.peek_generation.get().wrapping_add(1);
         imp.peek_generation.set(generation);
         imp.peek_active.set(true);
+        *imp.status_override.borrow_mut() =
+            Some("Peek active: face-up cards hidden, face-down cards revealed for 3s.".to_string());
         self.render();
 
         glib::timeout_add_local_once(
@@ -73,6 +97,8 @@ impl CardthropicWindow {
                         return;
                     }
                     imp.peek_active.set(false);
+                    *imp.status_override.borrow_mut() =
+                        Some("Peek ended. Resume play or trigger Peek again.".to_string());
                     window.render();
                 }
             ),
@@ -84,6 +110,14 @@ impl CardthropicWindow {
             return false;
         }
         let mode = self.active_game_mode();
+        let should_animate = self.should_play_non_drag_move_animation();
+        let waste_top = boundary::waste_top(&self.imp().game.borrow(), mode);
+        let animation_from = self.capture_motion_source(MotionTarget::WasteTop);
+        let animation_to = waste_top.and_then(|card| {
+            self.capture_motion_source(MotionTarget::Foundation(foundation_index_for_suit(
+                card.suit,
+            )))
+        });
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
             &mut self.imp().game.borrow_mut(),
@@ -93,6 +127,13 @@ impl CardthropicWindow {
         .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
+        if changed && should_animate {
+            if let (Some(card), Some(from), Some(to)) = (waste_top, animation_from, animation_to) {
+                if let Some(texture) = self.glitched_texture_for_card_motion(card) {
+                    self.play_move_animation_to_point(texture, from, to);
+                }
+            }
+        }
         changed
     }
 
@@ -101,6 +142,10 @@ impl CardthropicWindow {
             return false;
         }
         let mode = self.active_game_mode();
+        let should_animate = self.should_play_non_drag_move_animation();
+        let waste_top = boundary::waste_top(&self.imp().game.borrow(), mode);
+        let animation_from = self.capture_motion_source(MotionTarget::WasteTop);
+        let animation_to = self.capture_tableau_landing_point(dst);
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
             &mut self.imp().game.borrow_mut(),
@@ -110,6 +155,13 @@ impl CardthropicWindow {
         .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
+        if changed && should_animate {
+            if let (Some(card), Some(from), Some(to)) = (waste_top, animation_from, animation_to) {
+                if let Some(texture) = self.glitched_texture_for_card_motion(card) {
+                    self.play_move_animation_to_point(texture, from, to);
+                }
+            }
+        }
         changed
     }
 
@@ -118,6 +170,13 @@ impl CardthropicWindow {
             return false;
         }
         let mode = self.active_game_mode();
+        let should_animate = self.should_play_non_drag_move_animation();
+        let animation_from = self.capture_motion_source(MotionTarget::TableauCard {
+            col: src,
+            index: start,
+        });
+        let animation_to = self.capture_tableau_landing_point(dst);
+        let run_texture = self.glitched_texture_for_tableau_run_motion(src, start);
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
             &mut self.imp().game.borrow_mut(),
@@ -127,6 +186,13 @@ impl CardthropicWindow {
         .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
+        if changed && should_animate {
+            if let (Some(texture), Some(from), Some(to)) =
+                (run_texture, animation_from, animation_to)
+            {
+                self.play_move_animation_to_point(texture, from, to);
+            }
+        }
         changed
     }
 
@@ -135,6 +201,18 @@ impl CardthropicWindow {
             return false;
         }
         let mode = self.active_game_mode();
+        let should_animate = self.should_play_non_drag_move_animation();
+        let top_card = boundary::tableau_top(&self.imp().game.borrow(), mode, src);
+        let animation_from = boundary::tableau_len(&self.imp().game.borrow(), mode, src)
+            .and_then(|len| len.checked_sub(1))
+            .and_then(|index| {
+                self.capture_motion_source(MotionTarget::TableauCard { col: src, index })
+            });
+        let animation_to = top_card.and_then(|card| {
+            self.capture_motion_source(MotionTarget::Foundation(foundation_index_for_suit(
+                card.suit,
+            )))
+        });
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
             &mut self.imp().game.borrow_mut(),
@@ -144,6 +222,13 @@ impl CardthropicWindow {
         .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
+        if changed && should_animate {
+            if let (Some(card), Some(from), Some(to)) = (top_card, animation_from, animation_to) {
+                if let Some(texture) = self.glitched_texture_for_card_motion(card) {
+                    self.play_move_animation_to_point(texture, from, to);
+                }
+            }
+        }
         changed
     }
 
@@ -152,6 +237,15 @@ impl CardthropicWindow {
             return false;
         }
         let mode = self.active_game_mode();
+        let should_animate = self.should_play_non_drag_move_animation();
+        let card = boundary::clone_klondike_for_automation(
+            &self.imp().game.borrow(),
+            mode,
+            self.current_klondike_draw_mode(),
+        )
+        .and_then(|game| game.foundations()[foundation_idx].last().copied());
+        let animation_from = self.capture_motion_source(MotionTarget::Foundation(foundation_idx));
+        let animation_to = self.capture_tableau_landing_point(dst);
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
             &mut self.imp().game.borrow_mut(),
@@ -164,6 +258,13 @@ impl CardthropicWindow {
         .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
+        if changed && should_animate {
+            if let (Some(card), Some(from), Some(to)) = (card, animation_from, animation_to) {
+                if let Some(texture) = self.glitched_texture_for_card_motion(card) {
+                    self.play_move_animation_to_point(texture, from, to);
+                }
+            }
+        }
         changed
     }
 }
