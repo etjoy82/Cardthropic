@@ -1,4 +1,5 @@
 use super::*;
+use crate::engine::boundary;
 
 impl CardthropicWindow {
     pub(super) fn select_or_move_tableau_with_start(
@@ -10,9 +11,10 @@ impl CardthropicWindow {
             return;
         }
         let imp = self.imp();
+        let mode = self.active_game_mode();
         if imp.waste_selected.get() {
             imp.waste_selected.set(false);
-            let can_move = imp.game.borrow().can_move_waste_to_tableau(clicked);
+            let can_move = boundary::can_move_waste_to_tableau(&imp.game.borrow(), mode, clicked);
             if can_move {
                 self.move_waste_to_tableau(clicked);
             } else {
@@ -58,7 +60,7 @@ impl CardthropicWindow {
         if imp.suppress_waste_click_once.replace(false) {
             return;
         }
-        let has_waste = imp.game.borrow().waste_top().is_some();
+        let has_waste = boundary::waste_top(&imp.game.borrow(), self.active_game_mode()).is_some();
         if !has_waste {
             imp.waste_selected.set(false);
             self.render();
@@ -103,23 +105,21 @@ impl CardthropicWindow {
     }
 
     pub(super) fn handle_drop_on_foundation(&self, foundation_idx: usize, payload: &str) -> bool {
+        let mode = self.active_game_mode();
         let changed = if payload == "waste" {
-            let suit_ok = self
-                .imp()
-                .game
-                .borrow()
-                .waste_top()
-                .map(|card| card.suit.foundation_index() == foundation_idx)
-                .unwrap_or(false);
+            let suit_ok = boundary::waste_top_matches_foundation(
+                &self.imp().game.borrow(),
+                mode,
+                foundation_idx,
+            );
             suit_ok && self.move_waste_to_foundation()
         } else if let Some((src, _start)) = parse_tableau_payload(payload) {
-            let suit_ok = self
-                .imp()
-                .game
-                .borrow()
-                .tableau_top(src)
-                .map(|card| card.suit.foundation_index() == foundation_idx)
-                .unwrap_or(false);
+            let suit_ok = boundary::tableau_top_matches_foundation(
+                &self.imp().game.borrow(),
+                mode,
+                src,
+                foundation_idx,
+            );
             suit_ok && self.move_tableau_to_foundation(src)
         } else {
             false
@@ -139,15 +139,12 @@ impl CardthropicWindow {
         }
 
         let imp = self.imp();
+        let mode = self.active_game_mode();
         let mut did_move = false;
 
         if imp.waste_selected.get() {
-            let suit_ok = imp
-                .game
-                .borrow()
-                .waste_top()
-                .map(|card| card.suit.foundation_index() == foundation_idx)
-                .unwrap_or(false);
+            let suit_ok =
+                boundary::waste_top_matches_foundation(&imp.game.borrow(), mode, foundation_idx);
             if suit_ok {
                 did_move = self.move_waste_to_foundation();
                 if did_move {
@@ -158,10 +155,7 @@ impl CardthropicWindow {
 
         let selected_run = { *imp.selected_run.borrow() };
         if let Some(selected) = selected_run {
-            let selected_is_top = imp
-                .game
-                .borrow()
-                .tableau_len(selected.col)
+            let selected_is_top = boundary::tableau_len(&imp.game.borrow(), mode, selected.col)
                 .map(|len| selected.start + 1 == len)
                 .unwrap_or(false);
             if !selected_is_top {
@@ -170,12 +164,12 @@ impl CardthropicWindow {
                 self.render();
                 return;
             }
-            let suit_ok = imp
-                .game
-                .borrow()
-                .tableau_top(selected.col)
-                .map(|card| card.suit.foundation_index() == foundation_idx)
-                .unwrap_or(false);
+            let suit_ok = boundary::tableau_top_matches_foundation(
+                &imp.game.borrow(),
+                mode,
+                selected.col,
+                foundation_idx,
+            );
             if suit_ok {
                 did_move = self.move_tableau_to_foundation(selected.col);
             }
@@ -185,19 +179,16 @@ impl CardthropicWindow {
             }
         }
 
-        let foundation_top_exists = imp
-            .game
-            .borrow()
-            .foundations()
-            .get(foundation_idx)
-            .map(|pile| !pile.is_empty())
-            .unwrap_or(false);
+        let foundation_top_exists =
+            boundary::foundation_top_exists(&imp.game.borrow(), mode, foundation_idx);
         if foundation_top_exists {
             for dst in 0..7 {
-                let can_move = imp
-                    .game
-                    .borrow()
-                    .can_move_foundation_top_to_tableau(foundation_idx, dst);
+                let can_move = boundary::can_move_foundation_top_to_tableau(
+                    &imp.game.borrow(),
+                    mode,
+                    foundation_idx,
+                    dst,
+                );
                 if can_move && self.move_foundation_to_tableau(foundation_idx, dst) {
                     *imp.status_override.borrow_mut() =
                         Some(format!("Moved foundation card to T{}.", dst + 1));

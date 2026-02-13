@@ -56,3 +56,40 @@ pub fn map_solver_line_to_hint_line(
     }
     Some(line)
 }
+
+pub fn enumerate_hint_moves(game: &KlondikeGame) -> Vec<HintMove> {
+    let mut moves = Vec::new();
+
+    if game.can_move_waste_to_foundation() {
+        moves.push(HintMove::WasteToFoundation);
+    }
+
+    for src in 0..7 {
+        if game.can_move_tableau_top_to_foundation(src) {
+            moves.push(HintMove::TableauTopToFoundation { src });
+        }
+    }
+
+    for dst in 0..7 {
+        if game.can_move_waste_to_tableau(dst) {
+            moves.push(HintMove::WasteToTableau { dst });
+        }
+    }
+
+    for src in 0..7 {
+        let len = game.tableau_len(src).unwrap_or(0);
+        for start in 0..len {
+            for dst in 0..7 {
+                if game.can_move_tableau_run_to_tableau(src, start, dst) {
+                    moves.push(HintMove::TableauRunToTableau { src, start, dst });
+                }
+            }
+        }
+    }
+
+    if game.stock_len() > 0 || game.waste_top().is_some() {
+        moves.push(HintMove::Draw);
+    }
+
+    moves
+}

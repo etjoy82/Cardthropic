@@ -1,4 +1,5 @@
 use super::*;
+use crate::engine::moves::map_solver_line_to_hint_line;
 
 fn card(suit: Suit, rank: u8, face_up: bool) -> Card {
     Card {
@@ -279,6 +280,28 @@ fn cyclone_shuffle_preserves_tableau_geometry_and_card_set() {
 }
 
 #[test]
+fn solver_line_maps_to_hint_line_for_valid_sequence() {
+    let mut game = empty_game();
+    game.set_draw_mode(DrawMode::One);
+    game.stock.push(card(Suit::Clubs, 1, false));
+
+    let line = vec![SolverMove::Draw, SolverMove::WasteToFoundation];
+    let mapped = map_solver_line_to_hint_line(&game, &line);
+    assert!(mapped.is_some());
+    assert_eq!(mapped.as_ref().map(Vec::len), Some(2));
+}
+
+#[test]
+fn solver_line_mapping_rejects_illegal_sequence() {
+    let mut game = empty_game();
+    game.waste.push(card(Suit::Clubs, 7, true));
+
+    let line = vec![SolverMove::WasteToFoundation];
+    let mapped = map_solver_line_to_hint_line(&game, &line);
+    assert!(mapped.is_none());
+}
+
+#[test]
 fn cyclone_shuffle_noops_for_tiny_tableau() {
     let mut game = empty_game();
     game.tableau[0].push(card(Suit::Clubs, 1, true));
@@ -301,4 +324,118 @@ fn game_mode_metadata_is_stable() {
     assert!(GameMode::Klondike.engine_ready());
     assert!(!GameMode::Spider.engine_ready());
     assert!(!GameMode::Freecell.engine_ready());
+}
+
+#[test]
+fn spider_seeded_games_are_deterministic() {
+    let a = SpiderGame::new_with_seed(1234);
+    let b = SpiderGame::new_with_seed(1234);
+    let c = SpiderGame::new_with_seed(1235);
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+}
+
+#[test]
+fn spider_setup_accounts_for_all_104_cards() {
+    let game = SpiderGame::new_with_seed(7);
+    let tableau_count: usize = game.tableau().iter().map(Vec::len).sum();
+    let total = tableau_count + game.stock_len();
+    assert_eq!(tableau_count, 54);
+    assert_eq!(game.stock_len(), 50);
+    assert_eq!(total, 104);
+}
+
+#[test]
+fn spider_setup_has_expected_column_geometry() {
+    let game = SpiderGame::new_with_seed(99);
+    for col in 0..10 {
+        let pile = &game.tableau()[col];
+        let expected = if col < 4 { 6 } else { 5 };
+        assert_eq!(pile.len(), expected);
+        assert_eq!(
+            pile.iter().filter(|card| card.face_up).count(),
+            1,
+            "column {col} should have exactly one face-up card"
+        );
+        assert!(pile.last().is_some_and(|card| card.face_up));
+    }
+}
+
+#[test]
+fn spider_deal_adds_one_face_up_card_per_column() {
+    let mut game = SpiderGame::new_with_seed(1);
+    assert!(game.can_deal_from_stock());
+    assert!(game.deal_from_stock());
+    assert_eq!(game.stock_len(), 40);
+    for pile in game.tableau() {
+        assert!(pile.last().is_some_and(|card| card.face_up));
+    }
+}
+
+#[test]
+fn spider_deal_rejects_empty_tableau() {
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    tableau[0].push(card(Suit::Spades, 13, true));
+    for pile in &mut tableau[1..9] {
+        pile.push(card(Suit::Spades, 12, true));
+    }
+    let stock = vec![card(Suit::Spades, 1, false); 10];
+    let mut game = SpiderGame::debug_new(SpiderSuitMode::One, stock, tableau, 0);
+    assert!(!game.can_deal_from_stock());
+    assert!(!game.deal_from_stock());
+}
+
+#[test]
+fn spider_move_run_moves_descending_sequence_and_flips_source() {
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    tableau[0] = vec![
+        card(Suit::Spades, 9, false),
+        card(Suit::Hearts, 8, true),
+        card(Suit::Spades, 7, true),
+    ];
+    tableau[1] = vec![card(Suit::Diamonds, 9, true)];
+    let mut game = SpiderGame::debug_new(SpiderSuitMode::Two, Vec::new(), tableau, 0);
+
+    assert!(game.can_move_run(0, 1, 1));
+    assert!(game.move_run(0, 1, 1));
+    assert_eq!(game.tableau()[0].len(), 1);
+    assert!(game.tableau()[0][0].face_up);
+    assert_eq!(game.tableau()[1].len(), 3);
+    assert_eq!(game.tableau()[1][1].rank, 8);
+    assert_eq!(game.tableau()[1][2].rank, 7);
+}
+
+#[test]
+fn spider_removes_completed_suited_king_to_ace_run() {
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    tableau[0] = vec![
+        card(Suit::Spades, 13, true),
+        card(Suit::Spades, 12, true),
+        card(Suit::Spades, 11, true),
+        card(Suit::Spades, 10, true),
+        card(Suit::Spades, 9, true),
+        card(Suit::Spades, 8, true),
+        card(Suit::Spades, 7, true),
+        card(Suit::Spades, 6, true),
+        card(Suit::Spades, 5, true),
+        card(Suit::Spades, 4, true),
+        card(Suit::Spades, 3, true),
+        card(Suit::Spades, 2, true),
+        card(Suit::Spades, 1, true),
+    ];
+    tableau[1] = vec![card(Suit::Spades, 13, true)];
+
+    let mut game = SpiderGame::debug_new(SpiderSuitMode::One, Vec::new(), tableau, 0);
+    assert!(game.move_run(1, 0, 2));
+    assert_eq!(game.completed_runs(), 1);
+    assert!(game.tableau()[0].is_empty());
+}
+
+#[test]
+fn spider_session_codec_round_trip_preserves_state() {
+    let mut game = SpiderGame::new_with_seed_and_mode(777, SpiderSuitMode::Two);
+    let _ = game.deal_from_stock();
+    let encoded = game.encode_for_session();
+    let decoded = SpiderGame::decode_from_session(&encoded).expect("decode spider session");
+    assert_eq!(decoded, game);
 }

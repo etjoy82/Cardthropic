@@ -19,7 +19,6 @@
  */
 
 use std::cell::{Cell, RefCell};
-use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,10 +31,17 @@ use adw::subclass::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
 
 use crate::deck::AngloDeck;
+use crate::engine::automation::AutomationProfile;
+use crate::engine::hinting::{HintNode, HintSuggestion};
+use crate::engine::keyboard_nav::KeyboardTarget;
+use crate::engine::loss_analysis::LossVerdict;
 use crate::engine::moves::{apply_hint_move_to_game, map_solver_line_to_hint_line, HintMove};
 use crate::engine::robot::RobotPlayback;
 use crate::engine::seed_history::SeedHistoryStore;
-use crate::game::{Card, DrawMode, DrawResult, GameMode, KlondikeGame, SolverMove, Suit};
+use crate::engine::variant::variant_for_mode;
+use crate::engine::variant_engine::engine_for_mode;
+use crate::engine::variant_state::VariantStateStore;
+use crate::game::{Card, DrawMode, GameMode, KlondikeGame, SolverMove};
 use crate::winnability;
 
 #[path = "window/actions_history.rs"]
@@ -46,18 +52,32 @@ mod actions_moves;
 mod actions_selection;
 #[path = "window/ai.rs"]
 mod ai;
-#[path = "window/dialogs.rs"]
-mod dialogs;
+#[path = "window/ai_winnability_check.rs"]
+mod ai_winnability_check;
+#[path = "window/dialogs_apm.rs"]
+mod dialogs_apm;
+#[path = "window/dialogs_help.rs"]
+mod dialogs_help;
 #[path = "window/drag.rs"]
 mod drag;
+#[path = "window/drag_setup.rs"]
+mod drag_setup;
 #[path = "window/handlers.rs"]
 mod handlers;
+#[path = "window/handlers_actions.rs"]
+mod handlers_actions;
+#[path = "window/handlers_geometry.rs"]
+mod handlers_geometry;
 #[path = "window/heuristics.rs"]
 mod heuristics;
 #[path = "window/hint_autoplay.rs"]
 mod hint_autoplay;
 #[path = "window/hint_core.rs"]
 mod hint_core;
+#[path = "window/hint_smart_move.rs"]
+mod hint_smart_move;
+#[path = "window/hint_suggestion.rs"]
+mod hint_suggestion;
 #[path = "window/hints.rs"]
 mod hints;
 #[path = "window/input.rs"]
@@ -70,116 +90,38 @@ mod menu;
 mod parsing;
 #[path = "window/render.rs"]
 mod render;
+#[path = "window/render_stock_waste_foundation.rs"]
+mod render_stock_waste_foundation;
+#[path = "window/render_tableau.rs"]
+mod render_tableau;
 #[path = "window/robot.rs"]
 mod robot;
 #[path = "window/seed.rs"]
 mod seed;
+#[path = "window/seed_history.rs"]
+mod seed_history;
+#[path = "window/seed_input.rs"]
+mod seed_input;
 #[path = "window/session.rs"]
 mod session;
 #[path = "window/state.rs"]
 mod state;
-#[path = "window/theme.rs"]
-mod theme;
+#[path = "window/theme_color.rs"]
+mod theme_color;
+#[path = "window/theme_core.rs"]
+mod theme_core;
+#[path = "window/theme_menu.rs"]
+mod theme_menu;
+#[path = "window/theme_userstyle.rs"]
+mod theme_userstyle;
+#[path = "window/types.rs"]
+mod types;
+#[path = "window/variant_flow.rs"]
+mod variant_flow;
 
 use heuristics::*;
 use parsing::*;
-
-#[derive(Debug, Clone)]
-pub struct Snapshot {
-    game: KlondikeGame,
-    selected_run: Option<SelectedRun>,
-    selected_waste: bool,
-    move_count: u32,
-    elapsed_seconds: u32,
-    timer_started: bool,
-    apm_samples: Vec<ApmSample>,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-pub(super) struct ApmSample {
-    elapsed_seconds: u32,
-    apm: f64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct SelectedRun {
-    col: usize,
-    start: usize,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SmartMoveMode {
-    Disabled,
-    SingleClick,
-    DoubleClick,
-}
-
-impl SmartMoveMode {
-    fn as_setting(self) -> &'static str {
-        match self {
-            Self::Disabled => "disabled",
-            Self::SingleClick => "single-click",
-            Self::DoubleClick => "double-click",
-        }
-    }
-
-    fn from_setting(value: &str) -> Self {
-        match value {
-            "disabled" => Self::Disabled,
-            "single-click" => Self::SingleClick,
-            "double-click" => Self::DoubleClick,
-            _ => Self::DoubleClick,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeyboardTarget {
-    Stock,
-    Waste,
-    Foundation(usize),
-    Tableau { col: usize, start: Option<usize> },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HintNode {
-    Stock,
-    Waste,
-    Foundation(usize),
-    Tableau { col: usize, index: Option<usize> },
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(super) enum DragOrigin {
-    Waste,
-    Tableau { col: usize, start: usize },
-}
-
-#[derive(Debug, Clone)]
-struct HintSuggestion {
-    message: String,
-    source: Option<HintNode>,
-    target: Option<HintNode>,
-    hint_move: Option<HintMove>,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum LossVerdict {
-    Lost { explored_states: usize },
-    WinnableLikely,
-    Inconclusive { explored_states: usize },
-}
-
-#[derive(Debug, Clone)]
-struct PersistedSession {
-    seed: u64,
-    mode: GameMode,
-    move_count: u32,
-    elapsed_seconds: u32,
-    timer_started: bool,
-    game: KlondikeGame,
-}
+use types::*;
 
 #[allow(deprecated)]
 mod imp {
@@ -308,7 +250,7 @@ mod imp {
         pub game_settings_content_box: TemplateChild<gtk::Box>,
         #[template_child]
         pub board_box: TemplateChild<gtk::Box>,
-        pub game: RefCell<KlondikeGame>,
+        pub game: RefCell<VariantStateStore>,
         pub current_seed: Cell<u64>,
         pub current_seed_win_recorded: Cell<bool>,
         pub(super) seed_history: RefCell<SeedHistoryStore>,
@@ -320,6 +262,9 @@ mod imp {
         pub board_color_preview: RefCell<Option<gtk::DrawingArea>>,
         pub board_color_swatches: RefCell<Vec<gtk::DrawingArea>>,
         pub board_color_provider: RefCell<Option<gtk::CssProvider>>,
+        pub custom_userstyle_css: RefCell<String>,
+        pub custom_userstyle_provider: RefCell<Option<gtk::CssProvider>>,
+        pub custom_userstyle_dialog: RefCell<Option<gtk::Window>>,
         pub deck: RefCell<Option<AngloDeck>>,
         pub deck_load_attempted: Cell<bool>,
         pub deck_error: RefCell<Option<String>>,
@@ -374,9 +319,7 @@ mod imp {
         pub peek_generation: Cell<u64>,
         pub current_game_mode: Cell<GameMode>,
         pub klondike_draw_mode: Cell<DrawMode>,
-        pub game_mode_klondike_button: RefCell<Option<gtk::Button>>,
-        pub game_mode_spider_button: RefCell<Option<gtk::Button>>,
-        pub game_mode_freecell_button: RefCell<Option<gtk::Button>>,
+        pub game_mode_buttons: RefCell<HashMap<GameMode, gtk::Button>>,
         pub help_dialog: RefCell<Option<gtk::Window>>,
         pub apm_graph_dialog: RefCell<Option<gtk::Window>>,
         pub apm_graph_area: RefCell<Option<gtk::DrawingArea>>,
@@ -388,7 +331,7 @@ mod imp {
 
     impl Default for CardthropicWindow {
         fn default() -> Self {
-            let seed = random_seed();
+            let seed = crate::engine::seed_ops::random_seed();
             Self {
                 help_button: TemplateChild::default(),
                 fullscreen_button: TemplateChild::default(),
@@ -449,7 +392,7 @@ mod imp {
                 game_settings_popover: TemplateChild::default(),
                 game_settings_content_box: TemplateChild::default(),
                 board_box: TemplateChild::default(),
-                game: RefCell::new(KlondikeGame::new_with_seed(seed)),
+                game: RefCell::new(VariantStateStore::new(seed)),
                 current_seed: Cell::new(seed),
                 current_seed_win_recorded: Cell::new(false),
                 seed_history: RefCell::new(SeedHistoryStore::default()),
@@ -461,6 +404,9 @@ mod imp {
                 board_color_preview: RefCell::new(None),
                 board_color_swatches: RefCell::new(Vec::new()),
                 board_color_provider: RefCell::new(None),
+                custom_userstyle_css: RefCell::new(String::new()),
+                custom_userstyle_provider: RefCell::new(None),
+                custom_userstyle_dialog: RefCell::new(None),
                 deck: RefCell::new(None),
                 deck_load_attempted: Cell::new(false),
                 deck_error: RefCell::new(None),
@@ -515,9 +461,7 @@ mod imp {
                 peek_generation: Cell::new(0),
                 current_game_mode: Cell::new(GameMode::Klondike),
                 klondike_draw_mode: Cell::new(DrawMode::One),
-                game_mode_klondike_button: RefCell::new(None),
-                game_mode_spider_button: RefCell::new(None),
-                game_mode_freecell_button: RefCell::new(None),
+                game_mode_buttons: RefCell::new(HashMap::new()),
                 help_dialog: RefCell::new(None),
                 apm_graph_dialog: RefCell::new(None),
                 apm_graph_area: RefCell::new(None),
@@ -657,22 +601,13 @@ glib::wrapper! {
         @implements gio::ActionGroup, gio::ActionMap;
 }
 
-const HINT_GUIDED_ANALYSIS_BUDGET: usize = 120_000;
-const HINT_EXHAUSTIVE_ANALYSIS_BUDGET: usize = 220_000;
-const AUTO_PLAY_LOOKAHEAD_DEPTH: u8 = 3;
-const AUTO_PLAY_BEAM_WIDTH: usize = 10;
-const AUTO_PLAY_NODE_BUDGET: usize = 3200;
-const AUTO_PLAY_WIN_SCORE: i64 = 1_200_000;
-const DIALOG_SEED_GUIDED_BUDGET: usize = 180_000;
-const DIALOG_SEED_EXHAUSTIVE_BUDGET: usize = 300_000;
-const DIALOG_FIND_WINNABLE_STATE_BUDGET: usize = 15_000;
 const APP_ICON_NAME: &str = "io.codeberg.emviolet.cardthropic";
 const APP_ICON_FALLBACK_NAME: &str = "cardthropic";
 const SETTINGS_SCHEMA_ID: &str = "io.codeberg.emviolet.cardthropic";
 const SETTINGS_KEY_BOARD_COLOR: &str = "board-color";
 const SETTINGS_KEY_SMART_MOVE_MODE: &str = "smart-move-mode";
 const SETTINGS_KEY_SAVED_SESSION: &str = "saved-session";
-const SETTINGS_KEY_APPEARANCE_MODE: &str = "appearance-mode";
+const SETTINGS_KEY_CUSTOM_USERSTYLE_CSS: &str = "custom-userstyle-css";
 const SEED_HISTORY_FILE_NAME: &str = "seed-history.txt";
 const APP_DATA_DIR_NAME: &str = "io.codeberg.emviolet.cardthropic";
 const MAX_SEED_HISTORY_ENTRIES: usize = 10_000;
@@ -683,40 +618,20 @@ const MIN_WINDOW_HEIGHT: i32 = 700;
 const TABLEAU_FACE_UP_STEP_PX: i32 = 24;
 const TABLEAU_FACE_DOWN_STEP_PX: i32 = 12;
 const DEFAULT_BOARD_COLOR: &str = "#1f232b";
-const BOARD_COLOR_THEMES: [(&str, &str); 4] = [
-    ("Felt", "#1f3b2f"),
-    ("Slate", "#2a2f45"),
-    ("Sunset", "#5a3d24"),
-    ("Ocean", "#1e3f53"),
-];
-const BOARD_COLOR_SWATCHES: [&str; 12] = [
-    "#1f232b", "#1f3b2f", "#2a2f45", "#3a2a26", "#1e3f53", "#2d2d2d", "#3b4f24", "#47315c",
-    "#5a3d24", "#0f5132", "#244a73", "#6b2f2f",
-];
-
-#[derive(Debug, Clone, Copy)]
-enum WorkspacePreset {
-    Compact600,
-    Hd720,
-    Fhd1080,
-    Qhd1440,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct WorkspaceLayoutProfile {
-    side_padding: i32,
-    tableau_vertical_padding: i32,
-    gap: i32,
-    assumed_depth: i32,
-    min_card_width: i32,
-    max_card_width: i32,
-    min_card_height: i32,
-}
 
 impl CardthropicWindow {
     pub fn new<P: IsA<gtk::Application>>(application: &P) -> Self {
         glib::Object::builder()
             .property("application", application)
             .build()
+    }
+
+    pub(super) fn automation_profile(&self) -> AutomationProfile {
+        engine_for_mode(self.imp().current_game_mode.get()).automation_profile()
+    }
+
+    pub(super) fn mode_spec(&self) -> crate::engine::variant::VariantSpec {
+        let mode = self.imp().current_game_mode.get();
+        variant_for_mode(mode).spec()
     }
 }

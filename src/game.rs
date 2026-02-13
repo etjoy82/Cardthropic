@@ -6,8 +6,11 @@ mod session_codec;
 mod setup;
 #[path = "game/solver.rs"]
 mod solver;
+#[path = "game/spider.rs"]
+mod spider;
 #[path = "game/types.rs"]
 mod types;
+pub use spider::*;
 pub use types::*;
 
 pub fn rank_label(rank: u8) -> &'static str {

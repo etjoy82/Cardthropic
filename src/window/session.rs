@@ -1,4 +1,6 @@
 use super::*;
+use crate::engine::boundary;
+use crate::engine::session::{decode_persisted_session, encode_persisted_session};
 
 impl CardthropicWindow {
     pub(super) fn setup_timer(&self) {
@@ -63,16 +65,18 @@ impl CardthropicWindow {
 
     pub(super) fn build_saved_session(&self) -> String {
         let imp = self.imp();
+        let mode = self.active_game_mode();
+        let draw_mode = imp.klondike_draw_mode.get();
         let game = imp.game.borrow();
-        let timer_started = imp.timer_started.get() && !game.is_won();
-        format!(
-            "v=1\nseed={}\nmode={}\nmoves={}\nelapsed={}\ntimer={}\ngame={}",
+        let timer_started = imp.timer_started.get() && !boundary::is_won(&game, mode);
+        encode_persisted_session(
+            &game,
             imp.current_seed.get(),
-            self.active_game_mode().id(),
+            mode,
             imp.move_count.get(),
             imp.elapsed_seconds.get(),
-            if timer_started { 1 } else { 0 },
-            game.encode_for_session()
+            timer_started,
+            draw_mode,
         )
     }
 
@@ -98,25 +102,31 @@ impl CardthropicWindow {
         if raw.trim().is_empty() {
             return false;
         }
-        let Some(session) = parse_saved_session(&raw) else {
+        let Some(session) = decode_persisted_session(&raw) else {
             let _ = settings.set_string(SETTINGS_KEY_SAVED_SESSION, "");
             return false;
         };
 
         let imp = self.imp();
-        *imp.game.borrow_mut() = session.game.clone();
+        imp.game.borrow_mut().set_runtime(session.runtime.clone());
         imp.current_seed.set(session.seed);
         imp.move_count.set(session.move_count);
         imp.elapsed_seconds.set(session.elapsed_seconds);
-        imp.timer_started
-            .set(session.timer_started && !session.game.is_won());
+        imp.timer_started.set(session.timer_started);
         *imp.selected_run.borrow_mut() = None;
         imp.waste_selected.set(false);
         imp.history.borrow_mut().clear();
         imp.future.borrow_mut().clear();
         imp.apm_samples.borrow_mut().clear();
         imp.current_game_mode.set(session.mode);
-        imp.klondike_draw_mode.set(session.game.draw_mode());
+        imp.klondike_draw_mode.set(session.klondike_draw_mode);
+        let _ = boundary::set_draw_mode(
+            &mut imp.game.borrow_mut(),
+            session.mode,
+            session.klondike_draw_mode,
+        );
+        imp.timer_started
+            .set(imp.timer_started.get() && !boundary::is_won(&imp.game.borrow(), session.mode));
         self.set_seed_input_text(&session.seed.to_string());
         *imp.status_override.borrow_mut() = Some("Resumed previous game.".to_string());
         *imp.last_saved_session.borrow_mut() = raw;

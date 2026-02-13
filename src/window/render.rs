@@ -1,23 +1,33 @@
 use super::*;
+use crate::engine::boundary;
+use crate::engine::render_plan;
+use crate::engine::status_text;
+use crate::engine::variant_engine::engine_for_mode;
 
 impl CardthropicWindow {
     pub(super) fn render(&self) {
         let imp = self.imp();
-        let game = imp.game.borrow();
-        let mode = self.active_game_mode();
-        let engine_ready = self.is_mode_engine_ready();
+        let view = boundary::game_view_model(
+            &imp.game.borrow(),
+            self.active_game_mode(),
+            self.current_klondike_draw_mode(),
+        );
+        let game = view.klondike();
+        let mode = view.mode();
+        let engine_ready = view.engine_ready();
+        let caps = engine_for_mode(mode).capabilities();
         if engine_ready {
-            self.note_current_seed_win_if_needed(&game);
+            self.note_current_seed_win_if_needed(game);
             if game.is_won() && imp.timer_started.get() {
                 imp.timer_started.set(false);
             }
         }
 
         imp.stock_label
-            .set_label(&format!("{} cards", game.stock_len()));
+            .set_label(&render_plan::card_count_label(game.stock_len()));
 
         imp.waste_label
-            .set_label(&format!("{} cards", game.waste_len()));
+            .set_label(&render_plan::card_count_label(game.waste_len()));
 
         let foundation_labels = [
             &imp.foundation_label_1,
@@ -30,24 +40,34 @@ impl CardthropicWindow {
             label.set_label("");
         }
 
-        self.render_card_images(&game);
+        self.render_card_images(game);
 
-        imp.undo_button
-            .set_sensitive(engine_ready && !imp.history.borrow().is_empty());
-        imp.redo_button
-            .set_sensitive(engine_ready && !imp.future.borrow().is_empty());
-        imp.auto_hint_button.set_sensitive(engine_ready);
-        imp.cyclone_shuffle_button.set_sensitive(engine_ready);
-        imp.peek_button.set_sensitive(engine_ready);
-        imp.robot_button.set_sensitive(engine_ready);
-        imp.seed_random_button.set_sensitive(engine_ready);
-        imp.seed_rescue_button.set_sensitive(engine_ready);
-        imp.seed_winnable_button.set_sensitive(engine_ready);
-        imp.seed_repeat_button.set_sensitive(engine_ready);
-        imp.seed_go_button.set_sensitive(engine_ready);
-        imp.seed_combo.set_sensitive(engine_ready);
+        let controls =
+            render_plan::plan_controls(caps, imp.history.borrow().len(), imp.future.borrow().len());
+        imp.undo_button.set_sensitive(controls.undo_enabled);
+        imp.redo_button.set_sensitive(controls.redo_enabled);
+        imp.auto_hint_button
+            .set_sensitive(controls.auto_hint_enabled);
+        imp.cyclone_shuffle_button
+            .set_sensitive(controls.cyclone_enabled);
+        imp.peek_button.set_sensitive(controls.peek_enabled);
+        imp.robot_button.set_sensitive(controls.robot_enabled);
+        imp.seed_random_button
+            .set_sensitive(controls.seed_random_enabled);
+        imp.seed_rescue_button
+            .set_sensitive(controls.seed_rescue_enabled);
+        imp.seed_winnable_button
+            .set_sensitive(controls.seed_winnable_enabled);
+        imp.seed_repeat_button
+            .set_sensitive(controls.seed_repeat_enabled);
+        imp.seed_go_button.set_sensitive(controls.seed_go_enabled);
+        imp.seed_combo.set_sensitive(controls.seed_combo_enabled);
 
-        let selected = sanitize_selected_run(&game, *imp.selected_run.borrow());
+        let selected_tuple = render_plan::sanitize_selected_run(
+            game,
+            (*imp.selected_run.borrow()).map(|run| (run.col, run.start)),
+        );
+        let selected = selected_tuple.map(|(col, start)| SelectedRun { col, start });
         *imp.selected_run.borrow_mut() = selected;
         self.update_tableau_selection_styles(selected);
         if imp.waste_selected.get() && game.waste_top().is_none() {
@@ -55,60 +75,21 @@ impl CardthropicWindow {
         }
         self.update_waste_selection_style(imp.waste_selected.get() && game.waste_top().is_some());
         self.update_keyboard_focus_style();
-        if let Some(err) = imp.deck_error.borrow().as_ref() {
-            imp.status_label
-                .set_label(&format!("Card deck load failed: {err}"));
-        } else if let Some(message) = imp.status_override.borrow().as_ref() {
-            imp.status_label.set_label(message);
-        } else if game.is_won() {
-            imp.status_label
-                .set_label("You won! All foundations are complete.");
-        } else if let Some(run) = selected {
-            let amount = game
-                .tableau_len(run.col)
-                .unwrap_or(0)
-                .saturating_sub(run.start);
-            if amount > 1 {
-                imp.status_label.set_label(&format!(
-                    "Selected {amount} cards from T{}. Click another tableau to move this run.",
-                    run.col + 1
-                ));
-            } else {
-                imp.status_label.set_label(&format!(
-                    "Selected tableau T{}. Click another tableau to move top card.",
-                    run.col + 1
-                ));
-            }
-        } else if imp.waste_selected.get() && game.waste_top().is_some() {
-            imp.status_label.set_label(
-                "Selected waste. Click a tableau to move it, or click waste again to cancel.",
-            );
-        } else if imp.peek_active.get() {
-            imp.status_label.set_label(
-                "Peek active: tableau face-up cards are hidden and face-down cards are revealed.",
-            );
-        } else if !engine_ready {
-            imp.status_label.set_label(&format!(
-                "{} mode scaffolded. Rules/engine are in progress.",
-                mode.label()
-            ));
-        } else {
-            let controls = match self.smart_move_mode() {
-                SmartMoveMode::Disabled => {
-                    "Klondike controls: click columns/waste to select and move manually. Smart Move is off."
-                }
-                SmartMoveMode::SingleClick => {
-                    "Klondike controls: single-click cards/waste for Smart Move. Use drag-and-drop for manual runs."
-                }
-                SmartMoveMode::DoubleClick => {
-                    "Klondike controls: click columns to move, click waste to select, double-click cards/waste for Smart Move."
-                }
-            };
-            imp.status_label.set_label(controls);
-        }
+        let selected_status = selected.map(|run| (run.col, run.start));
+        let status = status_text::build_status_text(
+            game,
+            selected_status,
+            imp.waste_selected.get(),
+            imp.peek_active.get(),
+            engine_ready,
+            mode.label(),
+            self.smart_move_mode().as_setting(),
+            imp.deck_error.borrow().as_deref(),
+            imp.status_override.borrow().as_deref(),
+        );
+        imp.status_label.set_label(&status);
 
         self.update_stats_label();
-        drop(game);
         self.persist_session_if_changed();
     }
 
@@ -149,8 +130,7 @@ impl CardthropicWindow {
         }
 
         let game = self.imp().game.borrow();
-        let visible_waste_cards = usize::from(game.draw_mode().count().clamp(1, 5));
-        let show_count = game.waste_len().min(visible_waste_cards);
+        let show_count = render_plan::waste_visible_count(game.draw_mode(), game.waste_len());
         if show_count == 0 {
             return;
         }
@@ -188,128 +168,19 @@ impl CardthropicWindow {
         let face_down_step = imp.face_down_step.get();
         let peek_active = imp.peek_active.get();
 
-        imp.stock_picture.set_width_request(card_width);
-        imp.stock_picture.set_height_request(card_height);
-        imp.stock_picture.set_can_shrink(false);
-        imp.waste_picture.set_width_request(card_width);
-        imp.waste_picture.set_height_request(card_height);
-        imp.waste_picture.set_can_shrink(false);
-        imp.waste_picture.set_halign(gtk::Align::Start);
-        imp.waste_picture.set_valign(gtk::Align::Start);
-        imp.waste_picture.set_paintable(None::<&gdk::Paintable>);
-        imp.waste_placeholder_box.set_width_request(card_width);
-        imp.waste_placeholder_box.set_height_request(card_height);
-        for picture in self.waste_fan_slots() {
-            picture.set_width_request(card_width);
-            picture.set_height_request(card_height);
-            picture.set_can_shrink(false);
-        }
-        let waste_fan_step = (card_width / 6).clamp(8, 22);
-        let foundation_group_width = (card_width * 4) + (8 * 3);
-        imp.stock_heading_box.set_width_request(card_width);
-        imp.waste_heading_box
-            .set_width_request(card_width + (waste_fan_step * 4));
-        imp.foundations_heading_box
-            .set_width_request(foundation_group_width);
-        imp.waste_overlay
-            .set_width_request(card_width + (waste_fan_step * 4));
-        imp.waste_overlay.set_height_request(card_height);
-        for picture in self.foundation_pictures() {
-            picture.set_width_request(card_width);
-            picture.set_height_request(card_height);
-            picture.set_can_shrink(false);
-        }
-
-        if game.stock_len() > 0 {
-            let back = deck.back_texture_scaled(card_width, card_height);
-            imp.stock_picture.set_paintable(Some(&back));
-        } else {
-            let empty = Self::blank_texture(card_width, card_height);
-            imp.stock_picture.set_paintable(Some(&empty));
-        }
-
-        let waste_widgets = self.waste_fan_slots();
-        let visible_waste_cards = usize::from(game.draw_mode().count().clamp(1, 5));
-        let waste_cards = game.waste_top_n(visible_waste_cards);
-        let show_count = waste_cards.len();
-
-        for picture in waste_widgets.iter() {
-            picture.set_visible(false);
-            picture.set_margin_start(0);
-            picture.set_paintable(None::<&gdk::Paintable>);
-        }
-
-        for (idx, card) in waste_cards.iter().copied().enumerate() {
-            if let Some(picture) = waste_widgets.get(idx) {
-                let texture = deck.texture_for_card_scaled(card, card_width, card_height);
-                picture.set_paintable(Some(&texture));
-                if idx > 0 {
-                    picture.set_margin_start((idx as i32) * waste_fan_step);
-                }
-                picture.set_visible(true);
-            }
-        }
-        imp.waste_placeholder_label.set_visible(show_count == 0);
-
-        for (idx, picture) in self.foundation_pictures().into_iter().enumerate() {
-            let top = game.foundations()[idx].last().copied();
-            self.set_picture_from_card(&picture, top, deck, card_width, card_height);
-        }
-        imp.foundation_placeholder_1
-            .set_visible(game.foundations()[0].is_empty());
-        imp.foundation_placeholder_2
-            .set_visible(game.foundations()[1].is_empty());
-        imp.foundation_placeholder_3
-            .set_visible(game.foundations()[2].is_empty());
-        imp.foundation_placeholder_4
-            .set_visible(game.foundations()[3].is_empty());
-
-        let mut tableau_card_pictures = vec![Vec::new(); 7];
-
-        for (idx, stack) in self.tableau_stacks().into_iter().enumerate() {
-            while let Some(child) = stack.first_child() {
-                stack.remove(&child);
-            }
-
-            stack.set_width_request(card_width);
-
-            let column = &game.tableau()[idx];
-            let mut y = 0;
-            for (card_idx, card) in column.iter().enumerate() {
-                let picture = gtk::Picture::new();
-                picture.set_width_request(card_width);
-                picture.set_height_request(card_height);
-                picture.set_can_shrink(true);
-                picture.set_content_fit(gtk::ContentFit::Contain);
-
-                let show_face_up = if peek_active {
-                    !card.face_up
-                } else {
-                    card.face_up
-                };
-                let texture = if show_face_up {
-                    deck.texture_for_card(*card)
-                } else {
-                    deck.back_texture()
-                };
-                picture.set_paintable(Some(&texture));
-                tableau_card_pictures[idx].push(picture.clone());
-
-                stack.put(&picture, 0.0, f64::from(y));
-                if card_idx + 1 < column.len() {
-                    y += if card.face_up {
-                        face_up_step
-                    } else {
-                        face_down_step
-                    };
-                }
-            }
-
-            let stack_height = (y + card_height).max(card_height);
-            stack.set_height_request(stack_height);
-        }
-
-        *imp.tableau_card_pictures.borrow_mut() = tableau_card_pictures;
+        self.configure_stock_waste_foundation_widgets(card_width, card_height);
+        self.render_stock_picture(game, deck, card_width, card_height);
+        self.render_waste_fan(game, deck, card_width, card_height);
+        self.render_foundations_area(game, deck, card_width, card_height);
+        self.render_tableau_columns(
+            game,
+            deck,
+            card_width,
+            card_height,
+            face_up_step,
+            face_down_step,
+            peek_active,
+        );
     }
 
     pub(super) fn set_picture_from_card(
