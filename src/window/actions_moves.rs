@@ -1,28 +1,21 @@
 use super::*;
+use crate::engine::boundary;
+use crate::engine::commands::EngineCommand;
 
 impl CardthropicWindow {
     pub(super) fn draw_card(&self) -> bool {
         if !self.guard_mode_engine("Draw") {
             return false;
         }
+        let mode = self.active_game_mode();
         let draw_mode = self.current_klondike_draw_mode();
-        {
-            let mut game = self.imp().game.borrow_mut();
-            if game.draw_mode() != draw_mode {
-                game.set_draw_mode(draw_mode);
-            }
-        }
         let snapshot = self.snapshot();
-        let result = self
-            .imp()
-            .game
-            .borrow_mut()
-            .draw_or_recycle_with_count(draw_mode.count());
-        let changed = match result {
-            DrawResult::DrewFromStock => true,
-            DrawResult::RecycledWaste => true,
-            DrawResult::NoOp => false,
-        };
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::DrawOrRecycle { draw_mode },
+        )
+        .changed;
 
         if !self.apply_changed_move(snapshot, changed) {
             *self.imp().status_override.borrow_mut() = Some("Nothing to draw.".to_string());
@@ -36,8 +29,14 @@ impl CardthropicWindow {
             return false;
         }
 
+        let mode = self.active_game_mode();
         let snapshot = self.snapshot();
-        let changed = self.imp().game.borrow_mut().cyclone_shuffle_tableau();
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::CycloneShuffleTableau,
+        )
+        .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         if changed {
             *self.imp().selected_run.borrow_mut() = None;
@@ -84,8 +83,14 @@ impl CardthropicWindow {
         if !self.guard_mode_engine("Waste-to-foundation move") {
             return false;
         }
+        let mode = self.active_game_mode();
         let snapshot = self.snapshot();
-        let changed = self.imp().game.borrow_mut().move_waste_to_foundation();
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::MoveWasteToFoundation,
+        )
+        .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
         changed
@@ -95,8 +100,14 @@ impl CardthropicWindow {
         if !self.guard_mode_engine("Waste-to-tableau move") {
             return false;
         }
+        let mode = self.active_game_mode();
         let snapshot = self.snapshot();
-        let changed = self.imp().game.borrow_mut().move_waste_to_tableau(dst);
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::MoveWasteToTableau { dst },
+        )
+        .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
         changed
@@ -106,12 +117,14 @@ impl CardthropicWindow {
         if !self.guard_mode_engine("Tableau move") {
             return false;
         }
+        let mode = self.active_game_mode();
         let snapshot = self.snapshot();
-        let changed = self
-            .imp()
-            .game
-            .borrow_mut()
-            .move_tableau_run_to_tableau(src, start, dst);
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::MoveTableauRunToTableau { src, start, dst },
+        )
+        .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
         changed
@@ -121,12 +134,14 @@ impl CardthropicWindow {
         if !self.guard_mode_engine("Tableau-to-foundation move") {
             return false;
         }
+        let mode = self.active_game_mode();
         let snapshot = self.snapshot();
-        let changed = self
-            .imp()
-            .game
-            .borrow_mut()
-            .move_tableau_top_to_foundation(src);
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::MoveTableauTopToFoundation { src },
+        )
+        .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
         changed
@@ -136,49 +151,19 @@ impl CardthropicWindow {
         if !self.guard_mode_engine("Foundation-to-tableau move") {
             return false;
         }
+        let mode = self.active_game_mode();
         let snapshot = self.snapshot();
-        let changed = self
-            .imp()
-            .game
-            .borrow_mut()
-            .move_foundation_top_to_tableau(foundation_idx, dst);
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::MoveFoundationTopToTableau {
+                foundation_idx,
+                dst,
+            },
+        )
+        .changed;
         let changed = self.apply_changed_move(snapshot, changed);
         self.render();
         changed
-    }
-
-    pub(super) fn can_auto_move_waste_to_foundation(&self, game: &KlondikeGame) -> bool {
-        let Some(card) = game.waste_top() else {
-            return false;
-        };
-        game.can_move_waste_to_foundation() && self.is_safe_auto_foundation(game, card)
-    }
-
-    pub(super) fn can_auto_move_tableau_to_foundation(
-        &self,
-        game: &KlondikeGame,
-        src: usize,
-    ) -> bool {
-        let Some(card) = game.tableau_top(src) else {
-            return false;
-        };
-        game.can_move_tableau_top_to_foundation(src) && self.is_safe_auto_foundation(game, card)
-    }
-
-    fn is_safe_auto_foundation(&self, game: &KlondikeGame, card: Card) -> bool {
-        if card.rank <= 2 {
-            return true;
-        }
-
-        match card.suit {
-            Suit::Hearts | Suit::Diamonds => {
-                game.foundation_top_rank(Suit::Clubs) >= card.rank - 1
-                    && game.foundation_top_rank(Suit::Spades) >= card.rank - 1
-            }
-            Suit::Clubs | Suit::Spades => {
-                game.foundation_top_rank(Suit::Hearts) >= card.rank - 1
-                    && game.foundation_top_rank(Suit::Diamonds) >= card.rank - 1
-            }
-        }
     }
 }

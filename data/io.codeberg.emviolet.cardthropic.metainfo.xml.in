@@ -24,13 +24,13 @@
       with Klondike and an adaptive board designed for many window sizes.
     </p>
     <p>
-      It includes seeded deals, undo/redo, smart move controls, autoplay wand,
-      winnability checks, board themes, and persistent seed history.
+      It includes seeded deals, smart move controls, automation (wand/rapid/robot),
+      persistent sessions, and a custom CSS userstyle editor.
     </p>
   </description>
   <screenshots>
     <screenshot type="default">
-      <image type="source" width="991" height="1018">https://codeberg.org/emviolet/cardthropic/raw/branch/main/data/screenshots/cardthropic-0.3-screenshot.png</image>
+      <image type="source" width="991" height="1018">https://codeberg.org/emviolet/Cardthropic/raw/branch/main/data/screenshots/cardthropic-0.5-screenshot.png</image>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1">
@@ -56,9 +56,14 @@
     <content_attribute id="social-location">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.5.0" date="2026-02-13">
+      <description>
+        <p>Major gameplay and UX release: improved Smart Move correctness, expanded automation behavior, modularized engine/window architecture, and a full theming redesign with presets plus custom CSS workflow.</p>
+      </description>
+    </release>
     <release version="0.3.1" date="2026-02-12">
       <description>
-        <p>Hotfix: added full appearance mode control (System/Light/Dark), including improved light-mode board palette behavior and popover interaction polish.</p>
+        <p>Hotfix release for appearance controls and interaction polish.</p>
       </description>
     </release>
     <release version="0.3.0" date="2026-02-12">
@@ -69,11 +74,6 @@
     <release version="0.2.1" date="2026-02-11">
       <description>
         <p>Polish update: fixed tableau pixel-shift jitter, added Rapid Wand automation, and corrected dock/taskbar icon resolution for Builder and Flatpak installs.</p>
-      </description>
-    </release>
-    <release version="0.2.0" date="2026-02-11">
-      <description>
-        <p>Initial public preview with Klondike gameplay and adaptive layout.</p>
       </description>
     </release>
   </releases>

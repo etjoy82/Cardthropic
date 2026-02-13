@@ -1,10 +1,15 @@
 use super::*;
+use crate::engine::boundary;
 
 impl CardthropicWindow {
     pub(super) fn snapshot(&self) -> Snapshot {
         let imp = self.imp();
+        let mode = self.active_game_mode();
+        let game = imp.game.borrow();
         Snapshot {
-            game: imp.game.borrow().clone(),
+            mode,
+            runtime: game.runtime_for_mode(mode),
+            draw_mode: imp.klondike_draw_mode.get(),
             selected_run: *imp.selected_run.borrow(),
             selected_waste: imp.waste_selected.get(),
             move_count: imp.move_count.get(),
@@ -32,7 +37,8 @@ impl CardthropicWindow {
             }
             let state_hash = self.current_game_hash();
             self.start_hint_loss_analysis_if_needed(state_hash);
-            if imp.game.borrow().is_won() {
+            let mode = self.active_game_mode();
+            if boundary::is_won(&imp.game.borrow(), mode) {
                 imp.timer_started.set(false);
             }
         }
@@ -77,8 +83,13 @@ impl CardthropicWindow {
 
     fn restore_snapshot(&self, snapshot: Snapshot) {
         let imp = self.imp();
-        *imp.game.borrow_mut() = snapshot.game;
-        imp.klondike_draw_mode.set(imp.game.borrow().draw_mode());
+        imp.current_game_mode.set(snapshot.mode);
+        imp.klondike_draw_mode.set(snapshot.draw_mode);
+        {
+            let mut game = imp.game.borrow_mut();
+            game.set_runtime(snapshot.runtime);
+            let _ = boundary::set_draw_mode(&mut game, snapshot.mode, snapshot.draw_mode);
+        }
         *imp.selected_run.borrow_mut() = snapshot.selected_run;
         imp.waste_selected.set(snapshot.selected_waste);
         imp.move_count.set(snapshot.move_count);

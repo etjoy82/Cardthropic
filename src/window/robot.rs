@@ -1,4 +1,6 @@
 use super::*;
+use crate::engine::boundary;
+use crate::engine::seed_ops;
 
 impl CardthropicWindow {
     pub(super) fn trigger_rapid_wand(&self) {
@@ -13,10 +15,11 @@ impl CardthropicWindow {
         self.stop_rapid_wand();
         self.imp().rapid_wand_running.set(true);
 
+        let profile = self.automation_profile();
         self.play_hint_for_player();
-        let remaining_steps = Rc::new(Cell::new(4_u8));
+        let remaining_steps = Rc::new(Cell::new(profile.rapid_wand_total_steps.saturating_sub(1)));
         let timer = glib::timeout_add_local(
-            Duration::from_millis(750),
+            Duration::from_millis(profile.rapid_wand_interval_ms),
             glib::clone!(
                 #[weak(rename_to = window)]
                 self,
@@ -60,9 +63,10 @@ impl CardthropicWindow {
         if self.imp().robot_mode_running.get() {
             self.stop_robot_mode();
         } else {
-            if self.imp().game.borrow().is_won() {
+            let mode = self.active_game_mode();
+            if boundary::is_won(&self.imp().game.borrow(), mode) {
                 self.start_random_seed_game();
-                if self.imp().game.borrow().is_won() {
+                if boundary::is_won(&self.imp().game.borrow(), mode) {
                     return;
                 }
             }
@@ -98,8 +102,9 @@ impl CardthropicWindow {
 
         self.robot_mode_step();
 
+        let profile = self.automation_profile();
         let timer = glib::timeout_add_local(
-            Duration::from_millis(250),
+            Duration::from_millis(profile.robot_step_interval_ms),
             glib::clone!(
                 #[weak(rename_to = window)]
                 self,
@@ -122,7 +127,8 @@ impl CardthropicWindow {
             return;
         }
 
-        let was_won = self.imp().game.borrow().is_won();
+        let mode = self.active_game_mode();
+        let was_won = boundary::is_won(&self.imp().game.borrow(), mode);
         if was_won {
             self.stop_robot_mode_with_message("Robot Mode stopped: game won.");
             return;
@@ -153,7 +159,7 @@ impl CardthropicWindow {
         } else {
             self.play_hint_for_player()
         };
-        let now_won = self.imp().game.borrow().is_won();
+        let now_won = boundary::is_won(&self.imp().game.borrow(), mode);
         if now_won {
             self.stop_robot_mode_with_message("Robot Mode stopped: game won.");
             return;
@@ -166,7 +172,7 @@ impl CardthropicWindow {
                 .set_use_scripted_line(false);
             let next_deals_tried = self.imp().robot_deals_tried.get().saturating_add(1);
             self.imp().robot_deals_tried.set(next_deals_tried);
-            let seed = random_seed();
+            let seed = seed_ops::random_seed();
             self.start_new_game_with_seed_internal(
                 seed,
                 format!(

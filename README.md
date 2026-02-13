@@ -1,80 +1,50 @@
 # Cardthropic
 
 Cardthropic is a modern GNOME solitaire app built with Rust, GTK4, and Libadwaita.
-It currently ships a full Klondike experience, with architecture already prepared for more variants.
+It currently ships a full Klondike experience, with architecture prepared for more variants.
 
 ![Cardthropic Logo](/logo-small.png)
 
-Current version: `0.3.1`
+Current version: `0.5.0`
 License: `GPL-3.0-or-later`
 
-## Why Cardthropic
+![Cardthropic 0.5 screenshot](data/screenshots/cardthropic-0.5-screenshot.png)
 
-Cardthropic is designed to feel native on GNOME while still being playful and experimental:
+## Highlights
 
-- Emoji-first controls for fast visual scanning.
-- Seed-first gameplay for reproducible runs.
-- Strong automation tooling (wand, rapid wand, robot mode).
-- Adaptive board layout tuned for small and large viewports.
-- Zero network permission at runtime in Flatpak.
+- Native GNOME UI with keyboard, mouse, and drag-and-drop play.
+- Seed-first gameplay (`🎲`, `🛟`, `W?`, `🔁`, `Go`) with persistent seed history.
+- Advanced automation:
+  - `🪄` Wave Magic Wand
+  - `⚡` Rapid Wand
+  - `🤖` Robot Mode
+  - `🌀` Cyclone Shuffle
+  - `🫣` Peek
+- Smart Move modes: `Double Click`, `Single Click`, `Disabled`.
+- Draw modes: Deal `1/2/3/4/5`.
+- Session resume after restart/crash.
+- Actions-per-minute telemetry + in-app APM graph.
+- Full theming system:
+  - curated built-in presets
+  - custom CSS userstyle editor
+  - clipboard-only CSS workflows (no filesystem access)
 
-![Cardthropic 0.3 screenshot](data/screenshots/cardthropic-0.3-screenshot.png)
+## Built-in Theme Presets
 
-## Implemented Features
+From the `🎨` menu:
 
-### Core Klondike
-
-- Full Klondike deal, move, foundation, tableau, draw/recycle flow.
-- Draw modes: Deal 1, 2, 3, 4, 5.
-- Smart Move modes: Double Click, Single Click, Disabled.
-- Undo/redo history.
-- Drag-and-drop and click-driven movement.
-- Keyboard navigation across stock, waste, foundations, and tableau.
-
-### Automation
-
-- `🪄` Wave Magic Wand: plays the best next move.
-- `⚡` Rapid Wand: burst of wand actions over time.
-- `🌀` Cyclone Shuffle Tableau: shuffles tableau cards while preserving each column's face-up/face-down geometry.
-- `🫣` Peek: temporary reveal mode.
-- `🤖` Robot Mode:
-  - runs wand actions every 250ms,
-  - auto-deals new seeds when stuck/lost,
-  - stops when a win is reached,
-  - supports precomputed solver-line playback when available.
-
-### Seed and Winnability System
-
-- Seed input and quick actions:
-  - `🎲` random deal,
-  - `🛟` find/start winnable deal,
-  - `W?` test current seed,
-  - `🔁` redeal current seed,
-  - `Go` launch typed seed.
-- Persisted seed history with per-seed stats:
-  - Plays,
-  - Wins,
-  - Recency ordering.
-- Seed history capacity controls:
-  - stored history cap: `10,000`,
-  - dropdown cap: `250` most recent.
-
-### Telemetry and Session Persistence
-
-- Replaces score with APM (actions per minute).
-- Time/APM stop on win.
-- APM sampled every 5 seconds.
-- `APM Graph` dialog for in-session performance visualization.
-- Full game session resume on relaunch (seed, mode, board state, timer, moves).
-
-### UI/UX
-
-- Native Libadwaita header + menu model.
-- Dedicated in-app Help dialog with live shortcut labels.
-- Fullscreen toggle support.
-- Board color control with presets/swatches and persistent preferences.
-- Custom app icon integrated for desktop/dock/Flatpak metadata.
-- Responsive layout with minimum window safeguards.
+- Cardthropic
+- Cardthropic Night
+- Cardthropic Midnight
+- Arcade
+- Glass
+- Neon
+- Noir
+- Forest
+- CRT
+- Terminal
+- Minimal Mono
+- Custom (opens CSS editor)
 
 ## Shortcuts
 
@@ -92,45 +62,17 @@ Cardthropic is designed to feel native on GNOME while still being playful and ex
 - `Ctrl+Shift+R` Start Winnable Deal Search
 - `Ctrl+Q` Quit
 
-## Game Modes
+Custom CSS editor:
 
-Cardthropic already includes mode scaffolding for:
+- `Ctrl+C` Copy CSS
+- `Ctrl+V` Paste CSS
+- `Ctrl+Shift+C` Copy Preset + CSS
 
-- `🥇` Klondike (implemented)
-- `🕷️` Spider (UI scaffold ready)
-- `🗽` FreeCell (UI scaffold ready)
+## Install (Recommended)
 
-The engine is being refactored to let additional variants plug in without rewriting the whole window layer.
+Cardthropic is best installed from the official Flatpak repo so GNOME Software can show full metadata (license, releases, screenshots, updates).
 
-## Architecture Snapshot
-
-The codebase has been heavily modularized to support long-term maintainability.
-
-### `src/game/`
-
-- `types.rs` shared domain types.
-- `setup.rs` game initialization and draw/recycle setup.
-- `klondike_moves.rs` move legality and move application.
-- `solver.rs` guided/exhaustive winnability and solver-line generation.
-- `session_codec.rs` session serialization/deserialization.
-- `tests.rs` game logic tests.
-
-### `src/window/`
-
-Window behavior is split into focused modules (`actions_*`, `drag`, `input`, `render`, `seed`, `robot`, `hints`, `menu`, `dialogs`, etc.) instead of a monolithic UI file.
-
-### `src/engine/`
-
-- `moves.rs` hint/solver move mapping.
-- `robot.rs` robot playback helpers.
-- `seed_history.rs` persistent seed stats store.
-- `game_mode.rs` variant runtime seam for future solitaire engines.
-
-## Get Cardthropic (Recommended)
-
-Cardthropic is best installed from the official Flatpak repository so GNOME Software can show full metadata (license, releases, screenshots, updates). Flathub is required.
-
-### Option A: Terminal (Flatpak remote)
+### Option A: Flatpak remote
 
 ```bash
 flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/cardthropic-flatpak/
@@ -139,7 +81,7 @@ flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
 flatpak run io.codeberg.emviolet.cardthropic
 ```
 
-### Fallback: Direct bundle install
+### Option B: Direct bundle
 
 If you only have `cardthropic.flatpak`:
 
@@ -151,16 +93,16 @@ flatpak run io.codeberg.emviolet.cardthropic
 
 ### Ubuntu (GNOME Software + Flatpak)
 
-1. Follow the official Flathub setup guide for Ubuntu:  
+1. Follow the official Flathub setup guide:
    <https://flathub.org/setup/Ubuntu>
-2. Ensure GNOME Software Flatpak integration is installed:
+2. Install integration packages:
 
 ```bash
 sudo apt install flatpak gnome-software-plugin-flatpak
 ```
 
-3. Log out/in (or reboot) so GNOME Software loads Flatpak support.
-4. Add Flathub and install the GNOME runtime dependency:
+3. Log out/in (or reboot).
+4. Ensure runtime dependency is available:
 
 ```bash
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -175,7 +117,7 @@ flatpak update --user --appstream cardthropic
 flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
 ```
 
-Snap package note: Flatpak is the only supported package right now. A Snap package may be added in the future.
+Packaging policy: Official builds are Flatpak-only. Native packages (`.deb`, `.rpm`, `snap`) are welcome as community-maintained ports.
 
 ## For Developers
 
@@ -186,7 +128,7 @@ cargo check
 cargo run
 ```
 
-### Flatpak local developer workflow
+### Flatpak local dev workflow
 
 ```bash
 scripts/flatpak/bootstrap.sh
@@ -200,52 +142,47 @@ scripts/flatpak/run.sh
 scripts/flatpak-repo/master.sh
 ```
 
-## Packaging and Safety Notes
+## Packaging/Safety Notes
 
-- Runtime app id: `io.codeberg.emviolet.cardthropic`
+- App ID: `io.codeberg.emviolet.cardthropic`
 - Flatpak runtime: `org.gnome.Platform//48`
-- Flathub is required as the runtime source for end-user bundle installs.
-- Project license metadata is set to GPLv3+ in AppStream.
-- Runtime permissions intentionally avoid network access.
-- Rendering defaults to software-safe settings for VM/dev stability.
+- Flathub is required as runtime source for end-user bundle installs.
+- AppStream metadata is GPLv3+ and screenshot-enabled.
+- Runtime permissions avoid network access.
 
-## Development Status
+## Status
 
-Cardthropic is actively developed and already highly playable in Klondike.
+- Klondike is highly playable and polished.
+- Engine/window modularization is in active progress for scalable multi-variant growth.
+- Spider and FreeCell scaffolding already exists in the mode system.
 
-Current focus:
+## Release Notes
 
-- continue engine/window decoupling,
-- add Spider and FreeCell on top of the new variant seams,
-- keep UX fast, native, and maintainable as feature count grows.
+### 0.5.0 (2026-02-13)
 
-## Releasing
-
-For a step-by-step source + Flatpak release process, see:
-
-- `RELEASE.md`
-
-## Changelog
+- Major post-0.3.1 release with substantial gameplay, architecture, and UX upgrades.
+- Smart Move correctness improvements and stronger solver-aligned move logic.
+- Deep engine/window modularization for long-term maintainability and variant expansion.
+- Theming overhaul: curated preset system, identity themes, and stronger visual direction.
+- New `🎨` theme popover UX with full preset list.
+- Custom CSS editor upgrades:
+  - dark code editor scheme
+  - clipboard actions + shortcuts
+  - editor font-size control
+  - resizable/snap/maximize-capable dialog window
+- Metadata refresh with new screenshot and release details.
 
 ### 0.3.1 (2026-02-12)
 
-- Hotfix release for appearance controls and light-mode usability.
-- Added explicit `System Default / Light / Dark` appearance selector in the board color popover.
-- Improved light-mode board color handling so palette choices remain readable with dark text.
-- Smoothed appearance-change interaction by closing the color popover after mode selection.
+- Hotfix release focused on appearance interaction polish.
 
 ### 0.3.0 (2026-02-12)
 
-- Major internal modularization pass for maintainability and multi-variant growth.
-- Expanded automation and Smart Move behavior with wand-aligned logic.
-- Added release screenshot and refreshed Flatpak/AppStream metadata.
-- GPLv3+ metadata now explicitly surfaced for software centers.
+- Gameplay polish update with smarter automation, expanded controls, persistent sessions, and refreshed Flatpak metadata/screenshots.
 
 ### 0.2.1 (2026-02-11)
 
-- Fixed tableau pixel-shift jitter.
-- Added Rapid Wand automation.
-- Finalized icon mapping for Builder + Flatpak dock/taskbar resolution.
+- Polish update: fixed tableau pixel-shift jitter, added Rapid Wand automation, and corrected dock/taskbar icon resolution for Builder and Flatpak installs.
 
 ### 0.2.0 (2026-02-11)
 

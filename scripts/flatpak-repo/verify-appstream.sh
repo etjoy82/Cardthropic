@@ -27,7 +27,17 @@ if [[ ! -d "${REPO_DIR}" ]]; then
   exit 1
 fi
 
-if ! ostree --repo="${REPO_DIR}" refs | rg -q '^appstream/x86_64$'; then
+if command -v rg >/dev/null 2>&1; then
+  SEARCH_BIN="rg"
+  SEARCH_OPTS=(-n)
+  SEARCH_QUIET_OPTS=(-q)
+else
+  SEARCH_BIN="grep"
+  SEARCH_OPTS=(-nE)
+  SEARCH_QUIET_OPTS=(-qE)
+fi
+
+if ! ostree --repo="${REPO_DIR}" refs | "${SEARCH_BIN}" "${SEARCH_QUIET_OPTS[@]}" '^appstream/x86_64$'; then
   echo "appstream/x86_64 ref not found in ${REPO_DIR}" >&2
   exit 1
 fi
@@ -35,7 +45,7 @@ fi
 echo "Inspecting appstream metadata in ${REPO_DIR}..."
 ostree --repo="${REPO_DIR}" cat appstream/x86_64 /appstream.xml.gz \
   | gzip -dc \
-  | rg -n "id>|project_license|screenshot|image|release version" \
+  | "${SEARCH_BIN}" "${SEARCH_OPTS[@]}" "id>|project_license|screenshot|image|release version" \
   || true
 
 echo
