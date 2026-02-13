@@ -90,7 +90,7 @@ impl CardthropicWindow {
         imp.status_label.set_label(&status);
 
         self.update_stats_label();
-        self.persist_session_if_changed();
+        self.mark_session_dirty();
     }
 
     pub(super) fn update_tableau_selection_styles(&self, selected: Option<SelectedRun>) {

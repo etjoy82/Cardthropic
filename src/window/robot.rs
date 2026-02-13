@@ -89,6 +89,7 @@ impl CardthropicWindow {
         }
 
         self.stop_rapid_wand();
+        self.cancel_hint_loss_analysis();
         self.imp().robot_mode_running.set(true);
         self.imp().robot_deals_tried.set(0);
         let using_solver = self.imp().robot_playback.borrow().use_scripted_line();
@@ -187,6 +188,7 @@ impl CardthropicWindow {
         if !self.imp().robot_mode_running.replace(false) {
             return;
         }
+        self.cancel_hint_loss_analysis();
         self.imp().robot_playback.borrow_mut().clear_scripted_line();
         if let Some(source_id) = self.imp().robot_mode_timer.borrow_mut().take() {
             Self::remove_source_if_present(source_id);
@@ -201,6 +203,7 @@ impl CardthropicWindow {
         if !self.imp().robot_mode_running.replace(false) {
             return;
         }
+        self.cancel_hint_loss_analysis();
         self.imp().robot_playback.borrow_mut().clear_scripted_line();
         if let Some(source_id) = self.imp().robot_mode_timer.borrow_mut().take() {
             Self::remove_source_if_present(source_id);

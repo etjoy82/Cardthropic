@@ -258,6 +258,8 @@ mod imp {
         pub waste_selected: Cell<bool>,
         pub settings: RefCell<Option<gio::Settings>>,
         pub last_saved_session: RefCell<String>,
+        pub session_dirty: Cell<bool>,
+        pub session_flush_timer: RefCell<Option<glib::SourceId>>,
         pub board_color_hex: RefCell<String>,
         pub board_color_preview: RefCell<Option<gtk::DrawingArea>>,
         pub board_color_swatches: RefCell<Vec<gtk::DrawingArea>>,
@@ -302,6 +304,7 @@ mod imp {
         pub(super) hint_loss_cache: RefCell<HashMap<u64, LossVerdict>>,
         pub hint_loss_analysis_running: Cell<bool>,
         pub hint_loss_analysis_hash: Cell<u64>,
+        pub hint_loss_analysis_cancel: RefCell<Option<Arc<AtomicBool>>>,
         pub rapid_wand_running: Cell<bool>,
         pub rapid_wand_timer: RefCell<Option<glib::SourceId>>,
         pub robot_mode_running: Cell<bool>,
@@ -400,6 +403,8 @@ mod imp {
                 waste_selected: Cell::new(false),
                 settings: RefCell::new(None),
                 last_saved_session: RefCell::new(String::new()),
+                session_dirty: Cell::new(false),
+                session_flush_timer: RefCell::new(None),
                 board_color_hex: RefCell::new(DEFAULT_BOARD_COLOR.to_string()),
                 board_color_preview: RefCell::new(None),
                 board_color_swatches: RefCell::new(Vec::new()),
@@ -444,6 +449,7 @@ mod imp {
                 hint_loss_cache: RefCell::new(HashMap::new()),
                 hint_loss_analysis_running: Cell::new(false),
                 hint_loss_analysis_hash: Cell::new(0),
+                hint_loss_analysis_cancel: RefCell::new(None),
                 rapid_wand_running: Cell::new(false),
                 rapid_wand_timer: RefCell::new(None),
                 robot_mode_running: Cell::new(false),
@@ -579,6 +585,16 @@ mod imp {
                 obj.set_seed_input_text(&self.current_seed.get().to_string());
             }
             obj.setup_handlers();
+            obj.connect_close_request(glib::clone!(
+                #[weak(rename_to = window)]
+                obj,
+                #[upgrade_or]
+                glib::Propagation::Proceed,
+                move |_| {
+                    window.flush_session_now();
+                    glib::Propagation::Proceed
+                }
+            ));
             obj.imp().tableau_row.set_homogeneous(true);
             obj.setup_timer();
             obj.render();

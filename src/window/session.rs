@@ -3,6 +3,8 @@ use crate::engine::boundary;
 use crate::engine::session::{decode_persisted_session, encode_persisted_session};
 
 impl CardthropicWindow {
+    const SESSION_FLUSH_INTERVAL_SECS: u32 = 3;
+
     pub(super) fn setup_timer(&self) {
         glib::timeout_add_seconds_local(
             1,
@@ -25,7 +27,7 @@ impl CardthropicWindow {
             imp.elapsed_seconds.set(imp.elapsed_seconds.get() + 1);
             self.record_apm_sample_if_due();
             self.update_stats_label();
-            self.persist_session_if_changed();
+            self.mark_session_dirty();
             if let Some(area) = imp.apm_graph_area.borrow().as_ref() {
                 area.queue_draw();
             }
@@ -80,7 +82,7 @@ impl CardthropicWindow {
         )
     }
 
-    pub(super) fn persist_session_if_changed(&self) {
+    fn persist_session_if_changed(&self) {
         let settings = self.imp().settings.borrow().clone();
         let Some(settings) = settings else {
             return;
@@ -91,6 +93,46 @@ impl CardthropicWindow {
         }
         let _ = settings.set_string(SETTINGS_KEY_SAVED_SESSION, &payload);
         *self.imp().last_saved_session.borrow_mut() = payload;
+    }
+
+    pub(super) fn mark_session_dirty(&self) {
+        let imp = self.imp();
+        imp.session_dirty.set(true);
+        if imp.session_flush_timer.borrow().is_some() {
+            return;
+        }
+
+        let timer = glib::timeout_add_seconds_local(
+            Self::SESSION_FLUSH_INTERVAL_SECS,
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || {
+                    let imp = window.imp();
+                    if !imp.session_dirty.get() {
+                        imp.session_flush_timer.borrow_mut().take();
+                        return glib::ControlFlow::Break;
+                    }
+
+                    window.persist_session_if_changed();
+                    imp.session_dirty.set(false);
+                    imp.session_flush_timer.borrow_mut().take();
+                    glib::ControlFlow::Break
+                }
+            ),
+        );
+        *imp.session_flush_timer.borrow_mut() = Some(timer);
+    }
+
+    pub(super) fn flush_session_now(&self) {
+        let imp = self.imp();
+        if let Some(source_id) = imp.session_flush_timer.borrow_mut().take() {
+            Self::remove_source_if_present(source_id);
+        }
+        self.persist_session_if_changed();
+        imp.session_dirty.set(false);
     }
 
     pub(super) fn try_restore_saved_session(&self) -> bool {
@@ -130,6 +172,7 @@ impl CardthropicWindow {
         self.set_seed_input_text(&session.seed.to_string());
         *imp.status_override.borrow_mut() = Some("Resumed previous game.".to_string());
         *imp.last_saved_session.borrow_mut() = raw;
+        imp.session_dirty.set(false);
         true
     }
 

@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+
 use gtk::gdk;
 use gtk::gdk_pixbuf;
 use gtk::glib;
@@ -10,7 +13,11 @@ pub struct AngloDeck {
     sheet: gdk_pixbuf::Pixbuf,
     col_edges: [i32; 14],
     row_edges: [i32; 6],
+    texture_cache: RefCell<HashMap<(usize, usize), gdk::Texture>>,
+    scaled_texture_cache: RefCell<HashMap<(usize, usize, i32, i32), gdk::Texture>>,
 }
+
+const MAX_SCALED_TEXTURE_CACHE_ENTRIES: usize = 512;
 
 impl AngloDeck {
     pub fn load() -> Result<Self, String> {
@@ -52,6 +59,8 @@ impl AngloDeck {
             sheet,
             col_edges,
             row_edges,
+            texture_cache: RefCell::new(HashMap::new()),
+            scaled_texture_cache: RefCell::new(HashMap::new()),
         })
     }
 
@@ -106,13 +115,21 @@ impl AngloDeck {
     }
 
     fn texture_for_cell(&self, row: usize, col: usize) -> gdk::Texture {
+        if let Some(texture) = self.texture_cache.borrow().get(&(row, col)) {
+            return texture.clone();
+        }
+
         let x0 = self.col_edges[col];
         let x1 = self.col_edges[col + 1];
         let y0 = self.row_edges[row];
         let y1 = self.row_edges[row + 1];
 
         let sub = self.sheet.new_subpixbuf(x0, y0, x1 - x0, y1 - y0);
-        gdk::Texture::for_pixbuf(&sub)
+        let texture = gdk::Texture::for_pixbuf(&sub);
+        self.texture_cache
+            .borrow_mut()
+            .insert((row, col), texture.clone());
+        texture
     }
 
     fn texture_for_cell_scaled(
@@ -122,19 +139,33 @@ impl AngloDeck {
         width: i32,
         height: i32,
     ) -> gdk::Texture {
+        let width = width.max(1);
+        let height = height.max(1);
+        let key = (row, col, width, height);
+        if let Some(texture) = self.scaled_texture_cache.borrow().get(&key) {
+            return texture.clone();
+        }
+
         let x0 = self.col_edges[col];
         let x1 = self.col_edges[col + 1];
         let y0 = self.row_edges[row];
         let y1 = self.row_edges[row + 1];
 
         let sub = self.sheet.new_subpixbuf(x0, y0, x1 - x0, y1 - y0);
-        let width = width.max(1);
-        let height = height.max(1);
-        if let Some(scaled) = sub.scale_simple(width, height, gdk_pixbuf::InterpType::Bilinear) {
+        let texture = if let Some(scaled) =
+            sub.scale_simple(width, height, gdk_pixbuf::InterpType::Bilinear)
+        {
             gdk::Texture::for_pixbuf(&scaled)
         } else {
             gdk::Texture::for_pixbuf(&sub)
+        };
+
+        let mut cache = self.scaled_texture_cache.borrow_mut();
+        if cache.len() >= MAX_SCALED_TEXTURE_CACHE_ENTRIES {
+            cache.clear();
         }
+        cache.insert(key, texture.clone());
+        texture
     }
 
     fn pixbuf_for_cell_scaled(

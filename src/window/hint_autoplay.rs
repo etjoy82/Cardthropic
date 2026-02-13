@@ -4,7 +4,18 @@ use crate::engine::boundary;
 use crate::engine::hinting;
 use crate::engine::loss_analysis::{self, LossVerdict};
 
+const MAX_AUTO_PLAY_SEEN_STATES: usize = 50_000;
+const MAX_HINT_LOSS_CACHE: usize = 4_096;
+
 impl CardthropicWindow {
+    pub(super) fn cancel_hint_loss_analysis(&self) {
+        let imp = self.imp();
+        if let Some(flag) = imp.hint_loss_analysis_cancel.borrow_mut().take() {
+            flag.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        imp.hint_loss_analysis_running.set(false);
+    }
+
     pub(super) fn compute_auto_play_suggestion(&self) -> HintSuggestion {
         let Some(game) = boundary::clone_klondike_for_automation(
             &self.imp().game.borrow(),
@@ -45,6 +56,13 @@ impl CardthropicWindow {
             .auto_play_seen_states
             .borrow_mut()
             .insert(state_hash);
+        {
+            let mut seen = self.imp().auto_play_seen_states.borrow_mut();
+            if seen.len() > MAX_AUTO_PLAY_SEEN_STATES {
+                seen.clear();
+                seen.insert(state_hash);
+            }
+        }
         let seen_states = self.imp().auto_play_seen_states.borrow().clone();
 
         let candidates = hinting::enumerate_hint_candidates(&game);
@@ -200,10 +218,12 @@ impl CardthropicWindow {
 
     pub(super) fn note_current_state_for_auto_play(&self) {
         let current_hash = self.current_game_hash();
-        self.imp()
-            .auto_play_seen_states
-            .borrow_mut()
-            .insert(current_hash);
+        let mut seen = self.imp().auto_play_seen_states.borrow_mut();
+        seen.insert(current_hash);
+        if seen.len() > MAX_AUTO_PLAY_SEEN_STATES {
+            seen.clear();
+            seen.insert(current_hash);
+        }
     }
 
     pub(super) fn unseen_followup_count(
@@ -269,18 +289,30 @@ impl CardthropicWindow {
         }
 
         let imp = self.imp();
+        if imp.robot_mode_running.get() {
+            return;
+        }
+        if boundary::is_won(&imp.game.borrow(), self.active_game_mode()) {
+            return;
+        }
         if imp.hint_loss_analysis_running.get() {
             return;
         }
         imp.hint_loss_analysis_running.set(true);
         imp.hint_loss_analysis_hash.set(state_hash);
+        let cancel = Arc::new(AtomicBool::new(false));
+        *imp.hint_loss_analysis_cancel.borrow_mut() = Some(Arc::clone(&cancel));
 
         let game = imp.game.borrow().clone();
         let profile = self.automation_profile();
-        let (sender, receiver) = mpsc::channel::<LossVerdict>();
+        let (sender, receiver) = mpsc::channel::<Option<LossVerdict>>();
 
         thread::spawn(move || {
-            let verdict = loss_analysis::analyze_klondike_loss_verdict(&game, profile);
+            let verdict = loss_analysis::analyze_klondike_loss_verdict_cancelable(
+                &game,
+                profile,
+                cancel.as_ref(),
+            );
             let _ = sender.send(verdict);
         });
 
@@ -292,13 +324,21 @@ impl CardthropicWindow {
                 #[upgrade_or]
                 glib::ControlFlow::Break,
                 move || match receiver.try_recv() {
-                    Ok(verdict) => {
+                    Ok(Some(verdict)) => {
                         let imp = window.imp();
                         let analyzed_hash = imp.hint_loss_analysis_hash.get();
                         imp.hint_loss_analysis_running.set(false);
+                        imp.hint_loss_analysis_cancel.borrow_mut().take();
                         imp.hint_loss_cache
                             .borrow_mut()
                             .insert(analyzed_hash, verdict);
+                        if imp.hint_loss_cache.borrow().len() > MAX_HINT_LOSS_CACHE {
+                            let keep = imp.hint_loss_cache.borrow().get(&analyzed_hash).copied();
+                            imp.hint_loss_cache.borrow_mut().clear();
+                            if let Some(keep) = keep {
+                                imp.hint_loss_cache.borrow_mut().insert(analyzed_hash, keep);
+                            }
+                        }
 
                         let current_hash = window.current_game_hash();
                         if current_hash == analyzed_hash {
@@ -311,9 +351,17 @@ impl CardthropicWindow {
                         }
                         glib::ControlFlow::Break
                     }
+                    Ok(None) => {
+                        let imp = window.imp();
+                        imp.hint_loss_analysis_running.set(false);
+                        imp.hint_loss_analysis_cancel.borrow_mut().take();
+                        glib::ControlFlow::Break
+                    }
                     Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
                     Err(mpsc::TryRecvError::Disconnected) => {
-                        window.imp().hint_loss_analysis_running.set(false);
+                        let imp = window.imp();
+                        imp.hint_loss_analysis_running.set(false);
+                        imp.hint_loss_analysis_cancel.borrow_mut().take();
                         glib::ControlFlow::Break
                     }
                 }

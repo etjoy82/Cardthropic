@@ -91,12 +91,13 @@ pub fn find_winnable_seed_parallel(
     let next_index = Arc::new(AtomicU32::new(0));
     let stop = Arc::new(AtomicBool::new(false));
     let (sender, receiver) = mpsc::channel::<(u64, u32, Vec<SolverMove>)>();
+    let mut handles = Vec::with_capacity(worker_count);
 
     for _ in 0..worker_count {
         let next_index = Arc::clone(&next_index);
         let stop = Arc::clone(&stop);
         let sender = sender.clone();
-        thread::spawn(move || loop {
+        let handle = thread::spawn(move || loop {
             if stop.load(Ordering::Relaxed) {
                 break;
             }
@@ -108,20 +109,34 @@ pub fn find_winnable_seed_parallel(
             let seed = start_seed.wrapping_add(u64::from(index));
             let mut game = KlondikeGame::new_with_seed(seed);
             game.set_draw_mode(draw_mode);
-            if game.is_winnable_guided(max_states) {
-                let cancel = AtomicBool::new(false);
-                let line = game
-                    .guided_winning_line_cancelable(max_states, &cancel)
-                    .unwrap_or(None)
-                    .unwrap_or_default();
-                if !stop.swap(true, Ordering::Relaxed) {
-                    let _ = sender.send((seed, index + 1, line));
-                }
+            let Some(winnable) = game.is_winnable_guided_cancelable(max_states, stop.as_ref())
+            else {
+                break;
+            };
+            if !winnable {
+                continue;
+            }
+
+            if stop.load(Ordering::Relaxed) {
                 break;
             }
+            let Some(line) = game.guided_winning_line_cancelable(max_states, stop.as_ref()) else {
+                break;
+            };
+            let line = line.unwrap_or_default();
+            if !stop.swap(true, Ordering::Relaxed) {
+                let _ = sender.send((seed, index + 1, line));
+            }
+            break;
         });
+        handles.push(handle);
     }
 
     drop(sender);
-    receiver.recv().ok()
+    let result = receiver.recv().ok();
+    stop.store(true, Ordering::Relaxed);
+    for handle in handles {
+        let _ = handle.join();
+    }
+    result
 }

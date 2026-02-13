@@ -16,6 +16,7 @@ impl CardthropicWindow {
         if !preserve_robot {
             self.stop_robot_mode();
         }
+        self.cancel_hint_loss_analysis();
         self.cancel_seed_winnable_check(None);
         self.clear_hint_effects();
         let mode = self.active_game_mode();
