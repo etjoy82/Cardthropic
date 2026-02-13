@@ -5,7 +5,7 @@ It currently ships a full Klondike experience, with architecture prepared for mo
 
 ![Cardthropic Logo](/logo-small.png)
 
-Current version: `0.5.0`
+Current version: `0.5.1`
 License: `GPL-3.0-or-later`
 
 ![Cardthropic 0.5 screenshot](data/screenshots/cardthropic-0.5-screenshot.png)
@@ -157,6 +157,15 @@ scripts/flatpak-repo/master.sh
 - Spider and FreeCell scaffolding already exists in the mode system.
 
 ## Release Notes
+
+### 0.5.1 (2026-02-13)
+
+- Performance and stability hotfix release.
+- Fixed solver/automation memory growth by making parallel winnability work cancelable and joining worker threads cleanly.
+- Added bounded caches for autoplay/loss-analysis state to prevent unbounded retention in long sessions.
+- Reduced background disk writes with debounced session persistence (dirty + delayed flush) while preserving resume safety.
+- Fixed post-robot background CPU churn by replacing per-frame geometry polling with interval polling and canceling stale loss-analysis work.
+- Added card texture caching to reduce repeated texture allocation churn during rapid render/automation loops.
 
 ### 0.5.0 (2026-02-13)
 

@@ -56,6 +56,11 @@
     <content_attribute id="social-location">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.5.1" date="2026-02-13">
+      <description>
+        <p>Performance and stability hotfix: reduced background CPU/disk churn, improved solver cancellation, and fixed memory growth during long automation runs.</p>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-02-13">
       <description>
         <p>Major gameplay and UX release: improved Smart Move correctness, expanded automation behavior, modularized engine/window architecture, and a full theming redesign with presets plus custom CSS workflow.</p>
