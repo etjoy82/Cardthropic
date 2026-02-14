@@ -33,7 +33,7 @@ echo "==> [4/5] Verifying AppStream metadata from built repo"
 scripts/flatpak-repo/verify-appstream.sh --repo "${ROOT_DIR}/build-repo"
 
 echo "==> [5/5] Writing SHA256SUMS"
-sha256sum cardthropic.flatpak > SHA256SUMS
+sha256sum cardthropic.flatpak >SHA256SUMS
 
 echo
 echo "Release artifacts ready:"

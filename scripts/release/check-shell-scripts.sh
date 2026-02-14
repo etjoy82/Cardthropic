@@ -26,23 +26,24 @@ fail() {
 }
 
 while IFS= read -r script; do
+  shebang="$(sed -n '1p' "${script}")"
+
   mode="$(stat -c '%a' "${script}")"
   [[ "${mode}" =~ ^[0-9]+$ ]] || fail "unable to read mode for ${script}"
 
-  shebang="$(sed -n '1p' "${script}")"
   [[ "${shebang}" == "#!/usr/bin/env bash" ]] || fail "bad shebang in ${script}"
 
   set_line="$(sed -n '2p' "${script}")"
   [[ "${set_line}" == "set -euo pipefail" ]] || fail "missing strict mode on line 2 in ${script}"
 
-  rg -q "Maintainer-only operational script for Cardthropic\\." "${script}" \
-    || fail "missing maintainer-only banner in ${script}"
+  rg -q "Maintainer-only operational script for Cardthropic\\." "${script}" ||
+    fail "missing maintainer-only banner in ${script}"
 
   # Require owner executable bit at minimum for maintainability.
-  owner_exec=$(( (10#${mode} / 100) % 10 ))
-  (( owner_exec & 1 )) || fail "script is not executable by owner: ${script}"
+  owner_exec=$(((10#${mode} / 100) % 10))
+  ((owner_exec & 1)) || fail "script is not executable by owner: ${script}"
 
   bash -n "${script}" || fail "bash -n failed for ${script}"
-done < <(find scripts -maxdepth 3 -type f -name '*.sh' | sort)
+done < <(scripts/release/list-shell-scripts.sh)
 
 echo "Shell script checks passed."

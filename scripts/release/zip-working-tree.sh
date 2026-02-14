@@ -29,18 +29,30 @@ NAME=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "ERROR: missing value for --repo" >&2
+        exit 2
+      fi
       REPO_PATH="${2:-}"
       shift 2
       ;;
     --output-dir)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "ERROR: missing value for --output-dir" >&2
+        exit 2
+      fi
       OUTPUT_DIR="${2:-}"
       shift 2
       ;;
     --name)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "ERROR: missing value for --name" >&2
+        exit 2
+      fi
       NAME="${2:-}"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;

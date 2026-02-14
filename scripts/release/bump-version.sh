@@ -40,11 +40,35 @@ require_cmd() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version) VERSION="${2:-}"; shift 2 ;;
-    --date) RELEASE_DATE="${2:-}"; shift 2 ;;
-    --dry-run) DRY_RUN=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
+    --version)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --version" >&2
+        exit 2
+      fi
+      VERSION="${2:-}"
+      shift 2
+      ;;
+    --date)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --date" >&2
+        exit 2
+      fi
+      RELEASE_DATE="${2:-}"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -110,7 +134,7 @@ awk -v version="${VERSION}" '
       exit 1
     }
   }
-' Cargo.toml > "${tmp}"
+' Cargo.toml >"${tmp}"
 apply_or_preview "Cargo.toml" "${tmp}"
 
 # meson.build: project version
@@ -130,7 +154,7 @@ awk -v version="${VERSION}" '
       exit 1
     }
   }
-' meson.build > "${tmp}"
+' meson.build >"${tmp}"
 apply_or_preview "meson.build" "${tmp}"
 
 # README.md: Current version line
@@ -151,7 +175,7 @@ awk -v version="${VERSION}" '
       exit 1
     }
   }
-' README.md > "${tmp}"
+' README.md >"${tmp}"
 apply_or_preview "README.md" "${tmp}"
 
 # CHANGELOG.md: insert section after Unreleased block
@@ -180,7 +204,7 @@ awk -v version="${VERSION}" -v date="${RELEASE_DATE}" '
       print ""
     }
   }
-' CHANGELOG.md > "${tmp}"
+' CHANGELOG.md >"${tmp}"
 apply_or_preview "CHANGELOG.md" "${tmp}"
 
 # AppStream metainfo: prepend new release under <releases>
@@ -204,7 +228,7 @@ awk -v version="${VERSION}" -v date="${RELEASE_DATE}" '
       exit 1
     }
   }
-' data/io.codeberg.emviolet.cardthropic.metainfo.xml.in > "${tmp}"
+' data/io.codeberg.emviolet.cardthropic.metainfo.xml.in >"${tmp}"
 apply_or_preview "data/io.codeberg.emviolet.cardthropic.metainfo.xml.in" "${tmp}"
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
