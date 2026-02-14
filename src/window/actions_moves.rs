@@ -14,6 +14,25 @@ fn foundation_index_for_suit(suit: Suit) -> usize {
 }
 
 impl CardthropicWindow {
+    pub(super) fn is_face_up_tableau_run(&self, col: usize, start: usize) -> bool {
+        let Some(game) = boundary::clone_klondike_for_automation(
+            &self.imp().game.borrow(),
+            self.active_game_mode(),
+            self.current_klondike_draw_mode(),
+        ) else {
+            return false;
+        };
+
+        let Some(len) = game.tableau_len(col) else {
+            return false;
+        };
+        if start >= len {
+            return false;
+        }
+
+        (start..len).all(|idx| game.tableau_card(col, idx).is_some_and(|card| card.face_up))
+    }
+
     pub(super) fn draw_card(&self) -> bool {
         if !self.guard_mode_engine("Draw") {
             return false;
@@ -167,6 +186,12 @@ impl CardthropicWindow {
 
     pub(super) fn move_tableau_run_to_tableau(&self, src: usize, start: usize, dst: usize) -> bool {
         if !self.guard_mode_engine("Tableau move") {
+            return false;
+        }
+        if !self.is_face_up_tableau_run(src, start) {
+            *self.imp().status_override.borrow_mut() =
+                Some("That move includes hidden cards and is not legal.".to_string());
+            self.render();
             return false;
         }
         let mode = self.active_game_mode();

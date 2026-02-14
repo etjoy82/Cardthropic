@@ -55,6 +55,15 @@ impl CardthropicWindow {
                 .unwrap_or(SmartMoveMode::DoubleClick)
         };
         self.set_smart_move_mode(smart_move_mode, false, false);
+
+        let hud_enabled = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| settings.boolean(SETTINGS_KEY_ENABLE_HUD))
+                .unwrap_or(true)
+        };
+        self.set_hud_enabled(hud_enabled, false);
     }
 
     pub(super) fn load_app_settings() -> Option<gio::Settings> {

@@ -48,16 +48,6 @@ impl CardthropicWindow {
         self.update_game_settings_menu();
     }
 
-    pub(super) fn popdown_game_settings_later(&self) {
-        glib::idle_add_local_once(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move || {
-                window.imp().game_settings_popover.popdown();
-            }
-        ));
-    }
-
     pub(super) fn popdown_main_menu_later(&self) {
         glib::idle_add_local_once(glib::clone!(
             #[weak(rename_to = window)]
@@ -134,38 +124,6 @@ impl CardthropicWindow {
                 draw_row.append(&button);
             }
             imp.game_settings_content_box.append(&draw_row);
-
-            if caps.seeded_deals {
-                let random_button = gtk::Button::with_label("Start Random Deal");
-                random_button.add_css_class("flat");
-                random_button.set_halign(gtk::Align::Fill);
-                random_button.set_hexpand(true);
-                random_button.connect_clicked(glib::clone!(
-                    #[weak(rename_to = window)]
-                    self,
-                    move |_| {
-                        window.start_random_seed_game();
-                        window.popdown_game_settings_later();
-                    }
-                ));
-                imp.game_settings_content_box.append(&random_button);
-            }
-
-            if caps.winnability {
-                let winnable_button = gtk::Button::with_label("Winnable Deal");
-                winnable_button.add_css_class("flat");
-                winnable_button.set_halign(gtk::Align::Fill);
-                winnable_button.set_hexpand(true);
-                winnable_button.connect_clicked(glib::clone!(
-                    #[weak(rename_to = window)]
-                    self,
-                    move |_| {
-                        window.start_random_winnable_seed_game();
-                        window.popdown_game_settings_later();
-                    }
-                ));
-                imp.game_settings_content_box.append(&winnable_button);
-            }
         } else {
             let note = gtk::Label::new(Some(spec.settings_placeholder));
             note.set_xalign(0.0);

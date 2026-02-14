@@ -7,6 +7,13 @@ impl CardthropicWindow {
         if !self.guard_mode_engine("Smart Move") {
             return false;
         }
+        if !self.is_face_up_tableau_run(col, start) {
+            self.flash_smart_move_fail_tableau_run(col, start);
+            *self.imp().status_override.borrow_mut() =
+                Some("Smart Move: no legal move from that card.".to_string());
+            self.render();
+            return false;
+        }
         let mode = self.active_game_mode();
         if smart_move::direct_tableau_to_foundation_move(
             &self.imp().game.borrow(),
@@ -66,6 +73,16 @@ impl CardthropicWindow {
             };
             (fallback_move, true)
         };
+
+        if let HintMove::TableauRunToTableau { src, start, .. } = hint_move {
+            if !self.is_face_up_tableau_run(src, start) {
+                self.flash_smart_move_fail_tableau_run(col, start);
+                *self.imp().status_override.borrow_mut() =
+                    Some("Smart Move: no legal move from that card.".to_string());
+                self.render();
+                return false;
+            }
+        }
 
         let changed = self.apply_hint_move(hint_move);
         if changed {

@@ -86,12 +86,26 @@ impl CardthropicWindow {
                 if !window.imp().robot_mode_running.get() {
                     return;
                 }
-                let robot_button = window.imp().robot_button.get();
+                let imp = window.imp();
+                let robot_button = imp.robot_button.get();
                 if let Some(picked) = window.pick(x, y, gtk::PickFlags::DEFAULT) {
                     let robot_widget: gtk::Widget = robot_button.clone().upcast();
                     if picked == robot_widget || picked.is_ancestor(&robot_button) {
                         return;
                     }
+                    let in_cards_zone = picked.is_ancestor(&imp.stock_picture.get())
+                        || picked.is_ancestor(&imp.waste_overlay.get())
+                        || picked.is_ancestor(&imp.foundation_picture_1.get())
+                        || picked.is_ancestor(&imp.foundation_picture_2.get())
+                        || picked.is_ancestor(&imp.foundation_picture_3.get())
+                        || picked.is_ancestor(&imp.foundation_picture_4.get())
+                        || picked.is_ancestor(&imp.tableau_scroller.get())
+                        || picked.is_ancestor(&imp.tableau_row.get());
+                    if !in_cards_zone {
+                        return;
+                    }
+                } else {
+                    return;
                 }
                 window.stop_robot_mode();
             }

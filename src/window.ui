@@ -28,6 +28,17 @@
                     <property name="has-frame">False</property>
                   </object>
                 </child>
+                <child>
+                  <object class="GtkToggleButton" id="hud_button">
+                    <property name="label" translatable="yes">HUD</property>
+                    <property name="tooltip-text" translatable="yes">Toggle HUD</property>
+                    <property name="has-frame">False</property>
+                    <property name="action-name">win.enable-hud</property>
+                    <style>
+                      <class name="hud-toggle"/>
+                    </style>
+                  </object>
+                </child>
               </object>
             </child>
             <child type="end">
@@ -101,125 +112,131 @@
                     <style>
                       <class name="board-background"/>
                     </style>
-                    <child>
-                  <object class="GtkBox">
-                    <property name="spacing">8</property>
-                    <child>
-                      <object class="GtkButton" id="seed_random_button">
-                        <property name="label">🎲</property>
-                        <property name="tooltip-text" translatable="yes">Start Random Deal</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="seed_rescue_button">
-                        <property name="label">🛟</property>
-                        <property name="tooltip-text" translatable="yes">Find and Start Winnable Deal</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="seed_winnable_button">
-                        <property name="label" translatable="yes">W?</property>
-                        <property name="tooltip-text" translatable="yes">Check if Seed is Winnable</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="seed_repeat_button">
-                        <property name="label">🔁</property>
-                        <property name="tooltip-text" translatable="yes">Deal Again from Current Seed</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkComboBoxText" id="seed_combo">
-                        <property name="has-entry">True</property>
-                        <property name="width-request">1</property>
-                        <property name="hexpand">True</property>
-                        <property name="tooltip-text" translatable="yes">Deal seed</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="seed_go_button">
-                        <property name="label" translatable="yes">Go</property>
-                        <property name="tooltip-text" translatable="yes">Start Deal from Seed</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                  </object>
-                </child>
                 <child>
-                  <object class="GtkBox">
+                  <object class="GtkBox" id="toolbar_box">
                     <property name="orientation">vertical</property>
-                    <property name="spacing">2</property>
+                    <property name="spacing">10</property>
                     <child>
-                      <object class="GtkLabel" id="stats_label">
-                        <property name="xalign">0</property>
-                        <style>
-                          <class name="stats-line"/>
-                        </style>
+                      <object class="GtkBox">
+                        <property name="spacing">8</property>
+                        <child>
+                          <object class="GtkButton" id="seed_random_button">
+                            <property name="label">🎲</property>
+                            <property name="tooltip-text" translatable="yes">Start Random Deal</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="seed_rescue_button">
+                            <property name="label">🛟</property>
+                            <property name="tooltip-text" translatable="yes">Find and Start Winnable Deal</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="seed_winnable_button">
+                            <property name="label" translatable="yes">W?</property>
+                            <property name="tooltip-text" translatable="yes">Check if Seed is Winnable</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="seed_repeat_button">
+                            <property name="label">🔁</property>
+                            <property name="tooltip-text" translatable="yes">Deal Again from Current Seed</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkComboBoxText" id="seed_combo">
+                            <property name="has-entry">True</property>
+                            <property name="width-request">1</property>
+                            <property name="hexpand">True</property>
+                            <property name="tooltip-text" translatable="yes">Deal seed</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="seed_go_button">
+                            <property name="label" translatable="yes">Go</property>
+                            <property name="tooltip-text" translatable="yes">Start Deal from Seed</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <child>
-                      <object class="GtkLabel" id="status_label">
-                        <property name="xalign">0</property>
-                        <property name="yalign">0</property>
-                        <property name="hexpand">True</property>
-                        <property name="wrap">True</property>
-                        <property name="wrap-mode">word-char</property>
-                        <property name="max-width-chars">120</property>
-                        <style>
-                          <class name="status-line"/>
-                        </style>
-                      </object>
-                    </child>
-                  </object>
-                </child>
-                <child>
-                  <object class="GtkBox">
-                    <property name="spacing">6</property>
-                    <property name="halign">start</property>
-                    <child>
-                      <object class="GtkButton" id="undo_button">
-                        <property name="icon-name">edit-undo-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">Undo</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="redo_button">
-                        <property name="icon-name">edit-redo-symbolic</property>
-                        <property name="tooltip-text" translatable="yes">Redo</property>
-                        <property name="has-frame">False</property>
+                      <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">2</property>
+                        <child>
+                          <object class="GtkLabel" id="stats_label">
+                            <property name="xalign">0</property>
+                            <style>
+                              <class name="stats-line"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkLabel" id="status_label">
+                            <property name="xalign">0</property>
+                            <property name="yalign">0</property>
+                            <property name="hexpand">True</property>
+                            <property name="wrap">True</property>
+                            <property name="wrap-mode">word-char</property>
+                            <property name="max-width-chars">120</property>
+                            <style>
+                              <class name="status-line"/>
+                            </style>
+                          </object>
+                        </child>
                       </object>
                     </child>
                     <child>
-                      <object class="GtkButton" id="auto_hint_button">
-                        <property name="label">🪄</property>
-                        <property name="tooltip-text" translatable="yes">Wave Magic Wand</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="cyclone_shuffle_button">
-                        <property name="label">🌀</property>
-                        <property name="tooltip-text" translatable="yes">Cyclone Shuffle Tableau</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="peek_button">
-                        <property name="label">🫣</property>
-                        <property name="tooltip-text" translatable="yes">Peek</property>
-                        <property name="has-frame">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkButton" id="robot_button">
-                        <property name="label">🤖</property>
-                        <property name="tooltip-text" translatable="yes">Robot Mode</property>
-                        <property name="has-frame">False</property>
+                      <object class="GtkBox">
+                        <property name="spacing">6</property>
+                        <property name="halign">start</property>
+                        <child>
+                          <object class="GtkButton" id="undo_button">
+                            <property name="icon-name">edit-undo-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Undo</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="redo_button">
+                            <property name="icon-name">edit-redo-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Redo</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="auto_hint_button">
+                            <property name="label">🪄</property>
+                            <property name="tooltip-text" translatable="yes">Wave Magic Wand</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="cyclone_shuffle_button">
+                            <property name="label">🌀</property>
+                            <property name="tooltip-text" translatable="yes">Cyclone Shuffle Tableau</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="peek_button">
+                            <property name="label">🫣</property>
+                            <property name="tooltip-text" translatable="yes">Peek</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="robot_button">
+                            <property name="label">🤖</property>
+                            <property name="tooltip-text" translatable="yes">Robot Mode</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
                       </object>
                     </child>
                   </object>
@@ -744,6 +761,10 @@
       <item>
         <attribute name="label" translatable="yes">_Draw</attribute>
         <attribute name="action">win.draw</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Enable HUD</attribute>
+        <attribute name="action">win.enable-hud</attribute>
       </item>
       <item>
         <attribute name="label" translatable="yes">_Undo</attribute>

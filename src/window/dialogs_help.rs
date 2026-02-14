@@ -46,6 +46,11 @@ impl CardthropicWindow {
             Some("win.toggle-fullscreen"),
         );
         push(
+            "HUD",
+            imp.hud_button.tooltip_text().map(|s| s.to_string()),
+            Some("win.enable-hud"),
+        );
+        push(
             "↶",
             imp.undo_button.tooltip_text().map(|s| s.to_string()),
             Some("win.undo"),
@@ -77,6 +82,11 @@ impl CardthropicWindow {
             "🤖",
             imp.robot_button.tooltip_text().map(|s| s.to_string()),
             Some("win.robot-mode"),
+        );
+        push(
+            "ⓘ",
+            Some("Robot Mode stop: click cards area or 🤖 button.".to_string()),
+            None,
         );
         push(
             "🎨",

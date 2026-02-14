@@ -1,5 +1,4 @@
 use super::*;
-use crate::engine::boundary;
 use crate::engine::variant::{spec_for_id, spec_for_mode};
 use crate::engine::variant_engine::engine_for_mode;
 
@@ -18,14 +17,15 @@ impl CardthropicWindow {
             return;
         }
         imp.klondike_draw_mode.set(draw_mode);
-        let mode = self.active_game_mode();
-        let _ = boundary::set_draw_mode(&mut imp.game.borrow_mut(), mode, draw_mode);
-        self.reset_hint_cycle_memory();
-        self.reset_auto_play_memory();
-        let state_hash = self.current_game_hash();
-        self.start_hint_loss_analysis_if_needed(state_hash);
-        *imp.status_override.borrow_mut() = Some(format!("Deal {} selected.", draw_mode.count()));
-        self.render();
+        let seed = imp.current_seed.get();
+        self.start_new_game_with_seed(
+            seed,
+            format!(
+                "Deal {} selected. Redealt current seed {}.",
+                draw_mode.count(),
+                seed
+            ),
+        );
     }
 
     pub(super) fn is_mode_engine_ready(&self) -> bool {

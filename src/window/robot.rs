@@ -18,7 +18,7 @@ impl CardthropicWindow {
     fn set_robot_status_running(&self, detail: &str) {
         let deals_tried = self.imp().robot_deals_tried.get();
         *self.imp().status_override.borrow_mut() = Some(format!(
-            "Robot: {detail}. Deals tried: {deals_tried}. Tip: click anywhere to stop."
+            "Robot: {detail}. Deals tried: {deals_tried}. Tip: click cards area or 🤖 to stop."
         ));
     }
 
@@ -201,7 +201,7 @@ impl CardthropicWindow {
                         true
                     } else {
                         *self.imp().status_override.borrow_mut() = Some(
-                            "Robot: move invalidated; recalculating. Tip: click anywhere to stop."
+                            "Robot: move invalidated; recalculating. Tip: click cards area or 🤖 to stop."
                                 .to_string(),
                         );
                         self.render();
@@ -210,7 +210,7 @@ impl CardthropicWindow {
                 }
                 None => {
                     *self.imp().status_override.borrow_mut() = Some(format!(
-                        "Robot: {}. Tip: click anywhere to stop.",
+                        "Robot: {}. Tip: click cards area or 🤖 to stop.",
                         suggestion.message
                     ));
                     self.render();

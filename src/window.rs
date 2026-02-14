@@ -140,6 +140,8 @@ mod imp {
         #[template_child]
         pub fullscreen_button: TemplateChild<gtk::Button>,
         #[template_child]
+        pub hud_button: TemplateChild<gtk::ToggleButton>,
+        #[template_child]
         pub undo_button: TemplateChild<gtk::Button>,
         #[template_child]
         pub redo_button: TemplateChild<gtk::Button>,
@@ -255,6 +257,8 @@ mod imp {
         #[template_child]
         pub board_box: TemplateChild<gtk::Box>,
         #[template_child]
+        pub toolbar_box: TemplateChild<gtk::Box>,
+        #[template_child]
         pub motion_layer: TemplateChild<gtk::Fixed>,
         pub game: RefCell<VariantStateStore>,
         pub current_seed: Cell<u64>,
@@ -325,6 +329,7 @@ mod imp {
         pub seed_search_in_progress: Cell<bool>,
         pub seed_combo_updating: Cell<bool>,
         pub smart_move_mode: Cell<SmartMoveMode>,
+        pub hud_enabled: Cell<bool>,
         pub peek_active: Cell<bool>,
         pub peek_generation: Cell<u64>,
         pub current_game_mode: Cell<GameMode>,
@@ -345,6 +350,7 @@ mod imp {
             Self {
                 help_button: TemplateChild::default(),
                 fullscreen_button: TemplateChild::default(),
+                hud_button: TemplateChild::default(),
                 undo_button: TemplateChild::default(),
                 redo_button: TemplateChild::default(),
                 auto_hint_button: TemplateChild::default(),
@@ -402,6 +408,7 @@ mod imp {
                 game_settings_popover: TemplateChild::default(),
                 game_settings_content_box: TemplateChild::default(),
                 board_box: TemplateChild::default(),
+                toolbar_box: TemplateChild::default(),
                 motion_layer: TemplateChild::default(),
                 game: RefCell::new(VariantStateStore::new(seed)),
                 current_seed: Cell::new(seed),
@@ -472,6 +479,7 @@ mod imp {
                 seed_search_in_progress: Cell::new(false),
                 seed_combo_updating: Cell::new(false),
                 smart_move_mode: Cell::new(SmartMoveMode::DoubleClick),
+                hud_enabled: Cell::new(true),
                 peek_active: Cell::new(false),
                 peek_generation: Cell::new(0),
                 current_game_mode: Cell::new(GameMode::Klondike),
@@ -588,6 +596,7 @@ mod imp {
             obj.load_seed_history();
             obj.refresh_seed_history_dropdown();
             obj.setup_styles();
+            obj.setup_hud_action();
             obj.setup_board_color_preferences();
             if !obj.try_restore_saved_session() {
                 obj.note_seed_play_started(self.current_seed.get());
@@ -634,6 +643,7 @@ const SETTINGS_KEY_SMART_MOVE_MODE: &str = "smart-move-mode";
 const SETTINGS_KEY_SAVED_SESSION: &str = "saved-session";
 const SETTINGS_KEY_CUSTOM_USERSTYLE_CSS: &str = "custom-userstyle-css";
 const SETTINGS_KEY_CUSTOM_CARD_SVG: &str = "custom-card-svg";
+const SETTINGS_KEY_ENABLE_HUD: &str = "enable-hud";
 const SEED_HISTORY_FILE_NAME: &str = "seed-history.txt";
 const APP_DATA_DIR_NAME: &str = "io.codeberg.emviolet.cardthropic";
 const MAX_SEED_HISTORY_ENTRIES: usize = 10_000;

@@ -21,10 +21,15 @@
 			<summary>Custom userstyle CSS</summary>
 			<description>Optional custom CSS applied on top of Cardthropic board styles.</description>
 		</key>
-		<key name="custom-card-svg" type="s">
-			<default>''</default>
-			<summary>Custom card sheet SVG</summary>
-			<description>Optional SVG card sheet pasted by the user and persisted in settings.</description>
-		</key>
-	</schema>
-</schemalist>
+			<key name="custom-card-svg" type="s">
+				<default>''</default>
+				<summary>Custom card sheet SVG</summary>
+				<description>Optional SVG card sheet pasted by the user and persisted in settings.</description>
+			</key>
+			<key name="enable-hud" type="b">
+				<default>true</default>
+				<summary>Enable HUD</summary>
+				<description>Show the toolbar area above the stock/waste/foundations row.</description>
+			</key>
+		</schema>
+	</schemalist>

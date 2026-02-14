@@ -1,20 +1,33 @@
 use super::*;
 use sourceview5::prelude::*;
 
-const USERSTYLE_PRESET_NAMES: [&str; 12] = [
+const USERSTYLE_PRESET_NAMES: [&str; 21] = [
     "Custom",
+    "System",
+    "Light Mode",
+    "Dark Mode",
     "Cardthropic",
-    "Cardthropic Night",
-    "Cardthropic Midnight",
-    "Arcade",
-    "Glass",
-    "Neon",
-    "Noir",
-    "Forest",
+    "Garnet",
+    "Amethyst",
+    "Aquamarine",
+    "Diamond",
+    "Emerald",
+    "Pearl",
+    "Ruby",
+    "Peridot",
+    "Sapphire",
+    "Opal",
+    "Topaz",
+    "Turquoise",
+    "Moonstone",
+    "Citrine",
     "CRT",
-    "Terminal",
-    "Minimal Mono",
+    "Magma",
 ];
+
+const USERSTYLE_TEMPLATE_SYSTEM: &str = r#"/* System
+No custom CSS overrides.
+*/"#;
 
 const USERSTYLE_TEMPLATE_ARCADE: &str = r#"/* Arcade */
 window,
@@ -98,70 +111,7 @@ popover entry {
 }
 "#;
 
-const USERSTYLE_TEMPLATE_GLASS: &str = r#"/* Glass */
-window,
-window background,
-box,
-label {
-  color: #eef5ff;
-}
-
-.board-background {
-  background-image:
-    linear-gradient(140deg, rgba(16, 38, 76, 0.90), rgba(49, 26, 72, 0.92)),
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.10), transparent 45%),
-    radial-gradient(circle at 80% 75%, rgba(56, 189, 248, 0.12), transparent 38%);
-  border: 2px solid rgba(255, 255, 255, 0.30);
-  box-shadow:
-    0 18px 44px rgba(0, 0, 0, 0.46),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-}
-
-headerbar,
-popover,
-frame {
-  background: rgba(18, 24, 45, 0.50);
-}
-
-button {
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.30);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.10));
-}
-
-entry,
-combobox,
-dropdown,
-popover entry {
-  background: rgba(10, 16, 30, 0.48);
-  border: 1px solid rgba(255, 255, 255, 0.36);
-}
-
-.status-line {
-  color: #eaf6ff;
-}
-
-.stats-line,
-.dim-label {
-  color: rgba(224, 238, 255, 0.84);
-}
-
-.keyboard-focus-empty {
-  box-shadow: inset 0 0 0 3px rgba(56, 189, 248, 0.74);
-  background-color: rgba(56, 189, 248, 0.11);
-}
-
-.card-slot {
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background-color: rgba(255, 255, 255, 0.04);
-}
-
-.slot-emoji {
-  opacity: 0.80;
-}
-"#;
-
-const USERSTYLE_TEMPLATE_NEON: &str = r#"/* Neon */
+const USERSTYLE_TEMPLATE_NEON: &str = r#"/* Cardthropic */
 window,
 label {
   color: #fff4ff;
@@ -434,84 +384,6 @@ popover entry {
 }
 "#;
 
-const USERSTYLE_TEMPLATE_CARDTHROPIC_NIGHT: &str = r#"/* Cardthropic Night */
-window,
-window background,
-box,
-label {
-  color: #f5f9ff;
-}
-
-.board-background {
-  background-image:
-    radial-gradient(circle at 12% 15%, rgba(110, 178, 255, 0.12), transparent 36%),
-    radial-gradient(circle at 84% 80%, rgba(255, 132, 188, 0.10), transparent 38%),
-    linear-gradient(155deg, #1a2540 0%, #27214d 48%, #173042 100%);
-  border: 2px solid rgba(232, 242, 255, 0.34);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    0 16px 36px rgba(0, 0, 0, 0.44);
-}
-
-headerbar,
-popover,
-frame {
-  background: rgba(22, 28, 50, 0.70);
-}
-
-button {
-  color: #f7fbff;
-  border-radius: 12px;
-  border: 1px solid rgba(232, 242, 255, 0.30);
-  background-image: linear-gradient(180deg, #455c95, #2e4070);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.30);
-}
-
-button:hover {
-  border-color: rgba(255, 255, 255, 0.52);
-}
-
-entry,
-combobox,
-dropdown,
-popover entry {
-  color: #f2f7ff;
-  background: rgba(15, 22, 40, 0.76);
-  border: 1px solid rgba(225, 237, 255, 0.36);
-}
-
-.status-line {
-  color: #ffffff;
-  font-weight: 700;
-}
-
-.stats-line,
-.dim-label {
-  color: rgba(230, 240, 255, 0.88);
-}
-
-.keyboard-focus-empty {
-  box-shadow: inset 0 0 0 3px rgba(124, 180, 255, 0.88);
-  background-color: rgba(124, 180, 255, 0.14);
-}
-
-.keyboard-focus-card {
-  box-shadow:
-    inset 0 0 0 2px #0d1020,
-    inset 0 0 0 6px #ffffff,
-    inset 0 0 0 9px #7cb4ff;
-}
-
-.card-slot {
-  border: 1px solid rgba(232, 242, 255, 0.26);
-  background-color: rgba(255, 255, 255, 0.04);
-}
-
-.slot-emoji {
-  opacity: 0.84;
-}
-"#;
-
 const USERSTYLE_TEMPLATE_CARDTHROPIC_MIDNIGHT: &str = r#"/* Cardthropic Midnight */
 window,
 window background,
@@ -662,7 +534,7 @@ popover entry {
 }
 "#;
 
-const USERSTYLE_TEMPLATE_TERMINAL: &str = r#"/* Terminal */
+const USERSTYLE_TEMPLATE_TERMINAL: &str = r#"/* Dark Mode */
 window,
 window background,
 box,
@@ -730,64 +602,430 @@ popover entry {
 }
 "#;
 
-const USERSTYLE_TEMPLATE_MINIMAL_MONO: &str = r#"/* Minimal Mono */
+const USERSTYLE_TEMPLATE_LIGHT_MODE: &str = r#"/* Light Mode */
 window,
-window background,
-box,
-label {
-  color: #ececec;
+window background {
+  background: #ffffff;
+  color: #111111;
 }
 
 .board-background {
-  background: #2b3242;
-  border: 1px solid rgba(255, 255, 255, 0.20);
-  box-shadow: none;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
 }
 
-headerbar,
-popover,
+box,
 frame {
-  background: rgba(40, 46, 60, 0.82);
+  color: #111111;
 }
 
-button {
-  color: #f2f2f2;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.08);
+headerbar {
+  background: #f6f6f7;
+  color: #111111;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+popover,
+menu,
+popover.background,
+menu.background {
+  background: #ffffff;
+  color: #111111;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+popover contents,
+menu contents {
+  background: #ffffff;
+  color: #111111;
+}
+
+modelbutton,
+menuitem,
+menu item,
+popover label {
+  color: #111111;
 }
 
 entry,
 combobox,
 dropdown,
 popover entry {
-  color: #efefef;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #111111;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+button {
+  color: #111111;
+  font-weight: 600;
+  border-radius: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background-image: linear-gradient(180deg, #ffffff, #f1f1f3);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+button:hover {
+  border-color: rgba(0, 0, 0, 0.22);
+  background-image: linear-gradient(180deg, #ffffff, #ececef);
+}
+
+button:active {
+  background-image: linear-gradient(180deg, #ececef, #ffffff);
+}
+
+.hud-toggle:checked {
+  color: #005ecb;
+  border-color: rgba(0, 94, 203, 0.40);
+  background-image: linear-gradient(180deg, #eaf3ff, #dfeeff);
+  box-shadow: inset 0 0 0 1px rgba(0, 94, 203, 0.20);
 }
 
 .status-line {
-  color: #f4f4f4;
+  color: #111111;
+  font-weight: 700;
 }
 
 .stats-line,
 .dim-label {
-  color: rgba(236, 236, 236, 0.78);
-}
-
-.keyboard-focus-empty {
-  box-shadow: inset 0 0 0 3px rgba(196, 196, 196, 0.84);
-  background-color: rgba(196, 196, 196, 0.10);
+  color: rgba(0, 0, 0, 0.62);
 }
 
 .card-slot {
-  border: 1px solid rgba(255, 255, 255, 0.20);
-  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.20);
+  background-color: #ffffff;
+}
+
+.tableau-selected-card,
+.waste-selected-card {
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 122, 255, 0.85),
+    0 0 10px rgba(0, 122, 255, 0.18);
+  background-color: rgba(0, 122, 255, 0.07);
+}
+
+.keyboard-focus-empty {
+  box-shadow: inset 0 0 0 3px rgba(0, 122, 255, 0.60);
+  background-color: rgba(0, 122, 255, 0.10);
+}
+
+.keyboard-focus-card {
+  box-shadow:
+    inset 0 0 0 2px #ffffff,
+    inset 0 0 0 5px #101010,
+    inset 0 0 0 8px #007aff;
 }
 
 .slot-emoji {
-  opacity: 0.68;
+  opacity: 0.50;
 }
+"#;
+
+const USERSTYLE_TEMPLATE_MAGMA: &str = r#"/* Magma Core */
+window, window background { background: #1a0500; }
+
+.board-background {
+    background-image: 
+        radial-gradient(circle at 50% 50%, rgba(255, 69, 0, 0.15), transparent 70%),
+        repeating-linear-gradient(
+            45deg,
+            #2b0a00 0px,
+            #2b0a00 2px,
+            #1a0500 2px,
+            #1a0500 20px
+        ),
+        linear-gradient(180deg, #3d0f00, #1a0500);
+    border: 3px solid #ff4500;
+    box-shadow: 
+        inset 0 0 150px #8b0000,
+        0 0 30px rgba(255, 69, 0, 0.4);
+}
+
+/* Give the buttons a "molten" look */
+button {
+    background: linear-gradient(180deg, #ff8c00, #ff4500);
+    color: #1a0500;
+    font-weight: bold;
+    border-radius: 10px;
+    border: 1px solid #ff0000;
+    box-shadow: 0 4px 15px rgba(255, 0, 0, 0.5);
+    transition: all 200ms ease-in-out;
+}
+
+button:hover {
+    background: #ff0000;
+    color: #ffffff;
+    box-shadow: 0 0 20px #ff4500;
+    transform: translateY(-2px);
+}
+
+.tableau-selected-card {
+    box-shadow: 
+        0 0 25px #ff8c00,
+        0 0 10px #ffffff;
+    border: 2px solid #ffffff;
+}
+
+.card-slot {
+    border: 2px solid #4d1100;
+    background-color: rgba(255, 69, 0, 0.05);
+}
+
+/* Testing texture/opacity churn */
+.slot-emoji { 
+    filter: drop-shadow(0 0 10px #ff4500);
+    opacity: 0.6;
+}
+
+label.status-line {
+    color: #ff8c00;
+    text-shadow: 0 0 8px rgba(255, 140, 0, 0.6);
+}"#;
+
+const USERSTYLE_TEMPLATE_SAPPHIRE: &str = r#"/* Sapphire */
+window,
+window background,
+box,
+label {
+  color: #eef4ff;
+}
+
+.board-background {
+  background-image:
+    radial-gradient(circle at 18% 15%, rgba(98, 166, 255, 0.16), transparent 42%),
+    radial-gradient(circle at 85% 82%, rgba(53, 112, 255, 0.14), transparent 42%),
+    linear-gradient(160deg, #0d1b4a, #10245d 48%, #0a173c 100%);
+  border: 2px solid rgba(146, 187, 255, 0.42);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.48);
+}
+
+button {
+  color: #f7fbff;
+  border: 1px solid rgba(170, 205, 255, 0.46);
+  background-image: linear-gradient(180deg, #355dc2, #233f8a);
+}
+
+.status-line {
+  color: #d6e7ff;
+}
+"#;
+
+const USERSTYLE_TEMPLATE_AQUAMARINE: &str = r#"/* Aquamarine */
+window,
+window background,
+box,
+label {
+  color: #eafff9;
+}
+
+.board-background {
+  background-image:
+    radial-gradient(circle at 14% 12%, rgba(138, 255, 229, 0.16), transparent 42%),
+    radial-gradient(circle at 84% 82%, rgba(77, 230, 210, 0.15), transparent 44%),
+    linear-gradient(160deg, #0e3a3d, #14555a 50%, #103337 100%);
+  border: 2px solid rgba(170, 255, 236, 0.38);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.44);
+}
+
+button {
+  color: #f5fffd;
+  border: 1px solid rgba(180, 255, 240, 0.42);
+  background-image: linear-gradient(180deg, #2a8f97, #1f6f76);
+}
+
+.status-line {
+  color: #c7fff4;
+}
+"#;
+
+const USERSTYLE_TEMPLATE_CITRINE: &str = r#"/* Citrine */
+window,
+window background,
+box,
+label {
+  color: #fff8e7;
+}
+
+.board-background {
+  background-image:
+    radial-gradient(circle at 16% 14%, rgba(255, 223, 126, 0.18), transparent 42%),
+    radial-gradient(circle at 84% 82%, rgba(255, 194, 72, 0.15), transparent 44%),
+    linear-gradient(160deg, #4a2a08, #5c350f 48%, #3a2107 100%);
+  border: 2px solid rgba(255, 219, 142, 0.38);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+}
+
+button {
+  color: #fff9ec;
+  border: 1px solid rgba(255, 232, 170, 0.44);
+  background-image: linear-gradient(180deg, #c08c2b, #9a6d1f);
+}
+
+.status-line {
+  color: #ffe6a8;
+}
+"#;
+
+const USERSTYLE_TEMPLATE_MOONSTONE: &str = r#"/* Moonstone */
+window,
+window background,
+box,
+label {
+  color: #f3f7ff;
+}
+
+.board-background {
+  background-image:
+    radial-gradient(circle at 17% 13%, rgba(214, 230, 255, 0.16), transparent 42%),
+    radial-gradient(circle at 83% 83%, rgba(170, 194, 255, 0.14), transparent 44%),
+    linear-gradient(160deg, #1e2537, #2a3046 52%, #1a2233 100%);
+  border: 2px solid rgba(206, 220, 255, 0.34);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.46);
+}
+
+button {
+  color: #f7faff;
+  border: 1px solid rgba(210, 226, 255, 0.40);
+  background-image: linear-gradient(180deg, #5b6e97, #455576);
+}
+
+.status-line {
+  color: #deebff;
+}
+"#;
+
+const USERSTYLE_TEMPLATE_GARNET: &str = r#"/* Garnet */
+window, window background, box, label { color: #ffeef2; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 16% 14%, rgba(255, 112, 145, 0.16), transparent 42%),
+    radial-gradient(circle at 84% 82%, rgba(176, 33, 69, 0.16), transparent 44%),
+    linear-gradient(160deg, #2c0712, #3e0a1b 52%, #22060f 100%);
+  border: 2px solid rgba(228, 102, 133, 0.42);
+}
+button { color: #fff4f7; background-image: linear-gradient(180deg, #9d2948, #7b1f39); border: 1px solid rgba(255, 165, 187, 0.40); }
+.status-line { color: #ffd0db; }
+"#;
+
+const USERSTYLE_TEMPLATE_AMETHYST: &str = r#"/* Amethyst */
+window, window background, box, label { color: #f8f1ff; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 15% 12%, rgba(196, 145, 255, 0.16), transparent 40%),
+    radial-gradient(circle at 86% 84%, rgba(134, 92, 222, 0.15), transparent 42%),
+    linear-gradient(160deg, #26123f, #34205a 52%, #1d1032 100%);
+  border: 2px solid rgba(189, 154, 255, 0.38);
+}
+button { color: #fbf7ff; background-image: linear-gradient(180deg, #7752bb, #5f4197); border: 1px solid rgba(208, 182, 255, 0.42); }
+.status-line { color: #e9d9ff; }
+"#;
+
+const USERSTYLE_TEMPLATE_DIAMOND: &str = r#"/* Diamond */
+window, window background, box, label { color: #f5fbff; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 14% 12%, rgba(220, 242, 255, 0.20), transparent 40%),
+    radial-gradient(circle at 84% 82%, rgba(170, 210, 255, 0.15), transparent 42%),
+    linear-gradient(160deg, #273847, #304a60 52%, #20303d 100%);
+  border: 2px solid rgba(198, 229, 255, 0.42);
+}
+button { color: #f7fcff; background-image: linear-gradient(180deg, #68839f, #516b85); border: 1px solid rgba(207, 232, 255, 0.40); }
+.status-line { color: #d8edff; }
+"#;
+
+const USERSTYLE_TEMPLATE_EMERALD: &str = r#"/* Emerald */
+window, window background, box, label { color: #effff4; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 16% 12%, rgba(131, 255, 171, 0.16), transparent 40%),
+    radial-gradient(circle at 84% 84%, rgba(48, 180, 103, 0.15), transparent 42%),
+    linear-gradient(160deg, #0f3624, #165138 52%, #0d2c1f 100%);
+  border: 2px solid rgba(149, 242, 184, 0.36);
+}
+button { color: #f4fff7; background-image: linear-gradient(180deg, #2f9362, #22734d); border: 1px solid rgba(173, 255, 204, 0.38); }
+.status-line { color: #ccf7dc; }
+"#;
+
+const USERSTYLE_TEMPLATE_PEARL: &str = r#"/* Pearl */
+window, window background, box, label { color: #fff8f0; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 14% 12%, rgba(255, 244, 229, 0.18), transparent 40%),
+    radial-gradient(circle at 84% 84%, rgba(245, 226, 205, 0.16), transparent 44%),
+    linear-gradient(160deg, #6c5e55, #7c6f65 52%, #584d45 100%);
+  border: 2px solid rgba(248, 231, 213, 0.42);
+}
+button { color: #fffdf9; background-image: linear-gradient(180deg, #a48d78, #886f5d); border: 1px solid rgba(255, 237, 219, 0.40); }
+.status-line { color: #ffe9d4; }
+"#;
+
+const USERSTYLE_TEMPLATE_RUBY: &str = r#"/* Ruby */
+window, window background, box, label { color: #fff0f5; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 16% 14%, rgba(255, 112, 160, 0.16), transparent 42%),
+    radial-gradient(circle at 84% 82%, rgba(209, 22, 74, 0.18), transparent 44%),
+    linear-gradient(160deg, #300712, #490a1d 52%, #25060f 100%);
+  border: 2px solid rgba(241, 88, 138, 0.42);
+}
+button { color: #fff5f8; background-image: linear-gradient(180deg, #bf2756, #971f44); border: 1px solid rgba(255, 166, 196, 0.42); }
+.status-line { color: #ffc7db; }
+"#;
+
+const USERSTYLE_TEMPLATE_PERIDOT: &str = r#"/* Peridot */
+window, window background, box, label { color: #f8ffe8; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 15% 12%, rgba(210, 255, 121, 0.16), transparent 40%),
+    radial-gradient(circle at 84% 82%, rgba(140, 193, 44, 0.15), transparent 42%),
+    linear-gradient(160deg, #2d3f12, #3c5519 52%, #25350f 100%);
+  border: 2px solid rgba(200, 236, 120, 0.38);
+}
+button { color: #fbffef; background-image: linear-gradient(180deg, #8cad35, #728e2b); border: 1px solid rgba(226, 250, 169, 0.42); }
+.status-line { color: #e0f6b0; }
+"#;
+
+const USERSTYLE_TEMPLATE_OPAL: &str = r#"/* Opal */
+window, window background, box, label { color: #fff7ff; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 12% 10%, rgba(255, 179, 228, 0.14), transparent 38%),
+    radial-gradient(circle at 86% 86%, rgba(161, 255, 255, 0.14), transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(197, 206, 255, 0.10), transparent 56%),
+    linear-gradient(160deg, #3b3347, #4a405b 52%, #2f283a 100%);
+  border: 2px solid rgba(226, 211, 255, 0.34);
+}
+button { color: #fffaff; background-image: linear-gradient(180deg, #8d79a8, #73638b); border: 1px solid rgba(233, 221, 255, 0.38); }
+.status-line { color: #eddfff; }
+"#;
+
+const USERSTYLE_TEMPLATE_TOPAZ: &str = r#"/* Topaz */
+window, window background, box, label { color: #fff8ec; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 14% 12%, rgba(255, 196, 112, 0.16), transparent 40%),
+    radial-gradient(circle at 84% 82%, rgba(231, 135, 38, 0.16), transparent 42%),
+    linear-gradient(160deg, #4c2a0a, #5f3810 52%, #3d2208 100%);
+  border: 2px solid rgba(249, 182, 109, 0.40);
+}
+button { color: #fff9ef; background-image: linear-gradient(180deg, #c57f2a, #a9681f); border: 1px solid rgba(255, 207, 143, 0.40); }
+.status-line { color: #ffd9a4; }
+"#;
+
+const USERSTYLE_TEMPLATE_TURQUOISE: &str = r#"/* Turquoise */
+window, window background, box, label { color: #edfffe; }
+.board-background {
+  background-image:
+    radial-gradient(circle at 16% 12%, rgba(128, 255, 244, 0.16), transparent 40%),
+    radial-gradient(circle at 84% 84%, rgba(54, 196, 196, 0.15), transparent 42%),
+    linear-gradient(160deg, #0c3d43, #14535a 52%, #0a3136 100%);
+  border: 2px solid rgba(144, 236, 230, 0.38);
+}
+button { color: #f4ffff; background-image: linear-gradient(180deg, #2f9ea3, #237f83); border: 1px solid rgba(178, 255, 247, 0.40); }
+.status-line { color: #c5f6f1; }
 "#;
 
 impl CardthropicWindow {
@@ -796,49 +1034,81 @@ impl CardthropicWindow {
     }
 
     pub(super) fn default_userstyle_css() -> &'static str {
-        USERSTYLE_TEMPLATE_CARDTHROPIC
+        USERSTYLE_TEMPLATE_NEON
     }
 
     pub(super) fn userstyle_css_for_preset(index: u32) -> Option<&'static str> {
         match index {
-            1 => Some(USERSTYLE_TEMPLATE_CARDTHROPIC),
-            2 => Some(USERSTYLE_TEMPLATE_CARDTHROPIC_NIGHT),
-            3 => Some(USERSTYLE_TEMPLATE_CARDTHROPIC_MIDNIGHT),
-            4 => Some(USERSTYLE_TEMPLATE_ARCADE),
-            5 => Some(USERSTYLE_TEMPLATE_GLASS),
-            6 => Some(USERSTYLE_TEMPLATE_NEON),
-            7 => Some(USERSTYLE_TEMPLATE_NOIR),
-            8 => Some(USERSTYLE_TEMPLATE_FOREST),
-            9 => Some(USERSTYLE_TEMPLATE_CRT),
-            10 => Some(USERSTYLE_TEMPLATE_TERMINAL),
-            11 => Some(USERSTYLE_TEMPLATE_MINIMAL_MONO),
+            1 => Some(USERSTYLE_TEMPLATE_SYSTEM),
+            2 => Some(USERSTYLE_TEMPLATE_LIGHT_MODE),
+            3 => Some(USERSTYLE_TEMPLATE_TERMINAL),
+            4 => Some(USERSTYLE_TEMPLATE_NEON),
+            5 => Some(USERSTYLE_TEMPLATE_GARNET),
+            6 => Some(USERSTYLE_TEMPLATE_AMETHYST),
+            7 => Some(USERSTYLE_TEMPLATE_AQUAMARINE),
+            8 => Some(USERSTYLE_TEMPLATE_DIAMOND),
+            9 => Some(USERSTYLE_TEMPLATE_EMERALD),
+            10 => Some(USERSTYLE_TEMPLATE_PEARL),
+            11 => Some(USERSTYLE_TEMPLATE_RUBY),
+            12 => Some(USERSTYLE_TEMPLATE_PERIDOT),
+            13 => Some(USERSTYLE_TEMPLATE_SAPPHIRE),
+            14 => Some(USERSTYLE_TEMPLATE_OPAL),
+            15 => Some(USERSTYLE_TEMPLATE_TOPAZ),
+            16 => Some(USERSTYLE_TEMPLATE_TURQUOISE),
+            17 => Some(USERSTYLE_TEMPLATE_MOONSTONE),
+            18 => Some(USERSTYLE_TEMPLATE_CITRINE),
+            19 => Some(USERSTYLE_TEMPLATE_CRT),
+            20 => Some(USERSTYLE_TEMPLATE_MAGMA),
             _ => None,
         }
     }
 
     pub(super) fn userstyle_preset_for_css(css: &str) -> u32 {
-        if css == USERSTYLE_TEMPLATE_CARDTHROPIC {
+        if css == USERSTYLE_TEMPLATE_SYSTEM {
             1
-        } else if css == USERSTYLE_TEMPLATE_CARDTHROPIC_NIGHT {
+        } else if css == USERSTYLE_TEMPLATE_LIGHT_MODE {
             2
-        } else if css == USERSTYLE_TEMPLATE_CARDTHROPIC_MIDNIGHT {
-            3
-        } else if css == USERSTYLE_TEMPLATE_ARCADE {
-            4
-        } else if css == USERSTYLE_TEMPLATE_GLASS {
-            5
-        } else if css == USERSTYLE_TEMPLATE_NEON {
-            6
-        } else if css == USERSTYLE_TEMPLATE_NOIR {
-            7
-        } else if css == USERSTYLE_TEMPLATE_FOREST {
-            8
-        } else if css == USERSTYLE_TEMPLATE_CRT {
-            9
         } else if css == USERSTYLE_TEMPLATE_TERMINAL {
+            3
+        } else if css == USERSTYLE_TEMPLATE_NEON
+            || css == USERSTYLE_TEMPLATE_CARDTHROPIC
+            || css == USERSTYLE_TEMPLATE_CARDTHROPIC_MIDNIGHT
+            || css == USERSTYLE_TEMPLATE_ARCADE
+            || css == USERSTYLE_TEMPLATE_NOIR
+        {
+            4
+        } else if css == USERSTYLE_TEMPLATE_GARNET {
+            5
+        } else if css == USERSTYLE_TEMPLATE_AMETHYST {
+            6
+        } else if css == USERSTYLE_TEMPLATE_AQUAMARINE || css == USERSTYLE_TEMPLATE_FOREST {
+            7
+        } else if css == USERSTYLE_TEMPLATE_DIAMOND {
+            8
+        } else if css == USERSTYLE_TEMPLATE_EMERALD {
+            9
+        } else if css == USERSTYLE_TEMPLATE_PEARL {
             10
-        } else if css == USERSTYLE_TEMPLATE_MINIMAL_MONO {
+        } else if css == USERSTYLE_TEMPLATE_RUBY {
             11
+        } else if css == USERSTYLE_TEMPLATE_PERIDOT {
+            12
+        } else if css == USERSTYLE_TEMPLATE_SAPPHIRE {
+            13
+        } else if css == USERSTYLE_TEMPLATE_OPAL {
+            14
+        } else if css == USERSTYLE_TEMPLATE_TOPAZ {
+            15
+        } else if css == USERSTYLE_TEMPLATE_TURQUOISE {
+            16
+        } else if css == USERSTYLE_TEMPLATE_MOONSTONE {
+            17
+        } else if css == USERSTYLE_TEMPLATE_CITRINE {
+            18
+        } else if css == USERSTYLE_TEMPLATE_CRT {
+            19
+        } else if css == USERSTYLE_TEMPLATE_MAGMA {
+            20
         } else {
             0
         }
@@ -921,8 +1191,11 @@ impl CardthropicWindow {
             .title("Custom CSS Userstyle")
             .resizable(true)
             .default_width(760)
-            .default_height(560)
+            .default_height(645)
             .build();
+        let committed_css = Rc::new(RefCell::new(
+            self.imp().custom_userstyle_css.borrow().clone(),
+        ));
         dialog.set_transient_for(None::<&gtk::Window>);
         dialog.set_hide_on_close(true);
         dialog.set_destroy_with_parent(false);
@@ -955,7 +1228,7 @@ impl CardthropicWindow {
         root.append(&title);
 
         let subtitle = gtk::Label::new(Some(
-            "Opinionated mode: start from a preset, preview fast, then save. Applies over board/theme styling.",
+            "Editing Custom CSS. Import a preset to replace Custom, preview fast, then save.",
         ));
         subtitle.set_xalign(0.0);
         subtitle.set_wrap(true);
@@ -963,31 +1236,37 @@ impl CardthropicWindow {
         root.append(&subtitle);
 
         let presets_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        let presets_label = gtk::Label::new(Some("Preset"));
+        let presets_label = gtk::Label::new(Some("Import from Preset"));
         presets_label.set_xalign(0.0);
         presets_label.add_css_class("dim-label");
-        let presets_dropdown = gtk::DropDown::from_strings(Self::userstyle_preset_names());
-        presets_dropdown.set_selected(Self::userstyle_preset_for_css(
-            &self.imp().custom_userstyle_css.borrow(),
-        ));
+        let import_preset_names: Vec<String> = Self::userstyle_preset_names()
+            .iter()
+            .skip(1)
+            .map(|name| (*name).to_string())
+            .collect();
+        let import_preset_name_refs: Vec<&str> = import_preset_names
+            .iter()
+            .map(|name| name.as_str())
+            .collect();
+        let presets_dropdown = gtk::DropDown::from_strings(&import_preset_name_refs);
+        // Keep import unset initially so the field is visually blank until user chooses a preset.
+        presets_dropdown.set_selected(gtk::INVALID_LIST_POSITION);
         presets_dropdown.set_hexpand(true);
-        presets_row.append(&presets_label);
-        presets_row.append(&presets_dropdown);
-        root.append(&presets_row);
 
         let font_sizes: [u32; 10] = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20];
-        let font_size_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        let font_size_label = gtk::Label::new(Some("Font Size"));
+        let font_size_label = gtk::Label::new(Some("IDE Font Size"));
         font_size_label.set_xalign(0.0);
         font_size_label.add_css_class("dim-label");
         let font_size_dropdown = gtk::DropDown::from_strings(&[
             "8", "9", "10", "11", "12", "13", "14", "16", "18", "20",
         ]);
-        font_size_dropdown.set_hexpand(true);
-        font_size_dropdown.set_selected(5);
-        font_size_row.append(&font_size_label);
-        font_size_row.append(&font_size_dropdown);
-        root.append(&font_size_row);
+        font_size_dropdown.set_selected(3);
+
+        presets_row.append(&presets_label);
+        presets_row.append(&presets_dropdown);
+        presets_row.append(&font_size_label);
+        presets_row.append(&font_size_dropdown);
+        root.append(&presets_row);
 
         let scrolled = gtk::ScrolledWindow::builder()
             .hexpand(true)
@@ -1029,7 +1308,7 @@ impl CardthropicWindow {
             &editor_font_provider,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 5,
         );
-        editor_font_provider.load_from_string(".userstyle-editor-view { font-size: 13pt; }");
+        editor_font_provider.load_from_string(".userstyle-editor-view { font-size: 11pt; }");
 
         let hint = gtk::Label::new(Some(
             "Tip: target classes like .board-background, .card-slot, .keyboard-focus-card.",
@@ -1054,132 +1333,22 @@ impl CardthropicWindow {
         diagnostics.add_css_class("dim-label");
         root.append(&diagnostics);
 
-        let clipboard_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        let copy_css = gtk::Button::with_label("Copy CSS");
-        copy_css.add_css_class("flat");
-        let paste_css = gtk::Button::with_label("Paste CSS");
-        paste_css.add_css_class("flat");
-        let copy_preset = gtk::Button::with_label("Copy Preset + CSS");
-        copy_preset.add_css_class("flat");
-        clipboard_row.append(&copy_css);
-        clipboard_row.append(&paste_css);
-        clipboard_row.append(&copy_preset);
-        root.append(&clipboard_row);
-
         let actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         actions.set_halign(gtk::Align::End);
-        let reset = gtk::Button::with_label("Reset");
-        reset.add_css_class("flat");
-        let apply = gtk::Button::with_label("Apply Preview");
-        apply.add_css_class("flat");
-        let save = gtk::Button::with_label("Save");
+        let save = gtk::Button::with_label("Save Changes");
         save.add_css_class("suggested-action");
-        let close = gtk::Button::with_label("Close");
-        actions.append(&reset);
-        actions.append(&apply);
+        let close = gtk::Button::with_label("Discard Changes");
+        close.add_css_class("flat");
         actions.append(&save);
         actions.append(&close);
         root.append(&actions);
-
-        copy_css.connect_clicked(glib::clone!(
-            #[weak]
-            buffer,
-            #[weak]
-            status,
-            move |_| {
-                if let Some(display) = gdk::Display::default() {
-                    let clipboard = display.clipboard();
-                    let text = buffer
-                        .text(&buffer.start_iter(), &buffer.end_iter(), true)
-                        .to_string();
-                    clipboard.set_text(&text);
-                    status.set_label("Copied CSS to clipboard");
-                } else {
-                    status.set_label("Clipboard unavailable");
-                }
-            }
-        ));
-
-        paste_css.connect_clicked(glib::clone!(
-            #[weak]
-            buffer,
-            #[weak]
-            status,
-            #[weak]
-            diagnostics,
-            move |_| {
-                if let Some(display) = gdk::Display::default() {
-                    let clipboard = display.clipboard();
-                    clipboard.read_text_async(
-                        None::<&gio::Cancellable>,
-                        glib::clone!(
-                            #[weak]
-                            buffer,
-                            #[weak]
-                            status,
-                            #[weak]
-                            diagnostics,
-                            move |result| match result {
-                                Ok(Some(text)) => {
-                                    let text = text.to_string();
-                                    buffer.set_text(&text);
-                                    status.set_label("Pasted CSS from clipboard");
-                                    match Self::validate_userstyle_css(&text) {
-                                        Ok(_) => {
-                                            diagnostics.set_label("CSS diagnostics: Looks valid.");
-                                            diagnostics.remove_css_class("error");
-                                        }
-                                        Err(err) => {
-                                            diagnostics
-                                                .set_label(&format!("CSS diagnostics: {err}"));
-                                            diagnostics.add_css_class("error");
-                                        }
-                                    }
-                                }
-                                Ok(None) => status.set_label("Clipboard has no text"),
-                                Err(_) => status.set_label("Failed to read clipboard text"),
-                            }
-                        ),
-                    );
-                } else {
-                    status.set_label("Clipboard unavailable");
-                }
-            }
-        ));
-
-        copy_preset.connect_clicked(glib::clone!(
-            #[weak]
-            buffer,
-            #[weak]
-            presets_dropdown,
-            #[weak]
-            status,
-            move |_| {
-                if let Some(display) = gdk::Display::default() {
-                    let clipboard = display.clipboard();
-                    let css = buffer
-                        .text(&buffer.start_iter(), &buffer.end_iter(), true)
-                        .to_string();
-                    let preset_idx = presets_dropdown.selected() as usize;
-                    let preset_name = Self::userstyle_preset_names()
-                        .get(preset_idx)
-                        .copied()
-                        .unwrap_or("Custom");
-                    let payload = format!("/* Preset: {preset_name} */\n{css}");
-                    clipboard.set_text(&payload);
-                    status.set_label("Copied preset name + CSS to clipboard");
-                } else {
-                    status.set_label("Clipboard unavailable");
-                }
-            }
-        ));
 
         font_size_dropdown.connect_selected_notify(glib::clone!(
             #[strong]
             editor_font_provider,
             move |dropdown| {
                 let selected = dropdown.selected() as usize;
-                let size = *font_sizes.get(selected).unwrap_or(&13);
+                let size = *font_sizes.get(selected).unwrap_or(&11);
                 editor_font_provider.load_from_string(&format!(
                     ".userstyle-editor-view {{ font-size: {}pt; }}",
                     size
@@ -1187,47 +1356,29 @@ impl CardthropicWindow {
             }
         ));
 
-        let shortcut_controller = gtk::EventControllerKey::new();
-        shortcut_controller.connect_key_pressed(glib::clone!(
-            #[weak]
-            copy_css,
-            #[weak]
-            paste_css,
-            #[weak]
-            copy_preset,
-            #[upgrade_or]
-            glib::Propagation::Proceed,
-            move |_, key, _, state| {
-                let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
-                let shift = state.contains(gdk::ModifierType::SHIFT_MASK);
-
-                if ctrl && shift && matches!(key, gdk::Key::c | gdk::Key::C) {
-                    copy_preset.emit_clicked();
-                    return glib::Propagation::Stop;
-                }
-                if ctrl && !shift && matches!(key, gdk::Key::c | gdk::Key::C) {
-                    copy_css.emit_clicked();
-                    return glib::Propagation::Stop;
-                }
-                if ctrl && !shift && matches!(key, gdk::Key::v | gdk::Key::V) {
-                    paste_css.emit_clicked();
-                    return glib::Propagation::Stop;
-                }
-                glib::Propagation::Proceed
-            }
-        ));
-        dialog.add_controller(shortcut_controller);
-
         presets_dropdown.connect_selected_notify(glib::clone!(
             #[weak(rename_to = window)]
             self,
             #[weak]
             buffer,
+            #[weak]
+            status,
+            #[weak]
+            live_preview,
+            #[strong]
+            import_preset_names,
             move |dropdown| {
-                if let Some(css) = Self::userstyle_css_for_preset(dropdown.selected()) {
+                let import_idx = dropdown.selected() as usize;
+                let preset_idx = dropdown.selected() + 1;
+                if let Some(css) = Self::userstyle_css_for_preset(preset_idx) {
                     buffer.set_text(css);
-                    // Preset picker should immediately preview and persist as a preset choice.
-                    window.apply_custom_userstyle(css, true);
+                    if live_preview.is_active() {
+                        // Import previews immediately only when live preview is enabled.
+                        window.apply_custom_userstyle(css, false);
+                    }
+                    if let Some(name) = import_preset_names.get(import_idx) {
+                        status.set_label(&format!("Imported {name} into Custom CSS"));
+                    }
                 }
             }
         ));
@@ -1263,34 +1414,6 @@ impl CardthropicWindow {
             }
         ));
 
-        apply.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            #[weak]
-            buffer,
-            #[weak]
-            status,
-            #[weak]
-            diagnostics,
-            move |_| {
-                let text = buffer
-                    .text(&buffer.start_iter(), &buffer.end_iter(), true)
-                    .to_string();
-                window.apply_custom_userstyle(&text, false);
-                status.set_label("Preview applied");
-                match Self::validate_userstyle_css(&text) {
-                    Ok(_) => {
-                        diagnostics.set_label("CSS diagnostics: Looks valid.");
-                        diagnostics.remove_css_class("error");
-                    }
-                    Err(err) => {
-                        diagnostics.set_label(&format!("CSS diagnostics: {err}"));
-                        diagnostics.add_css_class("error");
-                    }
-                }
-            }
-        ));
-
         save.connect_clicked(glib::clone!(
             #[weak(rename_to = window)]
             self,
@@ -1300,12 +1423,17 @@ impl CardthropicWindow {
             status,
             #[weak]
             diagnostics,
+            #[strong]
+            committed_css,
+            #[weak]
+            dialog,
             move |_| {
                 let text = buffer
                     .text(&buffer.start_iter(), &buffer.end_iter(), true)
                     .to_string();
                 window.apply_custom_userstyle(&text, true);
-                status.set_label("Saved to preferences");
+                *committed_css.borrow_mut() = text.clone();
+                status.set_label("Changes saved");
                 match Self::validate_userstyle_css(&text) {
                     Ok(_) => {
                         diagnostics.set_label("CSS diagnostics: Looks valid.");
@@ -1316,35 +1444,20 @@ impl CardthropicWindow {
                         diagnostics.add_css_class("error");
                     }
                 }
-            }
-        ));
-
-        reset.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            #[weak]
-            buffer,
-            #[weak]
-            presets_dropdown,
-            #[weak]
-            status,
-            #[weak]
-            diagnostics,
-            move |_| {
-                buffer.set_text(Self::default_userstyle_css());
-                window.apply_custom_userstyle(Self::default_userstyle_css(), true);
-                status.set_label("Reset to default Cardthropic CSS");
-                diagnostics.set_label("CSS diagnostics: Ready");
-                diagnostics.remove_css_class("error");
-                presets_dropdown
-                    .set_selected(Self::userstyle_preset_for_css(Self::default_userstyle_css()));
+                dialog.close();
             }
         ));
 
         close.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[strong]
+            committed_css,
             #[weak]
             dialog,
             move |_| {
+                let css = committed_css.borrow().clone();
+                window.apply_custom_userstyle(&css, false);
                 dialog.close();
             }
         ));
@@ -1352,9 +1465,13 @@ impl CardthropicWindow {
         dialog.connect_close_request(glib::clone!(
             #[weak(rename_to = window)]
             self,
+            #[strong]
+            committed_css,
             #[upgrade_or]
             glib::Propagation::Proceed,
             move |_| {
+                let css = committed_css.borrow().clone();
+                window.apply_custom_userstyle(&css, false);
                 *window.imp().custom_userstyle_dialog.borrow_mut() = None;
                 glib::Propagation::Proceed
             }
