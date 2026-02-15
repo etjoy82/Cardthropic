@@ -1,5 +1,6 @@
 use super::*;
 use crate::engine::boundary;
+use crate::game::SpiderGame;
 
 impl CardthropicWindow {
     pub(super) fn tableau_card_y_offset(
@@ -33,6 +34,82 @@ impl CardthropicWindow {
         card_height: i32,
     ) -> Option<gdk::Texture> {
         let len = game.tableau_len(col)?;
+        if start >= len {
+            return None;
+        }
+
+        let face_up_step = self.imp().face_up_step.get();
+        let face_down_step = self.imp().face_down_step.get();
+        let mut y = 0_i32;
+        let mut layers: Vec<(gdk_pixbuf::Pixbuf, i32)> = Vec::new();
+
+        for idx in start..len {
+            let card = game.tableau_card(col, idx)?;
+            let pixbuf = if card.face_up {
+                deck.pixbuf_for_card_scaled(card, card_width, card_height)
+            } else {
+                deck.back_pixbuf_scaled(card_width, card_height)
+            };
+            layers.push((pixbuf, y));
+            y += if card.face_up {
+                face_up_step
+            } else {
+                face_down_step
+            };
+        }
+
+        let run_height = layers
+            .last()
+            .map(|(_, pos_y)| pos_y + card_height)
+            .unwrap_or(card_height)
+            .max(card_height);
+        let composed = gdk_pixbuf::Pixbuf::new(
+            gdk_pixbuf::Colorspace::Rgb,
+            true,
+            8,
+            card_width.max(1),
+            run_height.max(1),
+        )?;
+        composed.fill(0x00000000);
+
+        for (layer, pos_y) in layers {
+            layer.copy_area(0, 0, card_width, card_height, &composed, 0, pos_y);
+        }
+
+        Some(gdk::Texture::for_pixbuf(&composed))
+    }
+
+    pub(super) fn tableau_card_y_offset_spider(
+        &self,
+        game: &SpiderGame,
+        col: usize,
+        index: usize,
+    ) -> i32 {
+        let mut y = 0_i32;
+        let face_up_step = self.imp().face_up_step.get();
+        let face_down_step = self.imp().face_down_step.get();
+        for idx in 0..index {
+            if let Some(card) = game.tableau_card(col, idx) {
+                y += if card.face_up {
+                    face_up_step
+                } else {
+                    face_down_step
+                };
+            }
+        }
+        y
+    }
+
+    pub(super) fn texture_for_tableau_drag_run_spider(
+        &self,
+        game: &SpiderGame,
+        deck: &AngloDeck,
+        col: usize,
+        start: usize,
+        card_width: i32,
+        card_height: i32,
+    ) -> Option<gdk::Texture> {
+        let len = game.tableau().get(col).map(Vec::len)?;
         if start >= len {
             return None;
         }
@@ -172,6 +249,47 @@ impl CardthropicWindow {
         y: f64,
     ) -> Option<usize> {
         let len = game.tableau_len(col)?;
+        if len == 0 {
+            return None;
+        }
+
+        let mut y_pos = 0.0_f64;
+        let mut positions = Vec::with_capacity(len);
+        let face_up_step = f64::from(self.imp().face_up_step.get());
+        let face_down_step = f64::from(self.imp().face_down_step.get());
+        for idx in 0..len {
+            positions.push((idx, y_pos));
+            let card = game.tableau_card(col, idx)?;
+            y_pos += if card.face_up {
+                face_up_step
+            } else {
+                face_down_step
+            };
+        }
+
+        let mut start = positions.last().map(|(idx, _)| *idx)?;
+        for (idx, pos) in positions {
+            if y >= pos {
+                start = idx;
+            } else {
+                break;
+            }
+        }
+
+        if game.tableau_card(col, start)?.face_up {
+            Some(start)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn tableau_run_start_from_y_spider(
+        &self,
+        game: &SpiderGame,
+        col: usize,
+        y: f64,
+    ) -> Option<usize> {
+        let len = game.tableau().get(col).map(Vec::len)?;
         if len == 0 {
             return None;
         }

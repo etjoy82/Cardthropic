@@ -56,6 +56,15 @@
     <content_attribute id="social-location">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.8.0" date="2026-02-15">
+      <description>
+        <p>Major Spider expansion: suit selector (1/2/3/4), full engine parity work, and broad move/interaction reliability improvements.</p>
+        <p>Automation upgrades across Spider and Klondike, including improved Robot behavior, richer status reporting, and reduced loop-prone exploration.</p>
+        <p>Added Spider W? seed winnability analysis path with solver-line handoff to Robot mode when available.</p>
+        <p>Added Smart Move support for Spider and aligned click-mode behavior (single/double/disabled) with mode-specific move handling.</p>
+        <p>UI polish: Spider foundations are hidden, status log auto-scroll is more reliable to true bottom, and FreeCell mode is visibly disabled in the menu until engine-ready.</p>
+      </description>
+    </release>
     <release version="0.6.0" date="2026-02-13">
       <description>
         <p>Major maintainer workflow hardening: strict shell policy checks, release consistency checks, shell lint policy, and one-command gate targets.</p>

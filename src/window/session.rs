@@ -170,6 +170,8 @@ impl CardthropicWindow {
         );
         imp.timer_started
             .set(imp.timer_started.get() && !boundary::is_won(&imp.game.borrow(), session.mode));
+        imp.spider_suit_mode
+            .set(imp.game.borrow().spider().suit_mode());
         self.set_seed_input_text(&session.seed.to_string());
         *imp.status_override.borrow_mut() = Some("Resumed previous game.".to_string());
         *imp.last_saved_session.borrow_mut() = raw;

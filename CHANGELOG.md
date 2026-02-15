@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation and maintainer release tooling continue to be refined for the alpha testbed workflow.
 
 
+
+## [0.8.0] - 2026-02-15
+
+### Changed
+- Major Spider expansion: suit selector (1/2/3/4), full engine parity work, and broad move/interaction reliability improvements.
+- Automation upgrades across Spider and Klondike, including improved Robot behavior, richer status reporting, and reduced loop-prone exploration.
+- Added Spider `W?` seed winnability analysis path with solver-line handoff to Robot mode when available.
+- Added Smart Move support for Spider and aligned click-mode behavior (single/double/disabled) with mode-specific move handling.
+- UI polish: Spider foundations are hidden, status log auto-scroll is more reliable to true bottom, and FreeCell mode is visibly disabled in the menu until engine-ready.
+
 ## [0.6.0] - 2026-02-13
 
 ### Changed

@@ -41,7 +41,7 @@ use crate::engine::seed_history::SeedHistoryStore;
 use crate::engine::variant::variant_for_mode;
 use crate::engine::variant_engine::engine_for_mode;
 use crate::engine::variant_state::VariantStateStore;
-use crate::game::{Card, DrawMode, GameMode, KlondikeGame, SolverMove};
+use crate::game::{Card, DrawMode, GameMode, KlondikeGame, SolverMove, SpiderSuitMode};
 use crate::winnability;
 
 #[path = "window/actions_history.rs"]
@@ -184,6 +184,8 @@ mod imp {
         #[template_child]
         pub foundations_heading_box: TemplateChild<gtk::Box>,
         #[template_child]
+        pub foundations_area_box: TemplateChild<gtk::Box>,
+        #[template_child]
         pub foundation_picture_1: TemplateChild<gtk::Picture>,
         #[template_child]
         pub foundation_placeholder_1: TemplateChild<gtk::Label>,
@@ -208,7 +210,11 @@ mod imp {
         #[template_child]
         pub foundation_label_4: TemplateChild<gtk::Label>,
         #[template_child]
-        pub status_label: TemplateChild<gtk::Label>,
+        pub status_text_view: TemplateChild<gtk::TextView>,
+        #[template_child]
+        pub status_scroller: TemplateChild<gtk::ScrolledWindow>,
+        #[template_child]
+        pub status_clear_button: TemplateChild<gtk::Button>,
         #[template_child]
         #[allow(deprecated)]
         pub seed_combo: TemplateChild<gtk::ComboBoxText>,
@@ -238,6 +244,12 @@ mod imp {
         pub tableau_stack_6: TemplateChild<gtk::Fixed>,
         #[template_child]
         pub tableau_stack_7: TemplateChild<gtk::Fixed>,
+        #[template_child]
+        pub tableau_stack_8: TemplateChild<gtk::Fixed>,
+        #[template_child]
+        pub tableau_stack_9: TemplateChild<gtk::Fixed>,
+        #[template_child]
+        pub tableau_stack_10: TemplateChild<gtk::Fixed>,
         #[template_child]
         pub tableau_scroller: TemplateChild<gtk::ScrolledWindow>,
         #[template_child]
@@ -277,6 +289,8 @@ mod imp {
         pub custom_userstyle_css: RefCell<String>,
         pub custom_userstyle_provider: RefCell<Option<gtk::CssProvider>>,
         pub custom_userstyle_dialog: RefCell<Option<gtk::Window>>,
+        pub status_history: RefCell<VecDeque<String>>,
+        pub status_last_appended: RefCell<String>,
         pub deck: RefCell<Option<AngloDeck>>,
         pub deck_load_attempted: Cell<bool>,
         pub deck_error: RefCell<Option<String>>,
@@ -334,6 +348,7 @@ mod imp {
         pub peek_generation: Cell<u64>,
         pub current_game_mode: Cell<GameMode>,
         pub klondike_draw_mode: Cell<DrawMode>,
+        pub spider_suit_mode: Cell<SpiderSuitMode>,
         pub game_mode_buttons: RefCell<HashMap<GameMode, gtk::Button>>,
         pub help_dialog: RefCell<Option<gtk::Window>>,
         pub apm_graph_dialog: RefCell<Option<gtk::Window>>,
@@ -372,6 +387,7 @@ mod imp {
                 stock_heading_box: TemplateChild::default(),
                 waste_heading_box: TemplateChild::default(),
                 foundations_heading_box: TemplateChild::default(),
+                foundations_area_box: TemplateChild::default(),
                 foundation_picture_1: TemplateChild::default(),
                 foundation_placeholder_1: TemplateChild::default(),
                 foundation_picture_2: TemplateChild::default(),
@@ -384,7 +400,9 @@ mod imp {
                 foundation_label_2: TemplateChild::default(),
                 foundation_label_3: TemplateChild::default(),
                 foundation_label_4: TemplateChild::default(),
-                status_label: TemplateChild::default(),
+                status_text_view: TemplateChild::default(),
+                status_scroller: TemplateChild::default(),
+                status_clear_button: TemplateChild::default(),
                 seed_combo: TemplateChild::default(),
                 seed_random_button: TemplateChild::default(),
                 seed_rescue_button: TemplateChild::default(),
@@ -399,6 +417,9 @@ mod imp {
                 tableau_stack_5: TemplateChild::default(),
                 tableau_stack_6: TemplateChild::default(),
                 tableau_stack_7: TemplateChild::default(),
+                tableau_stack_8: TemplateChild::default(),
+                tableau_stack_9: TemplateChild::default(),
+                tableau_stack_10: TemplateChild::default(),
                 tableau_scroller: TemplateChild::default(),
                 tableau_row: TemplateChild::default(),
                 main_menu_popover: TemplateChild::default(),
@@ -427,6 +448,8 @@ mod imp {
                 custom_userstyle_css: RefCell::new(String::new()),
                 custom_userstyle_provider: RefCell::new(None),
                 custom_userstyle_dialog: RefCell::new(None),
+                status_history: RefCell::new(VecDeque::new()),
+                status_last_appended: RefCell::new(String::new()),
                 deck: RefCell::new(None),
                 deck_load_attempted: Cell::new(false),
                 deck_error: RefCell::new(None),
@@ -450,7 +473,7 @@ mod imp {
                 geometry_render_pending: Cell::new(false),
                 geometry_render_dirty: Cell::new(false),
                 last_metrics_key: Cell::new(0),
-                tableau_card_pictures: RefCell::new(vec![Vec::new(); 7]),
+                tableau_card_pictures: RefCell::new(vec![Vec::new(); 10]),
                 hint_timeouts: RefCell::new(Vec::new()),
                 hint_widgets: RefCell::new(Vec::new()),
                 hint_recent_states: RefCell::new(VecDeque::new()),
@@ -484,6 +507,7 @@ mod imp {
                 peek_generation: Cell::new(0),
                 current_game_mode: Cell::new(GameMode::Klondike),
                 klondike_draw_mode: Cell::new(DrawMode::One),
+                spider_suit_mode: Cell::new(SpiderSuitMode::One),
                 game_mode_buttons: RefCell::new(HashMap::new()),
                 help_dialog: RefCell::new(None),
                 apm_graph_dialog: RefCell::new(None),
@@ -640,6 +664,7 @@ const APP_ICON_FALLBACK_NAME: &str = "cardthropic";
 const SETTINGS_SCHEMA_ID: &str = "io.codeberg.emviolet.cardthropic";
 const SETTINGS_KEY_BOARD_COLOR: &str = "board-color";
 const SETTINGS_KEY_SMART_MOVE_MODE: &str = "smart-move-mode";
+const SETTINGS_KEY_SPIDER_SUIT_MODE: &str = "spider-suit-mode";
 const SETTINGS_KEY_SAVED_SESSION: &str = "saved-session";
 const SETTINGS_KEY_CUSTOM_USERSTYLE_CSS: &str = "custom-userstyle-css";
 const SETTINGS_KEY_CUSTOM_CARD_SVG: &str = "custom-card-svg";

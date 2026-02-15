@@ -182,7 +182,11 @@ impl CardthropicWindow {
         let foundation_top_exists =
             boundary::foundation_top_exists(&imp.game.borrow(), mode, foundation_idx);
         if foundation_top_exists {
-            for dst in 0..7 {
+            let tableau_columns = match mode {
+                GameMode::Spider => 10,
+                _ => 7,
+            };
+            for dst in 0..tableau_columns {
                 let can_move = boundary::can_move_foundation_top_to_tableau(
                     &imp.game.borrow(),
                     mode,

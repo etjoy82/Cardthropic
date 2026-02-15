@@ -73,6 +73,16 @@ impl CardthropicWindow {
                 window.toggle_robot_mode();
             }
         ));
+        imp.status_clear_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| {
+                let imp = window.imp();
+                imp.status_history.borrow_mut().clear();
+                imp.status_last_appended.borrow_mut().clear();
+                imp.status_text_view.buffer().set_text("");
+            }
+        ));
     }
 
     pub(super) fn setup_robot_stop_capture_handler(&self) {
@@ -246,6 +256,32 @@ impl CardthropicWindow {
                 #[weak(rename_to = window)]
                 self,
                 move |_, n_press, _, y| {
+                    if window.active_game_mode() == GameMode::Spider {
+                        let game = window.imp().game.borrow().spider().clone();
+                        let start = window.tableau_run_start_from_y_spider(&game, index, y);
+                        match window.smart_move_mode() {
+                            SmartMoveMode::DoubleClick if n_press == 2 => {
+                                if let Some(start) = start {
+                                    window.try_smart_move_from_tableau(index, start);
+                                }
+                            }
+                            SmartMoveMode::SingleClick if n_press == 1 => {
+                                *window.imp().selected_run.borrow_mut() = None;
+                                window.imp().waste_selected.set(false);
+                                if let Some(start) = start {
+                                    window.try_smart_move_from_tableau(index, start);
+                                }
+                            }
+                            SmartMoveMode::Disabled | SmartMoveMode::DoubleClick
+                                if n_press == 1 =>
+                            {
+                                window.select_or_move_tableau_with_start(index, start);
+                            }
+                            _ => {}
+                        }
+                        return;
+                    }
+
                     match window.smart_move_mode() {
                         SmartMoveMode::DoubleClick if n_press == 2 => {
                             let start = boundary::clone_klondike_for_automation(

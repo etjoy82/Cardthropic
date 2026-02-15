@@ -1,4 +1,5 @@
 use super::*;
+use crate::engine::boundary;
 use crate::engine::seed_ops;
 
 impl CardthropicWindow {
@@ -30,8 +31,11 @@ impl CardthropicWindow {
         self.refresh_seed_history_dropdown();
     }
 
-    pub(super) fn note_current_seed_win_if_needed(&self, game: &KlondikeGame) {
-        if !game.is_won() || self.imp().current_seed_win_recorded.get() {
+    pub(super) fn note_current_seed_win_if_needed(&self) {
+        let mode = self.active_game_mode();
+        if !boundary::is_won(&self.imp().game.borrow(), mode)
+            || self.imp().current_seed_win_recorded.get()
+        {
             return;
         }
 

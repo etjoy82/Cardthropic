@@ -177,16 +177,43 @@
                           </object>
                         </child>
                         <child>
-                          <object class="GtkLabel" id="status_label">
-                            <property name="xalign">0</property>
-                            <property name="yalign">0</property>
-                            <property name="hexpand">True</property>
-                            <property name="wrap">True</property>
-                            <property name="wrap-mode">word-char</property>
-                            <property name="max-width-chars">120</property>
-                            <style>
-                              <class name="status-line"/>
-                            </style>
+                          <object class="GtkBox">
+                            <property name="spacing">6</property>
+                            <child>
+                              <object class="GtkScrolledWindow" id="status_scroller">
+                                <property name="hexpand">True</property>
+                                <property name="vexpand">False</property>
+                                <property name="min-content-height">44</property>
+                                <property name="max-content-height">44</property>
+                                <property name="hscrollbar-policy">never</property>
+                                <property name="vscrollbar-policy">automatic</property>
+                                <property name="overlay-scrolling">True</property>
+                                <child>
+                                  <object class="GtkTextView" id="status_text_view">
+                                    <property name="editable">False</property>
+                                    <property name="cursor-visible">False</property>
+                                    <property name="accepts-tab">False</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="hexpand">True</property>
+                                    <property name="vexpand">False</property>
+                                    <property name="wrap-mode">word-char</property>
+                                    <property name="left-margin">2</property>
+                                    <property name="right-margin">2</property>
+                                    <style>
+                                      <class name="status-line"/>
+                                    </style>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="status_clear_button">
+                                <property name="label" translatable="yes">Clear</property>
+                                <property name="tooltip-text" translatable="yes">Clear status log</property>
+                                <property name="has-frame">False</property>
+                                <property name="valign">center</property>
+                              </object>
+                            </child>
                           </object>
                         </child>
                       </object>
@@ -449,7 +476,7 @@
                               </object>
                             </child>
                             <child>
-                              <object class="GtkBox">
+                              <object class="GtkBox" id="foundations_area_box">
                                 <property name="spacing">8</property>
                                 <property name="halign">end</property>
                                 <property name="valign">start</property>
@@ -711,6 +738,36 @@
                                 </child>
                                 <child>
                                   <object class="GtkFixed" id="tableau_stack_7">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_8">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_9">
+                                    <property name="width-request">74</property>
+                                    <property name="height-request">120</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">start</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkFixed" id="tableau_stack_10">
                                     <property name="width-request">74</property>
                                     <property name="height-request">120</property>
                                     <property name="halign">start</property>

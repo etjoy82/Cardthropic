@@ -1,9 +1,9 @@
 use crate::engine::automation::{
     AutomationProfile, FREECELL_AUTOMATION_PROFILE, SPIDER_AUTOMATION_PROFILE,
 };
-use crate::engine::variant_engine::VariantEngine;
+use crate::engine::variant_engine::{VariantCapabilities, VariantEngine};
 use crate::engine::variant_state::VariantStateStore;
-use crate::game::{DrawMode, GameMode, SpiderGame};
+use crate::game::{Card, DrawMode, DrawResult, GameMode, SpiderGame};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SpiderEngine;
@@ -14,7 +14,23 @@ impl VariantEngine for SpiderEngine {
     }
 
     fn engine_ready(&self) -> bool {
-        false
+        true
+    }
+
+    fn capabilities(&self) -> VariantCapabilities {
+        VariantCapabilities {
+            draw: true,
+            undo_redo: true,
+            smart_move: true,
+            autoplay: true,
+            rapid_wand: true,
+            robot_mode: true,
+            winnability: true,
+            seeded_deals: true,
+            cyclone_shuffle: true,
+            peek: true,
+            draw_mode_selection: false,
+        }
     }
 
     fn automation_profile(&self) -> AutomationProfile {
@@ -27,8 +43,61 @@ impl VariantEngine for SpiderEngine {
         seed: u64,
         _draw_mode: DrawMode,
     ) -> bool {
-        state.set_spider(SpiderGame::new_with_seed(seed));
+        let suit_mode = state.spider().suit_mode();
+        state.set_spider(SpiderGame::new_with_seed_and_mode(seed, suit_mode));
         true
+    }
+
+    fn draw_or_recycle(
+        &self,
+        state: &mut VariantStateStore,
+        _draw_mode: DrawMode,
+    ) -> Option<DrawResult> {
+        if state.spider_mut().deal_from_stock() {
+            Some(DrawResult::DrewFromStock)
+        } else {
+            Some(DrawResult::NoOp)
+        }
+    }
+
+    fn move_tableau_run_to_tableau(
+        &self,
+        state: &mut VariantStateStore,
+        src: usize,
+        start: usize,
+        dst: usize,
+    ) -> bool {
+        state.spider_mut().move_run(src, start, dst)
+    }
+
+    fn cyclone_shuffle_tableau(&self, state: &mut VariantStateStore) -> bool {
+        state.spider_mut().cyclone_shuffle_tableau()
+    }
+
+    fn can_move_tableau_run_to_tableau(
+        &self,
+        state: &VariantStateStore,
+        src: usize,
+        start: usize,
+        dst: usize,
+    ) -> bool {
+        state.spider().can_move_run(src, start, dst)
+    }
+
+    fn tableau_top(&self, state: &VariantStateStore, col: usize) -> Option<Card> {
+        state
+            .spider()
+            .tableau()
+            .get(col)
+            .and_then(|pile| pile.last().copied())
+    }
+
+    fn tableau_len(&self, state: &VariantStateStore, col: usize) -> Option<usize> {
+        state.spider().tableau().get(col).map(Vec::len)
+    }
+
+    fn is_won(&self, state: &VariantStateStore) -> bool {
+        state.spider().is_won()
     }
 }
 

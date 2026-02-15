@@ -4,7 +4,10 @@ use std::hash::{Hash, Hasher};
 
 impl CardthropicWindow {
     pub(super) fn update_tableau_metrics(&self) {
-        const COLUMNS: i32 = 7;
+        let columns = match self.active_game_mode() {
+            GameMode::Spider => 10,
+            _ => 7,
+        };
         let profile = self.workspace_layout_profile();
 
         let imp = self.imp();
@@ -37,8 +40,8 @@ impl CardthropicWindow {
         } else {
             (window_width - profile.side_padding * 2).max(0)
         };
-        let slots = (available_width - column_gap * (COLUMNS - 1)).max(0);
-        let width_limited_by_columns = if slots > 0 { slots / COLUMNS } else { 70 };
+        let slots = (available_width - column_gap * (columns - 1)).max(0);
+        let width_limited_by_columns = if slots > 0 { slots / columns } else { 70 };
         let width_limited_by_top_row = self.max_card_width_for_top_row_fit(available_width);
         let reserve = self.vertical_layout_reserve(window_height);
         let usable_window_height = (window_height - reserve).max(220);
@@ -184,11 +187,17 @@ impl CardthropicWindow {
         let mut best = 18;
         let mut lo = 18;
         let mut hi = 320;
+        let spider_mode = self.active_game_mode() == GameMode::Spider;
 
         while lo <= hi {
             let mid = (lo + hi) / 2;
             let waste_step = (mid / 6).clamp(8, 22);
-            let top_row_width = (6 * mid) + (4 * waste_step) + 56;
+            let top_row_width = if spider_mode {
+                // Spider hides foundations; only stock + waste need to fit.
+                (2 * mid) + (4 * waste_step) + 32
+            } else {
+                (6 * mid) + (4 * waste_step) + 56
+            };
             if top_row_width <= usable {
                 best = mid;
                 lo = mid + 1;

@@ -24,7 +24,12 @@ impl CardthropicWindow {
             let button = gtk::Button::with_label(spec.emoji);
             button.add_css_class("flat");
             button.add_css_class("game-mode-emoji-button");
-            button.set_tooltip_text(Some(spec.label));
+            if spec.engine_ready {
+                button.set_tooltip_text(Some(spec.label));
+            } else {
+                button.set_tooltip_text(Some(&format!("{} (coming soon)", spec.label)));
+                button.set_sensitive(false);
+            }
             button.connect_clicked(glib::clone!(
                 #[weak(rename_to = window)]
                 self,
@@ -82,7 +87,47 @@ impl CardthropicWindow {
         heading.add_css_class("heading");
         imp.game_settings_content_box.append(&heading);
 
-        if caps.draw_mode_selection {
+        if mode == GameMode::Spider {
+            let suit_label = gtk::Label::new(Some("Suits"));
+            suit_label.set_xalign(0.0);
+            suit_label.add_css_class("dim-label");
+            imp.game_settings_content_box.append(&suit_label);
+
+            let suit_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+            suit_row.set_hexpand(true);
+            let suits = [
+                SpiderSuitMode::One,
+                SpiderSuitMode::Two,
+                SpiderSuitMode::Three,
+                SpiderSuitMode::Four,
+            ];
+            let current_suit_mode = self.current_spider_suit_mode();
+            let mut group_anchor: Option<gtk::CheckButton> = None;
+
+            for suit_mode in suits {
+                let label = format!("Suit {}", suit_mode.suit_count());
+                let button = gtk::CheckButton::with_label(&label);
+                if let Some(anchor) = group_anchor.as_ref() {
+                    button.set_group(Some(anchor));
+                } else {
+                    group_anchor = Some(button.clone());
+                }
+                if suit_mode == current_suit_mode {
+                    button.set_active(true);
+                }
+                button.connect_toggled(glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |btn| {
+                        if btn.is_active() {
+                            window.set_spider_suit_mode(suit_mode, true);
+                        }
+                    }
+                ));
+                suit_row.append(&button);
+            }
+            imp.game_settings_content_box.append(&suit_row);
+        } else if caps.draw_mode_selection {
             let draw_label = gtk::Label::new(Some("Deal"));
             draw_label.set_xalign(0.0);
             draw_label.add_css_class("dim-label");

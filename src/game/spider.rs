@@ -9,6 +9,7 @@ use super::{Card, Suit};
 pub enum SpiderSuitMode {
     One,
     Two,
+    Three,
     Four,
 }
 
@@ -76,7 +77,7 @@ impl SpiderGame {
     }
 
     pub fn can_deal_from_stock(&self) -> bool {
-        self.stock.len() >= 10 && self.tableau.iter().all(|pile| !pile.is_empty())
+        self.stock.len() >= 10
     }
 
     pub fn deal_from_stock(&mut self) -> bool {
@@ -127,6 +128,52 @@ impl SpiderGame {
         self.flip_top_if_needed(src);
         self.remove_completed_runs();
         true
+    }
+
+    pub fn cyclone_shuffle_tableau(&mut self) -> bool {
+        let original = self.tableau.clone();
+        let column_geometry: Vec<(usize, usize)> = self
+            .tableau
+            .iter()
+            .map(|pile| {
+                let face_down = pile.iter().filter(|card| !card.face_up).count();
+                let face_up = pile.len().saturating_sub(face_down);
+                (face_down, face_up)
+            })
+            .collect();
+
+        let mut cards: Vec<Card> = self
+            .tableau
+            .iter()
+            .flat_map(|pile| pile.iter().copied())
+            .collect();
+        if cards.len() < 2 {
+            return false;
+        }
+
+        let mut rng = rand::thread_rng();
+        for _ in 0..8 {
+            cards.shuffle(&mut rng);
+
+            let mut cursor = 0_usize;
+            for (col, pile) in self.tableau.iter_mut().enumerate() {
+                let (face_down, face_up) = column_geometry[col];
+                let pile_len = face_down + face_up;
+                pile.clear();
+                for idx in 0..pile_len {
+                    let mut card = cards[cursor];
+                    cursor += 1;
+                    card.face_up = idx >= face_down;
+                    pile.push(card);
+                }
+            }
+
+            if self.tableau != original {
+                return true;
+            }
+        }
+
+        false
     }
 
     pub fn tableau_card(&self, col: usize, index: usize) -> Option<Card> {
@@ -217,10 +264,30 @@ impl SpiderGame {
 }
 
 impl SpiderSuitMode {
+    pub fn suit_count(self) -> u8 {
+        match self {
+            Self::One => 1,
+            Self::Two => 2,
+            Self::Three => 3,
+            Self::Four => 4,
+        }
+    }
+
+    pub fn from_suit_count(value: u8) -> Option<Self> {
+        match value {
+            1 => Some(Self::One),
+            2 => Some(Self::Two),
+            3 => Some(Self::Three),
+            4 => Some(Self::Four),
+            _ => None,
+        }
+    }
+
     fn session_tag(self) -> &'static str {
         match self {
             Self::One => "1",
             Self::Two => "2",
+            Self::Three => "3",
             Self::Four => "4",
         }
     }
@@ -229,6 +296,7 @@ impl SpiderSuitMode {
         match value {
             "1" => Some(Self::One),
             "2" => Some(Self::Two),
+            "3" => Some(Self::Three),
             "4" => Some(Self::Four),
             _ => None,
         }
@@ -290,6 +358,33 @@ fn spider_deck(suit_mode: SpiderSuitMode) -> Vec<Card> {
                         });
                     }
                 }
+            }
+        }
+        SpiderSuitMode::Three => {
+            let suits = [Suit::Spades, Suit::Hearts, Suit::Clubs];
+            let full_set = suits.len() * 13;
+            let base_copies = 104 / full_set;
+            let remainder = 104 % full_set;
+
+            for _ in 0..base_copies {
+                for suit in suits {
+                    for rank in 1..=13 {
+                        deck.push(Card {
+                            suit,
+                            rank,
+                            face_up: false,
+                        });
+                    }
+                }
+            }
+            for idx in 0..remainder {
+                let suit = suits[idx % suits.len()];
+                let rank = u8::try_from((idx / suits.len()) + 1).unwrap_or(13);
+                deck.push(Card {
+                    suit,
+                    rank,
+                    face_up: false,
+                });
             }
         }
     }

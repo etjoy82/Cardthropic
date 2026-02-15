@@ -74,7 +74,7 @@ impl GameMode {
     }
 
     pub fn engine_ready(self) -> bool {
-        matches!(self, Self::Klondike)
+        matches!(self, Self::Klondike | Self::Spider)
     }
 }
 

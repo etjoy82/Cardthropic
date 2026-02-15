@@ -15,22 +15,37 @@ fn foundation_index_for_suit(suit: Suit) -> usize {
 
 impl CardthropicWindow {
     pub(super) fn is_face_up_tableau_run(&self, col: usize, start: usize) -> bool {
-        let Some(game) = boundary::clone_klondike_for_automation(
-            &self.imp().game.borrow(),
-            self.active_game_mode(),
-            self.current_klondike_draw_mode(),
-        ) else {
-            return false;
-        };
+        match self.active_game_mode() {
+            GameMode::Spider => {
+                let game = self.imp().game.borrow();
+                let spider = game.spider();
+                let Some(len) = spider.tableau().get(col).map(Vec::len) else {
+                    return false;
+                };
+                if start >= len {
+                    return false;
+                }
+                (start..len).all(|idx| spider.tableau_card(col, idx).is_some_and(|c| c.face_up))
+            }
+            _ => {
+                let Some(game) = boundary::clone_klondike_for_automation(
+                    &self.imp().game.borrow(),
+                    self.active_game_mode(),
+                    self.current_klondike_draw_mode(),
+                ) else {
+                    return false;
+                };
 
-        let Some(len) = game.tableau_len(col) else {
-            return false;
-        };
-        if start >= len {
-            return false;
+                let Some(len) = game.tableau_len(col) else {
+                    return false;
+                };
+                if start >= len {
+                    return false;
+                }
+
+                (start..len).all(|idx| game.tableau_card(col, idx).is_some_and(|card| card.face_up))
+            }
         }
-
-        (start..len).all(|idx| game.tableau_card(col, idx).is_some_and(|card| card.face_up))
     }
 
     pub(super) fn draw_card(&self) -> bool {

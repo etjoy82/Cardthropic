@@ -12,7 +12,7 @@ use crate::engine::{
     automation::KLONDIKE_AUTOMATION_PROFILE, automation::SPIDER_AUTOMATION_PROFILE,
 };
 use crate::engine::{boundary, commands::EngineCommand};
-use crate::game::{DrawMode, GameMode, KlondikeGame, SpiderGame};
+use crate::game::{Card, DrawMode, GameMode, KlondikeGame, SpiderGame, SpiderSuitMode, Suit};
 
 #[test]
 fn robot_playback_anchor_matching_and_mismatch() {
@@ -127,7 +127,7 @@ fn variant_engine_registry_matches_modes() {
         assert_eq!(engine.mode(), mode);
     }
     assert!(engine_for_mode(GameMode::Klondike).engine_ready());
-    assert!(!engine_for_mode(GameMode::Spider).engine_ready());
+    assert!(engine_for_mode(GameMode::Spider).engine_ready());
     assert!(!engine_for_mode(GameMode::Freecell).engine_ready());
     assert_eq!(
         engine_for_mode(GameMode::Klondike).automation_profile(),
@@ -148,9 +148,15 @@ fn variant_engine_registry_matches_modes() {
     assert!(klondike_caps.winnability);
 
     let spider_caps = engine_for_mode(GameMode::Spider).capabilities();
-    assert!(!spider_caps.draw);
-    assert!(!spider_caps.undo_redo);
-    assert!(!spider_caps.winnability);
+    assert!(spider_caps.draw);
+    assert!(spider_caps.undo_redo);
+    assert!(spider_caps.winnability);
+    assert!(spider_caps.smart_move);
+    assert!(spider_caps.autoplay);
+    assert!(spider_caps.rapid_wand);
+    assert!(spider_caps.robot_mode);
+    assert!(spider_caps.seeded_deals);
+    assert!(spider_caps.cyclone_shuffle);
 
     let freecell_caps = engine_for_mode(GameMode::Freecell).capabilities();
     assert!(!freecell_caps.draw);
@@ -204,6 +210,184 @@ fn boundary_is_won_is_mode_aware() {
 }
 
 #[test]
+fn spider_boundary_001_initialize_seeded_updates_spider_without_mutating_klondike() {
+    let mut state = VariantStateStore::new(17);
+    let klondike_before = state.klondike().clone();
+    let spider_before = state.spider().clone();
+
+    let ok = boundary::initialize_seeded_with_draw_mode(
+        &mut state,
+        GameMode::Spider,
+        9_876_543,
+        DrawMode::Five,
+    );
+    assert!(ok);
+
+    assert_eq!(state.klondike(), &klondike_before);
+    assert_ne!(state.spider(), &spider_before);
+    assert_eq!(state.spider(), &SpiderGame::new_with_seed(9_876_543));
+}
+
+#[test]
+fn spider_boundary_002_execute_command_routes_spider_draw_and_move() {
+    let mut state = VariantStateStore::new(99);
+    let klondike_before = state.klondike().clone();
+
+    let draw = boundary::execute_command(
+        &mut state,
+        GameMode::Spider,
+        EngineCommand::DrawOrRecycle {
+            draw_mode: DrawMode::One,
+        },
+    );
+    assert!(draw.changed);
+    assert_eq!(
+        draw.draw_result,
+        Some(crate::game::DrawResult::DrewFromStock)
+    );
+    assert_eq!(state.klondike(), &klondike_before);
+
+    let src = 0usize;
+    let dst = 1usize;
+    let len = boundary::tableau_len(&state, GameMode::Spider, src).unwrap_or(0);
+    let start = len.saturating_sub(1);
+    let can_before =
+        boundary::can_move_tableau_run_to_tableau(&state, GameMode::Spider, src, start, dst);
+    let mv = boundary::execute_command(
+        &mut state,
+        GameMode::Spider,
+        EngineCommand::MoveTableauRunToTableau { src, start, dst },
+    );
+    assert_eq!(mv.changed, can_before);
+    assert_eq!(state.klondike(), &klondike_before);
+}
+
+#[test]
+fn spider_boundary_003_spider_can_move_helpers_reject_out_of_range_indices() {
+    let state = VariantStateStore::new(123);
+
+    assert!(!boundary::can_move_tableau_run_to_tableau(
+        &state,
+        GameMode::Spider,
+        999,
+        999,
+        999
+    ));
+    assert!(!boundary::can_move_tableau_top_to_foundation(
+        &state,
+        GameMode::Spider,
+        999
+    ));
+    assert!(!boundary::can_move_waste_to_tableau(
+        &state,
+        GameMode::Spider,
+        999
+    ));
+}
+
+#[test]
+fn spider_boundary_004_draw_succeeds_with_empty_tableau_when_stock_available() {
+    let mut state = VariantStateStore::new(321);
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    for pile in &mut tableau[0..9] {
+        pile.push(Card {
+            suit: Suit::Spades,
+            rank: 12,
+            face_up: true,
+        });
+    }
+    let stock = vec![
+        Card {
+            suit: Suit::Spades,
+            rank: 1,
+            face_up: false,
+        };
+        10
+    ];
+    let spider = SpiderGame::debug_new(SpiderSuitMode::One, stock, tableau, 0);
+    state.set_spider(spider.clone());
+
+    let draw = boundary::execute_command(
+        &mut state,
+        GameMode::Spider,
+        EngineCommand::DrawOrRecycle {
+            draw_mode: DrawMode::One,
+        },
+    );
+    assert!(draw.changed);
+    assert_eq!(
+        draw.draw_result,
+        Some(crate::game::DrawResult::DrewFromStock)
+    );
+    assert_ne!(state.spider(), &spider);
+    assert_eq!(state.spider().stock_len(), 0);
+    assert_eq!(state.spider().tableau()[9].len(), 1);
+}
+
+#[test]
+fn spider_boundary_005_move_tableau_run_executes_when_legal() {
+    let mut state = VariantStateStore::new(777);
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    tableau[0] = vec![
+        Card {
+            suit: Suit::Spades,
+            rank: 9,
+            face_up: true,
+        },
+        Card {
+            suit: Suit::Hearts,
+            rank: 8,
+            face_up: true,
+        },
+    ];
+    tableau[1] = vec![Card {
+        suit: Suit::Clubs,
+        rank: 9,
+        face_up: true,
+    }];
+    state.set_spider(SpiderGame::debug_new(
+        SpiderSuitMode::Four,
+        Vec::new(),
+        tableau,
+        0,
+    ));
+
+    let can_before = boundary::can_move_tableau_run_to_tableau(&state, GameMode::Spider, 0, 1, 1);
+    assert!(can_before);
+
+    let moved = boundary::execute_command(
+        &mut state,
+        GameMode::Spider,
+        EngineCommand::MoveTableauRunToTableau {
+            src: 0,
+            start: 1,
+            dst: 1,
+        },
+    );
+    assert!(moved.changed);
+    assert_eq!(state.spider().tableau()[0].len(), 1);
+    assert_eq!(state.spider().tableau()[1].len(), 2);
+    assert_eq!(state.spider().tableau()[1][1].rank, 8);
+}
+
+#[test]
+fn spider_boundary_006_cyclone_shuffle_routes_to_spider_state_only() {
+    let mut state = VariantStateStore::new(2024);
+    let klondike_before = state.klondike().clone();
+    let spider_before = state.spider().clone();
+
+    let shuffled = boundary::execute_command(
+        &mut state,
+        GameMode::Spider,
+        EngineCommand::CycloneShuffleTableau,
+    );
+
+    assert!(shuffled.changed);
+    assert_eq!(state.klondike(), &klondike_before);
+    assert_ne!(state.spider(), &spider_before);
+}
+
+#[test]
 fn smart_move_fallback_helpers_return_legal_moves() {
     let mut state = VariantStateStore::new(17);
     let mode = GameMode::Klondike;
@@ -241,6 +425,49 @@ fn smart_move_fallback_helpers_return_legal_moves() {
 }
 
 #[test]
+fn smart_move_spider_tableau_fallback_uses_spider_columns() {
+    let mut state = VariantStateStore::new(777);
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    tableau[0] = vec![
+        Card {
+            suit: Suit::Spades,
+            rank: 9,
+            face_up: true,
+        },
+        Card {
+            suit: Suit::Hearts,
+            rank: 8,
+            face_up: true,
+        },
+    ];
+    tableau[1] = vec![Card {
+        suit: Suit::Clubs,
+        rank: 9,
+        face_up: true,
+    }];
+    state.set_spider(SpiderGame::debug_new(
+        SpiderSuitMode::Four,
+        Vec::new(),
+        tableau,
+        0,
+    ));
+
+    let mode = GameMode::Spider;
+    if let Some(HintMove::TableauRunToTableau { src, start, dst }) =
+        smart_move::fallback_tableau_run_move(&state, mode, 0, 1)
+    {
+        assert_eq!(src, 0);
+        assert_eq!(start, 1);
+        assert!(dst < 10);
+        assert!(boundary::can_move_tableau_run_to_tableau(
+            &state, mode, src, start, dst
+        ));
+    } else {
+        panic!("expected a legal spider fallback tableau move");
+    }
+}
+
+#[test]
 fn persisted_session_v2_round_trip_for_klondike_runtime() {
     let mut state = VariantStateStore::new(42);
     let mode = GameMode::Klondike;
@@ -259,6 +486,48 @@ fn persisted_session_v2_round_trip_for_klondike_runtime() {
     assert_eq!(decoded.elapsed_seconds, 33);
     assert!(decoded.timer_started);
     assert_eq!(decoded.klondike_draw_mode, DrawMode::Three);
+}
+
+#[test]
+fn persisted_session_v2_round_trip_for_spider_runtime() {
+    let mut state = VariantStateStore::new(42);
+    let mode = GameMode::Spider;
+    let seed = 7_777_u64;
+    let mut spider = SpiderGame::new_with_seed(seed);
+    assert!(spider.deal_from_stock());
+    state.set_spider(spider.clone());
+
+    let encoded = encode_persisted_session(&state, seed, mode, 12, 44, true, DrawMode::One);
+    let decoded = decode_persisted_session(&encoded).expect("decode persisted spider session");
+    assert_eq!(decoded.seed, seed);
+    assert_eq!(decoded.mode, GameMode::Spider);
+    assert_eq!(decoded.move_count, 12);
+    assert_eq!(decoded.elapsed_seconds, 44);
+    assert!(decoded.timer_started);
+    assert_eq!(decoded.klondike_draw_mode, DrawMode::One);
+    match decoded.runtime {
+        crate::engine::game_mode::VariantRuntime::Spider(decoded_spider) => {
+            assert_eq!(decoded_spider, spider);
+        }
+        _ => panic!("expected spider runtime"),
+    }
+}
+
+#[test]
+fn variant_state_set_runtime_spider_does_not_mutate_klondike() {
+    let mut state = VariantStateStore::new(100);
+    let klondike_before = state.klondike().clone();
+    let spider_before = state.spider().clone();
+
+    let mut new_spider = SpiderGame::new_with_seed(200);
+    assert!(new_spider.deal_from_stock());
+    state.set_runtime(crate::engine::game_mode::VariantRuntime::Spider(
+        new_spider.clone(),
+    ));
+
+    assert_eq!(state.klondike(), &klondike_before);
+    assert_ne!(state.spider(), &spider_before);
+    assert_eq!(state.spider(), &new_spider);
 }
 
 #[test]

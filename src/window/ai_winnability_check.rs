@@ -50,11 +50,15 @@ impl CardthropicWindow {
         if !self.guard_mode_engine("Winnability analysis") {
             return;
         }
+        let mode = self.active_game_mode();
         if self.imp().seed_check_running.get() {
-            let deal_count = self.current_klondike_draw_mode().count();
-            self.cancel_seed_winnable_check(Some(&seed_ops::msg_winnability_check_canceled(
-                deal_count,
-            )));
+            let cancel_message = if mode == GameMode::Spider {
+                let suit_count = self.current_spider_suit_mode().suit_count();
+                format!("Winnability check canceled (Spider {suit_count}-suit).")
+            } else {
+                seed_ops::msg_winnability_check_canceled(self.current_klondike_draw_mode().count())
+            };
+            self.cancel_seed_winnable_check(Some(cancel_message.as_str()));
             return;
         }
 
@@ -119,20 +123,39 @@ impl CardthropicWindow {
         let (sender, receiver) = mpsc::channel::<Option<winnability::SeedWinnabilityCheckResult>>();
         let draw_mode = self.current_klondike_draw_mode();
         let deal_count = draw_mode.count();
+        let spider_suit_mode = self.current_spider_suit_mode();
+        let spider_suit_count = spider_suit_mode.suit_count();
         let profile = self.automation_profile();
-        *self.imp().status_override.borrow_mut() = Some(format!(
-            "W? checking seed {seed} for Deal {deal_count} (up to {}s)...",
-            SEED_WINNABILITY_TIMEOUT_SECS
-        ));
+        *self.imp().status_override.borrow_mut() = Some(if mode == GameMode::Spider {
+            format!(
+                "W? checking seed {seed} for Spider {spider_suit_count}-suit (up to {}s)...",
+                SEED_WINNABILITY_TIMEOUT_SECS
+            )
+        } else {
+            format!(
+                "W? checking seed {seed} for Deal {deal_count} (up to {}s)...",
+                SEED_WINNABILITY_TIMEOUT_SECS
+            )
+        });
         self.render();
         thread::spawn(move || {
-            let result = winnability::is_seed_winnable(
-                seed,
-                draw_mode,
-                profile.dialog_seed_guided_budget,
-                profile.dialog_seed_exhaustive_budget,
-                &cancel_flag,
-            );
+            let result = if mode == GameMode::Spider {
+                winnability::is_spider_seed_winnable(
+                    seed,
+                    spider_suit_mode,
+                    profile.dialog_seed_guided_budget,
+                    profile.dialog_seed_exhaustive_budget,
+                    &cancel_flag,
+                )
+            } else {
+                winnability::is_seed_winnable(
+                    seed,
+                    draw_mode,
+                    profile.dialog_seed_guided_budget,
+                    profile.dialog_seed_exhaustive_budget,
+                    &cancel_flag,
+                )
+            };
             let _ = sender.send(result);
         });
 
@@ -165,12 +188,19 @@ impl CardthropicWindow {
                             }
 
                             if result.canceled {
-                                *window.imp().status_override.borrow_mut() =
-                                    Some(seed_ops::msg_winnability_check_timed_out(
+                                let message = if mode == GameMode::Spider {
+                                    format!(
+                                        "Winnability check timed out after {}s (Spider {spider_suit_count}-suit): no wins found in {} iterations before giving up.",
+                                        SEED_WINNABILITY_TIMEOUT_SECS, result.iterations
+                                    )
+                                } else {
+                                    seed_ops::msg_winnability_check_timed_out(
                                         deal_count,
                                         SEED_WINNABILITY_TIMEOUT_SECS,
                                         result.iterations,
-                                    ));
+                                    )
+                                };
+                                *window.imp().status_override.borrow_mut() = Some(message);
                                 window.render();
                                 return glib::ControlFlow::Break;
                             }
@@ -180,36 +210,59 @@ impl CardthropicWindow {
                                 if let Some(entry) = window.seed_text_entry() {
                                     entry.add_css_class("seed-winnable");
                                 }
-                                if let Some(line) = result.solver_line.as_ref().and_then(|line| {
-                                    let game = window.imp().game.borrow().clone();
-                                    map_solver_line_to_hint_line(&game, line.as_slice())
+                                if let Some(line) = result.hint_line.clone().or_else(|| {
+                                    result.solver_line.as_ref().and_then(|line| {
+                                        let game = window.imp().game.borrow().clone();
+                                        map_solver_line_to_hint_line(&game, line.as_slice())
+                                    })
                                 }) {
                                     window.arm_robot_solver_anchor_for_current_state(line);
                                 }
                                 let moves = result.moves_to_win.unwrap_or(0);
-                                *window.imp().status_override.borrow_mut() =
-                                    Some(seed_ops::msg_seed_winnable(
+                                let message = if mode == GameMode::Spider {
+                                    format!(
+                                        "Seed {seed} is winnable for Spider {spider_suit_count}-suit from a fresh deal (solver line: {moves} moves, {} iterations). Use Robot as first action to see win.",
+                                        result.iterations
+                                    )
+                                } else {
+                                    seed_ops::msg_seed_winnable(
                                         seed,
                                         deal_count,
                                         moves,
                                         result.iterations,
-                                    ));
+                                    )
+                                };
+                                *window.imp().status_override.borrow_mut() = Some(message);
                             } else {
                                 if let Some(entry) = window.seed_text_entry() {
                                     entry.add_css_class("seed-unwinnable");
                                 }
-                                let message = if result.hit_state_limit {
-                                    seed_ops::msg_seed_unwinnable_limited(
-                                        seed,
-                                        deal_count,
-                                        result.iterations,
-                                    )
+                                let message = if mode == GameMode::Spider {
+                                    if result.hit_state_limit {
+                                        format!(
+                                            "Seed {seed} not proven winnable for Spider {spider_suit_count}-suit from a fresh deal ({} iterations, limits hit).",
+                                            result.iterations
+                                        )
+                                    } else {
+                                        format!(
+                                            "Seed {seed} is not winnable for Spider {spider_suit_count}-suit from a fresh deal ({} iterations).",
+                                            result.iterations
+                                        )
+                                    }
                                 } else {
-                                    seed_ops::msg_seed_unwinnable(
-                                        seed,
-                                        deal_count,
-                                        result.iterations,
-                                    )
+                                    if result.hit_state_limit {
+                                        seed_ops::msg_seed_unwinnable_limited(
+                                            seed,
+                                            deal_count,
+                                            result.iterations,
+                                        )
+                                    } else {
+                                        seed_ops::msg_seed_unwinnable(
+                                            seed,
+                                            deal_count,
+                                            result.iterations,
+                                        )
+                                    }
                                 };
                                 *window.imp().status_override.borrow_mut() = Some(message);
                             }
@@ -223,10 +276,14 @@ impl CardthropicWindow {
                         Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
                         Err(mpsc::TryRecvError::Disconnected) => {
                             if window.finish_seed_winnable_check(generation) {
-                                *window.imp().status_override.borrow_mut() =
-                                    Some(seed_ops::msg_winnability_check_stopped_unexpectedly(
-                                        deal_count,
-                                    ));
+                                let message = if mode == GameMode::Spider {
+                                    format!(
+                                        "Winnability check stopped unexpectedly (Spider {spider_suit_count}-suit)."
+                                    )
+                                } else {
+                                    seed_ops::msg_winnability_check_stopped_unexpectedly(deal_count)
+                                };
+                                *window.imp().status_override.borrow_mut() = Some(message);
                                 window.render();
                             }
                             glib::ControlFlow::Break
