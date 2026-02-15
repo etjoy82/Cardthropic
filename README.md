@@ -1,80 +1,65 @@
 # Cardthropic
 
 Cardthropic is a modern GNOME solitaire app built with Rust, GTK4, and Libadwaita.
-It currently ships a full Klondike experience, with architecture prepared for more variants.
 
 ![Cardthropic Logo](/logo-small.png)
 
 Current version: `0.8.0` (alpha channel)
 License: `GPL-3.0-or-later`
+App ID: `io.codeberg.emviolet.cardthropic`
 
-![Cardthropic 0.5 screenshot](data/screenshots/cardthropic-0.5-screenshot.png)
+![Cardthropic screenshot](data/screenshots/cardthropic-0.8-screenshot.png)
 
-## Highlights
+## What It Includes
 
-- Native GNOME UI with keyboard, mouse, and drag-and-drop play.
-- Seed-first gameplay (`🎲`, `🛟`, `W?`, `🔁`, `Go`) with persistent seed history.
-- Advanced automation:
-  - `🪄` Wave Magic Wand
+- Native GNOME UX with keyboard, mouse, and drag-and-drop interaction
+- Seed-first workflow with history and replay controls (`🎲`, `🛟`, `W?`, `🔁`, `Go`)
+- Automation tools:
+  - `🪄` Magic Wand
   - `⚡` Rapid Wand
   - `🤖` Robot Mode
   - `🌀` Cyclone Shuffle
   - `🫣` Peek
-- Smart Move modes: `Double Click`, `Single Click`, `Disabled`.
-- Draw modes: Deal `1/2/3/4/5`.
-- Session resume after restart/crash.
-- Actions-per-minute telemetry + in-app APM graph.
-- Full theming system:
-  - curated built-in presets
-  - custom CSS userstyle editor
-  - clipboard-only CSS workflows (no filesystem access)
+- Smart Move modes: `Double Click`, `Single Click`, `Disabled`
+- Session persistence and resume
+- APM telemetry and in-app APM graph
+- Built-in themes + custom CSS userstyle editor
 
-## Built-in Theme Presets
+## Variant Status
 
-From the `🎨` menu:
+| Variant | Status | Notes |
+|---|---|---|
+| Klondike | Playable | Full gameplay flow with draw-mode settings, automation, and seed tooling |
+| Spider | Playable | Multi-suit modes (`1/2/3/4`), automation, Smart Move, and `W?` support |
+| FreeCell | Not yet available | Menu entry is visible but disabled until engine-ready |
 
-- Cardthropic
-- Cardthropic Night
-- Cardthropic Midnight
-- Arcade
-- Glass
-- Neon
-- Noir
-- Forest
-- CRT
-- Terminal
-- Minimal Mono
-- Custom (opens CSS editor)
-
-## Shortcuts
+## Controls and Shortcuts
 
 - `F1` Help
-- `F11` Toggle Fullscreen
-- `Space` Draw
+- `F11` Fullscreen
+- `Space` Draw/Deal from stock
 - `Ctrl+Z` Undo
 - `Ctrl+Y` Redo
-- `Ctrl+Space` Wave Magic Wand
+- `Ctrl+Space` Magic Wand
 - `Ctrl+Shift+Space` Rapid Wand
 - `F3` Peek
-- `F5` Cyclone Shuffle Tableau
+- `F5` Cyclone Shuffle
 - `F6` Robot Mode
-- `Ctrl+R` Start Random Deal
-- `Ctrl+Shift+R` Start Winnable Deal Search
+- `Ctrl+R` Random seed
+- `Ctrl+Shift+R` Random winnable-seed search
 - `Ctrl+Q` Quit
 
 Custom CSS editor:
 
 - `Ctrl+C` Copy CSS
 - `Ctrl+V` Paste CSS
-- `Ctrl+Shift+C` Copy Preset + CSS
+- `Ctrl+Shift+C` Copy preset + CSS
 
-## Install (Recommended)
+## Install
 
-Cardthropic is best installed from the official Flatpak repo so GNOME Software can show full metadata (license, releases, screenshots, updates).
+Cardthropic is currently distributed as Flatpak.
 
-Alpha testbed note: this Codeberg distribution is currently an alpha channel. The remote commands below intentionally use an unsigned remote (`--no-gpg-verify`) for this phase.
-
-### Option A: Flatpak remote
+### Option A: Install from Codeberg Pages Remote (alpha)
 
 ```bash
 flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/Cardthropic-flatpak/
@@ -83,9 +68,7 @@ flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
 flatpak run io.codeberg.emviolet.cardthropic
 ```
 
-### Option B: Direct bundle
-
-If you only have `cardthropic.flatpak`:
+### Option B: Install from Bundle (`cardthropic.flatpak`)
 
 ```bash
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -93,57 +76,22 @@ flatpak install ./cardthropic.flatpak
 flatpak run io.codeberg.emviolet.cardthropic
 ```
 
-### Ubuntu (GNOME Software + Flatpak)
+## Build and Run (Developer)
 
-1. Follow the official Flathub setup guide:
-   <https://flathub.org/setup/Ubuntu>
-2. Install integration packages:
-
-```bash
-sudo apt install flatpak gnome-software-plugin-flatpak
-```
-
-3. Log out/in (or reboot).
-4. Ensure runtime dependency is available:
-
-```bash
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install -y flathub org.gnome.Platform//48
-```
-
-5. Add Cardthropic remote and install:
-
-```bash
-flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/Cardthropic-flatpak/
-flatpak update --user --appstream cardthropic
-flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
-```
-
-Packaging policy: Official builds are Flatpak-only. Native packages (`.deb`, `.rpm`, `snap`) are welcome as community-maintained ports.
-
-## For Developers
-
-Developer tooling policy:
-
-- This Codeberg repository is an **alpha testbed**.
-- Shell scripts under `scripts/` are **maintainer-only operational tooling** for this repo/workflow.
-- Those scripts are not intended as a stable, third-party public interface.
-- CI policy: `.woodpecker.yml` runs `scripts/release/maintainer-gate.sh --strict-tools` on push/PR.
-
-### Contributor workflow (local coding)
+### Native (cargo)
 
 ```bash
 cargo check
 cargo run
 ```
 
-Optional test run:
+Optional:
 
 ```bash
 cargo test -q
 ```
 
-### Flatpak local dev workflow (maintainer-oriented)
+### Flatpak local workflow
 
 ```bash
 scripts/flatpak/bootstrap.sh
@@ -151,105 +99,50 @@ scripts/flatpak/build-install.sh
 scripts/flatpak/run.sh
 ```
 
-### Publish/update Flatpak repo (Codeberg Pages, maintainer-only)
+## Maintainer Tooling
 
-```bash
-scripts/flatpak-repo/master.sh
-```
+This repository is an alpha testbed. Scripts under `scripts/` are maintainer-oriented operational tooling for this project.
 
-Preview publish actions without executing:
-
-```bash
-scripts/flatpak-repo/master.sh --dry-run
-```
-
-### Maintainer quality gate (maintainer-only)
-
-Run this before release/hotfix flows:
+Quality gate:
 
 ```bash
 scripts/release/maintainer-gate.sh
 ```
 
-Shortcut:
-
-```bash
-make gate
-```
-
-Shell lint policy is repo-pinned in `.shellcheckrc`.
-
-Fast pre-commit shell lint:
+Strict shell tooling pass:
 
 ```bash
 scripts/release/lint-shell.sh --strict-tools
 ```
 
-Shortcut:
-
-```bash
-make shell-lint-strict
-```
-
-### Hotfix release helper (maintainer-only)
-
-```bash
-scripts/release/hotfix-flow.sh --version X.Y.Z
-```
-
-By default this runs checks, builds a bundle, verifies AppStream metadata from `build-repo`, and then prints git commands.
-
-Skip bundle + repo verification only if needed:
-
-```bash
-scripts/release/hotfix-flow.sh --version X.Y.Z --skip-bundle
-```
-
-### Version bump helper (maintainer-only)
+Version bump helper:
 
 ```bash
 scripts/release/bump-version.sh --version X.Y.Z
 ```
 
-### Release note finalize helper (maintainer-only)
+Release-note finalizer:
 
 ```bash
-scripts/release/finalize-release-notes.sh --version X.Y.Z \
-  --note "First release note" \
-  --note "Second release note"
+scripts/release/finalize-release-notes.sh --version X.Y.Z --note "First note" --note "Second note"
 ```
 
-## Packaging/Safety Notes
+Automated release pipeline:
 
-- App ID: `io.codeberg.emviolet.cardthropic`
-- Flatpak runtime: `org.gnome.Platform//48`
-- Flathub is required as runtime source for end-user bundle installs.
-- AppStream metadata is GPLv3+ and screenshot-enabled.
-- Runtime permissions avoid network access.
+```bash
+scripts/flatpak/release.sh
+```
 
-## Status
+For full release procedure, see `RELEASE.md`.
 
-- Klondike is highly playable and polished.
-- Engine/window modularization is in active progress for scalable multi-variant growth.
-- Spider and FreeCell scaffolding already exists in the mode system.
+## Notes
 
-### Variant Readiness
+- Runtime target: `org.gnome.Platform//48`
+- Current Codeberg alpha remote is intentionally unsigned (`--no-gpg-verify`)
+- Flatpak is the official distribution channel for this project right now
 
-| Variant | Readiness | Notes |
-|---|---|---|
-| Klondike | Playable | Full gameplay + automation + hinting + persistence |
-| Spider | Scaffolded | Runtime/data model exists; engine/rules integration in progress |
-| FreeCell | Scaffolded | Mode exists as placeholder; gameplay engine not yet implemented |
-
-## Known Constraints
-
-- This Codeberg repository and release channel are an alpha testbed.
-- Flatpak is the only official distribution format for this project at the moment.
-- Remote install path currently uses `--no-gpg-verify` for alpha testing.
-- Internal scripts under `scripts/` are maintainer operations, not a stable public CLI.
-
-## Changelog
+## Project Docs
 
 - `CHANGELOG.md`
-- `RELEASE.md` (maintainer release process)
-- `data/io.codeberg.emviolet.cardthropic.metainfo.xml.in` (AppStream release metadata)
+- `RELEASE.md`
+- `data/io.codeberg.emviolet.cardthropic.metainfo.xml.in`
