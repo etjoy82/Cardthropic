@@ -98,8 +98,9 @@
 }
 
 .status-line {
+  font-size: 0.86em;
   font-weight: 600;
-  min-height: 2.6em;
+  min-height: 2.2em;
 }
 
 .stats-line,

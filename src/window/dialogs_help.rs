@@ -84,6 +84,20 @@ impl CardthropicWindow {
             Some("win.robot-mode"),
         );
         push(
+            "📋",
+            imp.copy_session_button
+                .tooltip_text()
+                .map(|s| s.to_string()),
+            None,
+        );
+        push(
+            "📥",
+            imp.paste_session_button
+                .tooltip_text()
+                .map(|s| s.to_string()),
+            None,
+        );
+        push(
             "ⓘ",
             Some("Robot Mode stop: click cards area or 🤖 button.".to_string()),
             None,

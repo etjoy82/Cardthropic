@@ -18,7 +18,7 @@ impl CardthropicWindow {
                 hint_move: None,
             };
         };
-        let profile = self.automation_profile();
+        let profile = self.automation_profile_with_strategy();
         if game.is_won() {
             return HintSuggestion {
                 message: "Hint: game already won.".to_string(),

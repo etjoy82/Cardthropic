@@ -1,5 +1,5 @@
 use crate::engine::game_mode::VariantRuntime;
-use crate::game::{DrawMode, GameMode};
+use crate::game::{Card, DrawMode, GameMode};
 
 #[derive(Debug, Clone)]
 pub struct Snapshot {
@@ -53,6 +53,40 @@ impl SmartMoveMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RobotStrategy {
+    Fast,
+    Balanced,
+    Deep,
+}
+
+impl RobotStrategy {
+    pub fn as_setting(self) -> &'static str {
+        match self {
+            Self::Fast => "fast",
+            Self::Balanced => "balanced",
+            Self::Deep => "deep",
+        }
+    }
+
+    pub fn from_setting(value: &str) -> Self {
+        match value {
+            "fast" => Self::Fast,
+            "balanced" => Self::Balanced,
+            "deep" => Self::Deep,
+            _ => Self::Balanced,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Fast => "Fast",
+            Self::Balanced => "Balanced",
+            Self::Deep => "Deep",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(super) enum DragOrigin {
     Waste,
@@ -76,4 +110,14 @@ pub(super) struct WorkspaceLayoutProfile {
     pub(super) min_card_width: i32,
     pub(super) max_card_width: i32,
     pub(super) min_card_height: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct TableauPictureRenderState {
+    pub(super) card: Card,
+    pub(super) display_face_up: bool,
+    pub(super) selected: bool,
+    pub(super) y: i32,
+    pub(super) card_width: i32,
+    pub(super) card_height: i32,
 }

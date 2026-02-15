@@ -1,3 +1,17 @@
+pub const WORD_SEED_MAX_LEN: usize = 32;
+
+const FNV1A64_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+const FNV1A64_PRIME: u64 = 0x00000100000001b3;
+
+fn hash_word_seed(input: &str) -> u64 {
+    let mut hash = FNV1A64_OFFSET_BASIS;
+    for byte in input.bytes() {
+        hash ^= u64::from(byte.to_ascii_lowercase());
+        hash = hash.wrapping_mul(FNV1A64_PRIME);
+    }
+    hash
+}
+
 pub fn parse_seed_input(input: &str) -> Result<Option<u64>, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -5,9 +19,25 @@ pub fn parse_seed_input(input: &str) -> Result<Option<u64>, String> {
     }
 
     let normalized = trimmed.replace('_', "");
-    normalized.parse::<u64>().map(Some).map_err(|_| {
-        "Seed must be an unsigned whole number (0 to 18446744073709551615).".to_string()
-    })
+    if normalized.chars().all(|ch| ch.is_ascii_digit()) {
+        return normalized.parse::<u64>().map(Some).map_err(|_| {
+            "Seed number must be an unsigned whole number (0 to 18446744073709551615)."
+                .to_string()
+        });
+    }
+
+    if trimmed.chars().all(|ch| ch.is_ascii_alphabetic()) {
+        if trimmed.len() > WORD_SEED_MAX_LEN {
+            return Err(format!(
+                "Word seeds can be at most {WORD_SEED_MAX_LEN} letters."
+            ));
+        }
+        return Ok(Some(hash_word_seed(trimmed)));
+    }
+
+    Err(format!(
+        "Seed must be either a number (u64, underscores allowed) or a word (A-Z letters only, max {WORD_SEED_MAX_LEN})."
+    ))
 }
 
 pub fn random_seed() -> u64 {
@@ -24,7 +54,7 @@ pub fn seed_dropdown_tooltip(
 ) -> Option<String> {
     if total_seed_count > max_dropdown_entries {
         Some(format!(
-            "Showing latest {} of {} seeds. Type any seed number to load.",
+            "Showing latest {} of {} seeds. Type any seed number or word to load.",
             max_dropdown_entries, total_seed_count
         ))
     } else {

@@ -1,9 +1,12 @@
 use super::*;
 use crate::engine::boundary;
+use crate::engine::game_mode::VariantRuntime;
 use crate::engine::session::{decode_persisted_session, encode_persisted_session};
+use crate::engine::variant_state::VariantStateStore;
 
 impl CardthropicWindow {
     const SESSION_FLUSH_INTERVAL_SECS: u32 = 3;
+    const MAX_PERSISTED_SNAPSHOTS: usize = 200;
 
     pub(super) fn setup_timer(&self) {
         glib::timeout_add_seconds_local(
@@ -66,13 +69,176 @@ impl CardthropicWindow {
         });
     }
 
+    fn encode_snapshot_runtime(runtime: &VariantRuntime) -> String {
+        match runtime {
+            VariantRuntime::Klondike(game) => format!("k:{}", game.encode_for_session()),
+            VariantRuntime::Spider(game) => format!("s:{}", game.encode_for_session()),
+            VariantRuntime::Freecell => "f:".to_string(),
+        }
+    }
+
+    fn encode_apm_samples(samples: &[ApmSample]) -> String {
+        if samples.is_empty() {
+            return "-".to_string();
+        }
+        samples
+            .iter()
+            .map(|sample| format!("{}:{:.3}", sample.elapsed_seconds, sample.apm))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    fn decode_apm_samples(raw: &str) -> Option<Vec<ApmSample>> {
+        if raw == "-" || raw.is_empty() {
+            return Some(Vec::new());
+        }
+        let mut out = Vec::new();
+        for token in raw.split(',') {
+            let (elapsed, apm) = token.split_once(':')?;
+            out.push(ApmSample {
+                elapsed_seconds: elapsed.parse::<u32>().ok()?,
+                apm: apm.parse::<f64>().ok()?,
+            });
+        }
+        Some(out)
+    }
+
+    fn encode_selected_run(selected: Option<SelectedRun>) -> String {
+        match selected {
+            Some(run) => format!("{},{}", run.col, run.start),
+            None => "-".to_string(),
+        }
+    }
+
+    fn decode_selected_run(raw: &str) -> Option<Option<SelectedRun>> {
+        if raw == "-" || raw.is_empty() {
+            return Some(None);
+        }
+        let (col, start) = raw.split_once(',')?;
+        Some(Some(SelectedRun {
+            col: col.parse::<usize>().ok()?,
+            start: start.parse::<usize>().ok()?,
+        }))
+    }
+
+    fn hex_encode(input: &str) -> String {
+        let mut out = String::with_capacity(input.len() * 2);
+        for b in input.as_bytes() {
+            use std::fmt::Write as _;
+            let _ = write!(&mut out, "{:02x}", b);
+        }
+        out
+    }
+
+    fn hex_decode(input: &str) -> Option<String> {
+        if input.len() % 2 != 0 {
+            return None;
+        }
+        let mut bytes = Vec::with_capacity(input.len() / 2);
+        let mut i = 0;
+        while i < input.len() {
+            let byte = u8::from_str_radix(&input[i..i + 2], 16).ok()?;
+            bytes.push(byte);
+            i += 2;
+        }
+        String::from_utf8(bytes).ok()
+    }
+
+    fn encode_snapshot(snapshot: &Snapshot) -> String {
+        let mode = snapshot.mode.id();
+        let draw = snapshot.draw_mode.count();
+        let selected = Self::encode_selected_run(snapshot.selected_run);
+        let waste = if snapshot.selected_waste { 1 } else { 0 };
+        let timer = if snapshot.timer_started { 1 } else { 0 };
+        let runtime = Self::hex_encode(&Self::encode_snapshot_runtime(&snapshot.runtime));
+        let apm = Self::encode_apm_samples(&snapshot.apm_samples);
+        format!(
+            "mode={mode};draw={draw};selected={selected};waste={waste};moves={};elapsed={};timer={timer};runtime_hex={runtime};apm={apm}",
+            snapshot.move_count, snapshot.elapsed_seconds
+        )
+    }
+
+    fn decode_snapshot(encoded: &str) -> Option<Snapshot> {
+        let mut fields = std::collections::HashMap::<&str, &str>::new();
+        for part in encoded.split(';') {
+            let (key, value) = part.split_once('=')?;
+            fields.insert(key.trim(), value.trim());
+        }
+
+        let mode = GameMode::from_id(fields.get("mode")?)?;
+        let draw_mode = DrawMode::from_count(fields.get("draw")?.parse::<u8>().ok()?)?;
+        let selected_run = Self::decode_selected_run(fields.get("selected")?)?;
+        let selected_waste = match *fields.get("waste")? {
+            "1" => true,
+            "0" => false,
+            _ => return None,
+        };
+        let move_count = fields.get("moves")?.parse::<u32>().ok()?;
+        let elapsed_seconds = fields.get("elapsed")?.parse::<u32>().ok()?;
+        let timer_started = match *fields.get("timer")? {
+            "1" => true,
+            "0" => false,
+            _ => return None,
+        };
+        let runtime_encoded = Self::hex_decode(fields.get("runtime_hex")?)?;
+        let runtime = VariantStateStore::decode_runtime_for_session(mode, &runtime_encoded)?;
+        let apm_samples = Self::decode_apm_samples(fields.get("apm")?)?;
+
+        Some(Snapshot {
+            mode,
+            runtime,
+            draw_mode,
+            selected_run,
+            selected_waste,
+            move_count,
+            elapsed_seconds,
+            timer_started,
+            apm_samples,
+        })
+    }
+
+    fn encode_snapshot_stack(stack: &[Snapshot]) -> String {
+        if stack.is_empty() {
+            return "-".to_string();
+        }
+        let len = stack.len();
+        let start = len.saturating_sub(Self::MAX_PERSISTED_SNAPSHOTS);
+        stack[start..]
+            .iter()
+            .map(|snapshot| Self::hex_encode(&Self::encode_snapshot(snapshot)))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    fn decode_snapshot_stack(raw: &str) -> Option<Vec<Snapshot>> {
+        if raw.is_empty() || raw == "-" {
+            return Some(Vec::new());
+        }
+        let mut out = Vec::new();
+        for token in raw.split(',') {
+            let decoded = Self::hex_decode(token)?;
+            out.push(Self::decode_snapshot(&decoded)?);
+        }
+        Some(out)
+    }
+
+    fn payload_field<'a>(raw: &'a str, key: &str) -> Option<&'a str> {
+        for line in raw.lines() {
+            let (k, v) = line.split_once('=')?;
+            if k.trim() == key {
+                return Some(v.trim());
+            }
+        }
+        None
+    }
+
     pub(super) fn build_saved_session(&self) -> String {
         let imp = self.imp();
         let mode = self.active_game_mode();
         let draw_mode = imp.klondike_draw_mode.get();
         let game = imp.game.borrow();
         let timer_started = imp.timer_started.get() && !boundary::is_won(&game, mode);
-        encode_persisted_session(
+        let mut payload = encode_persisted_session(
             &game,
             imp.current_seed.get(),
             mode,
@@ -80,7 +246,14 @@ impl CardthropicWindow {
             imp.elapsed_seconds.get(),
             timer_started,
             draw_mode,
-        )
+        );
+        let history_encoded = Self::encode_snapshot_stack(&imp.history.borrow());
+        let future_encoded = Self::encode_snapshot_stack(&imp.future.borrow());
+        payload.push_str("\nhistory=");
+        payload.push_str(&history_encoded);
+        payload.push_str("\nfuture=");
+        payload.push_str(&future_encoded);
+        payload
     }
 
     fn persist_session_if_changed(&self) {
@@ -145,12 +318,31 @@ impl CardthropicWindow {
         if raw.trim().is_empty() {
             return false;
         }
-        let Some(session) = decode_persisted_session(&raw) else {
+        if self
+            .restore_session_from_payload(&raw, "Resumed previous game.", false)
+            .is_ok()
+        {
+            true
+        } else {
             let _ = settings.set_string(SETTINGS_KEY_SAVED_SESSION, "");
-            return false;
+            false
+        }
+    }
+
+    pub(super) fn restore_session_from_payload(
+        &self,
+        raw: &str,
+        status_message: &str,
+        persist_payload: bool,
+    ) -> Result<(), String> {
+        let Some(session) = decode_persisted_session(raw) else {
+            return Err("payload is not a valid Cardthropic game state".to_string());
         };
 
         let imp = self.imp();
+        self.stop_rapid_wand();
+        self.stop_robot_mode();
+        self.cancel_seed_winnable_check(None);
         imp.game.borrow_mut().set_runtime(session.runtime.clone());
         imp.current_seed.set(session.seed);
         imp.move_count.set(session.move_count);
@@ -173,10 +365,30 @@ impl CardthropicWindow {
         imp.spider_suit_mode
             .set(imp.game.borrow().spider().suit_mode());
         self.set_seed_input_text(&session.seed.to_string());
-        *imp.status_override.borrow_mut() = Some("Resumed previous game.".to_string());
-        *imp.last_saved_session.borrow_mut() = raw;
+        self.update_game_mode_menu_selection();
+        self.invalidate_card_render_cache();
+        imp.pending_deal_instructions.set(false);
+        *imp.status_override.borrow_mut() = Some(status_message.to_string());
+        let history = Self::payload_field(raw, "history")
+            .and_then(Self::decode_snapshot_stack)
+            .unwrap_or_default();
+        let future = Self::payload_field(raw, "future")
+            .and_then(Self::decode_snapshot_stack)
+            .unwrap_or_default();
+        *imp.history.borrow_mut() = history;
+        *imp.future.borrow_mut() = future;
+        *imp.last_saved_session.borrow_mut() = raw.to_string();
+        if persist_payload {
+            if let Some(settings) = imp.settings.borrow().as_ref() {
+                let _ = settings.set_string(SETTINGS_KEY_SAVED_SESSION, raw);
+            }
+        }
         imp.session_dirty.set(false);
-        true
+        self.reset_hint_cycle_memory();
+        self.reset_auto_play_memory();
+        let state_hash = self.current_game_hash();
+        self.start_hint_loss_analysis_if_needed(state_hash);
+        Ok(())
     }
 
     pub(super) fn update_stats_label(&self) {

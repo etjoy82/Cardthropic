@@ -6,6 +6,7 @@ pub fn build_status_text(
     waste_selected: bool,
     peek_active: bool,
     engine_ready: bool,
+    show_controls_hint: bool,
     mode_label: &str,
     smart_move_mode: &str,
     deck_error: Option<&str>,
@@ -43,6 +44,10 @@ pub fn build_status_text(
     }
     if !engine_ready {
         return format!("{mode_label} mode scaffolded. Rules/engine are in progress.");
+    }
+
+    if !show_controls_hint {
+        return String::new();
     }
 
     match smart_move_mode {
