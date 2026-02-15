@@ -72,6 +72,10 @@ impl<M> RobotPlayback<M> {
         !self.scripted_line.is_empty()
     }
 
+    pub fn scripted_line_len(&self) -> usize {
+        self.scripted_line.len()
+    }
+
     pub fn set_use_scripted_line(&mut self, enabled: bool) {
         self.use_scripted_line = enabled;
     }

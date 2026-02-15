@@ -41,6 +41,7 @@ impl CardthropicWindow {
         imp.waste_selected.set(false);
         *imp.deck_error.borrow_mut() = None;
         *imp.status_override.borrow_mut() = Some(status);
+        imp.pending_deal_instructions.set(true);
         imp.history.borrow_mut().clear();
         imp.future.borrow_mut().clear();
         imp.apm_samples.borrow_mut().clear();

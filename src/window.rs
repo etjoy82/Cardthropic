@@ -154,6 +154,12 @@ mod imp {
         #[template_child]
         pub robot_button: TemplateChild<gtk::Button>,
         #[template_child]
+        pub copy_session_button: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub paste_session_button: TemplateChild<gtk::Button>,
+        #[template_child]
+        pub robot_debug_toggle_button: TemplateChild<gtk::ToggleButton>,
+        #[template_child]
         pub stock_picture: TemplateChild<gtk::Picture>,
         #[template_child]
         pub waste_overlay: TemplateChild<gtk::Overlay>,
@@ -210,11 +216,9 @@ mod imp {
         #[template_child]
         pub foundation_label_4: TemplateChild<gtk::Label>,
         #[template_child]
-        pub status_text_view: TemplateChild<gtk::TextView>,
+        pub status_label: TemplateChild<gtk::Label>,
         #[template_child]
-        pub status_scroller: TemplateChild<gtk::ScrolledWindow>,
-        #[template_child]
-        pub status_clear_button: TemplateChild<gtk::Button>,
+        pub status_history_button: TemplateChild<gtk::Button>,
         #[template_child]
         #[allow(deprecated)]
         pub seed_combo: TemplateChild<gtk::ComboBoxText>,
@@ -257,7 +261,7 @@ mod imp {
         #[template_child]
         pub main_menu_popover: TemplateChild<gtk::PopoverMenu>,
         #[template_child]
-        pub board_color_menu_button: TemplateChild<gtk::MenuButton>,
+        pub board_color_menu_button: TemplateChild<gtk::Button>,
         #[template_child]
         pub game_settings_menu_button: TemplateChild<gtk::MenuButton>,
         #[template_child]
@@ -287,10 +291,14 @@ mod imp {
         pub board_color_swatches: RefCell<Vec<gtk::DrawingArea>>,
         pub board_color_provider: RefCell<Option<gtk::CssProvider>>,
         pub custom_userstyle_css: RefCell<String>,
+        pub saved_custom_userstyle_css: RefCell<String>,
         pub custom_userstyle_provider: RefCell<Option<gtk::CssProvider>>,
         pub custom_userstyle_dialog: RefCell<Option<gtk::Window>>,
+        pub theme_presets_window: RefCell<Option<gtk::Window>>,
         pub status_history: RefCell<VecDeque<String>>,
         pub status_last_appended: RefCell<String>,
+        pub status_history_dialog: RefCell<Option<gtk::Window>>,
+        pub status_history_buffer: RefCell<Option<gtk::TextBuffer>>,
         pub deck: RefCell<Option<AngloDeck>>,
         pub deck_load_attempted: Cell<bool>,
         pub deck_error: RefCell<Option<String>>,
@@ -313,8 +321,11 @@ mod imp {
         pub observed_maximized: Cell<bool>,
         pub geometry_render_pending: Cell<bool>,
         pub geometry_render_dirty: Cell<bool>,
+        pub pending_deal_instructions: Cell<bool>,
         pub last_metrics_key: Cell<u64>,
         pub tableau_card_pictures: RefCell<Vec<Vec<gtk::Picture>>>,
+        pub(super) tableau_picture_state_cache: RefCell<Vec<Vec<Option<TableauPictureRenderState>>>>,
+        pub last_stock_waste_foundation_size: Cell<(i32, i32)>,
         pub hint_timeouts: RefCell<Vec<glib::SourceId>>,
         pub hint_widgets: RefCell<Vec<gtk::Widget>>,
         pub hint_recent_states: RefCell<VecDeque<u64>>,
@@ -333,8 +344,13 @@ mod imp {
         pub rapid_wand_timer: RefCell<Option<glib::SourceId>>,
         pub robot_mode_running: Cell<bool>,
         pub robot_mode_timer: RefCell<Option<glib::SourceId>>,
+        pub robot_forever_enabled: Cell<bool>,
+        pub robot_wins: Cell<u32>,
+        pub robot_losses: Cell<u32>,
+        pub robot_last_benchmark_dump_total: Cell<u32>,
         pub robot_deals_tried: Cell<u32>,
         pub robot_moves_applied: Cell<u32>,
+        pub robot_debug_enabled: Cell<bool>,
         pub(super) robot_playback: RefCell<RobotPlayback<HintMove>>,
         pub(super) drag_origin: RefCell<Option<DragOrigin>>,
         pub drag_widgets: RefCell<Vec<gtk::Widget>>,
@@ -343,6 +359,7 @@ mod imp {
         pub seed_search_in_progress: Cell<bool>,
         pub seed_combo_updating: Cell<bool>,
         pub smart_move_mode: Cell<SmartMoveMode>,
+        pub robot_strategy: Cell<RobotStrategy>,
         pub hud_enabled: Cell<bool>,
         pub peek_active: Cell<bool>,
         pub peek_generation: Cell<u64>,
@@ -372,6 +389,9 @@ mod imp {
                 cyclone_shuffle_button: TemplateChild::default(),
                 peek_button: TemplateChild::default(),
                 robot_button: TemplateChild::default(),
+                copy_session_button: TemplateChild::default(),
+                paste_session_button: TemplateChild::default(),
+                robot_debug_toggle_button: TemplateChild::default(),
                 stock_picture: TemplateChild::default(),
                 waste_overlay: TemplateChild::default(),
                 waste_picture: TemplateChild::default(),
@@ -400,9 +420,8 @@ mod imp {
                 foundation_label_2: TemplateChild::default(),
                 foundation_label_3: TemplateChild::default(),
                 foundation_label_4: TemplateChild::default(),
-                status_text_view: TemplateChild::default(),
-                status_scroller: TemplateChild::default(),
-                status_clear_button: TemplateChild::default(),
+                status_label: TemplateChild::default(),
+                status_history_button: TemplateChild::default(),
                 seed_combo: TemplateChild::default(),
                 seed_random_button: TemplateChild::default(),
                 seed_rescue_button: TemplateChild::default(),
@@ -446,10 +465,14 @@ mod imp {
                 board_color_swatches: RefCell::new(Vec::new()),
                 board_color_provider: RefCell::new(None),
                 custom_userstyle_css: RefCell::new(String::new()),
+                saved_custom_userstyle_css: RefCell::new(String::new()),
                 custom_userstyle_provider: RefCell::new(None),
                 custom_userstyle_dialog: RefCell::new(None),
+                theme_presets_window: RefCell::new(None),
                 status_history: RefCell::new(VecDeque::new()),
                 status_last_appended: RefCell::new(String::new()),
+                status_history_dialog: RefCell::new(None),
+                status_history_buffer: RefCell::new(None),
                 deck: RefCell::new(None),
                 deck_load_attempted: Cell::new(false),
                 deck_error: RefCell::new(None),
@@ -472,8 +495,11 @@ mod imp {
                 observed_maximized: Cell::new(false),
                 geometry_render_pending: Cell::new(false),
                 geometry_render_dirty: Cell::new(false),
+                pending_deal_instructions: Cell::new(true),
                 last_metrics_key: Cell::new(0),
                 tableau_card_pictures: RefCell::new(vec![Vec::new(); 10]),
+                tableau_picture_state_cache: RefCell::new(vec![Vec::new(); 10]),
+                last_stock_waste_foundation_size: Cell::new((0, 0)),
                 hint_timeouts: RefCell::new(Vec::new()),
                 hint_widgets: RefCell::new(Vec::new()),
                 hint_recent_states: RefCell::new(VecDeque::new()),
@@ -492,8 +518,13 @@ mod imp {
                 rapid_wand_timer: RefCell::new(None),
                 robot_mode_running: Cell::new(false),
                 robot_mode_timer: RefCell::new(None),
+                robot_forever_enabled: Cell::new(false),
+                robot_wins: Cell::new(0),
+                robot_losses: Cell::new(0),
+                robot_last_benchmark_dump_total: Cell::new(0),
                 robot_deals_tried: Cell::new(0),
                 robot_moves_applied: Cell::new(0),
+                robot_debug_enabled: Cell::new(false),
                 robot_playback: RefCell::new(RobotPlayback::default()),
                 drag_origin: RefCell::new(None),
                 drag_widgets: RefCell::new(Vec::new()),
@@ -502,6 +533,7 @@ mod imp {
                 seed_search_in_progress: Cell::new(false),
                 seed_combo_updating: Cell::new(false),
                 smart_move_mode: Cell::new(SmartMoveMode::DoubleClick),
+                robot_strategy: Cell::new(RobotStrategy::Balanced),
                 hud_enabled: Cell::new(true),
                 peek_active: Cell::new(false),
                 peek_generation: Cell::new(0),
@@ -561,6 +593,9 @@ mod imp {
             klass.install_action("win.robot-mode", None, |window, _, _| {
                 window.toggle_robot_mode();
             });
+            klass.install_action("win.copy-benchmark-snapshot", None, |window, _, _| {
+                window.copy_benchmark_snapshot();
+            });
             klass.install_action("win.help", None, |window, _, _| {
                 window.show_help_dialog();
             });
@@ -587,6 +622,15 @@ mod imp {
             });
             klass.install_action("win.smart-move-disabled", None, |window, _, _| {
                 window.set_smart_move_mode(SmartMoveMode::Disabled, true, true);
+            });
+            klass.install_action("win.automation-strategy-fast", None, |window, _, _| {
+                window.set_robot_strategy(RobotStrategy::Fast, true, true);
+            });
+            klass.install_action("win.automation-strategy-balanced", None, |window, _, _| {
+                window.set_robot_strategy(RobotStrategy::Balanced, true, true);
+            });
+            klass.install_action("win.automation-strategy-deep", None, |window, _, _| {
+                window.set_robot_strategy(RobotStrategy::Deep, true, true);
             });
         }
 
@@ -621,6 +665,7 @@ mod imp {
             obj.refresh_seed_history_dropdown();
             obj.setup_styles();
             obj.setup_hud_action();
+            obj.setup_forever_mode_action();
             obj.setup_board_color_preferences();
             if !obj.try_restore_saved_session() {
                 obj.note_seed_play_started(self.current_seed.get());
@@ -667,8 +712,11 @@ const SETTINGS_KEY_SMART_MOVE_MODE: &str = "smart-move-mode";
 const SETTINGS_KEY_SPIDER_SUIT_MODE: &str = "spider-suit-mode";
 const SETTINGS_KEY_SAVED_SESSION: &str = "saved-session";
 const SETTINGS_KEY_CUSTOM_USERSTYLE_CSS: &str = "custom-userstyle-css";
+const SETTINGS_KEY_SAVED_CUSTOM_USERSTYLE_CSS: &str = "saved-custom-userstyle-css";
+const SETTINGS_KEY_CUSTOM_USERSTYLE_WORD_WRAP: &str = "custom-userstyle-word-wrap";
 const SETTINGS_KEY_CUSTOM_CARD_SVG: &str = "custom-card-svg";
 const SETTINGS_KEY_ENABLE_HUD: &str = "enable-hud";
+const SETTINGS_KEY_ROBOT_STRATEGY: &str = "robot-strategy";
 const SEED_HISTORY_FILE_NAME: &str = "seed-history.txt";
 const APP_DATA_DIR_NAME: &str = "io.codeberg.emviolet.cardthropic";
 const MAX_SEED_HISTORY_ENTRIES: usize = 10_000;
@@ -679,6 +727,7 @@ const MIN_WINDOW_HEIGHT: i32 = 800;
 const TABLEAU_FACE_UP_STEP_PX: i32 = 24;
 const TABLEAU_FACE_DOWN_STEP_PX: i32 = 12;
 const DEFAULT_BOARD_COLOR: &str = "#1f232b";
+const ROBOT_BENCHMARK_DUMP_INTERVAL: u32 = 25;
 
 impl CardthropicWindow {
     pub fn new<P: IsA<gtk::Application>>(application: &P) -> Self {

@@ -26,6 +26,16 @@
 			<summary>Custom userstyle CSS</summary>
 			<description>Optional custom CSS applied on top of Cardthropic board styles.</description>
 		</key>
+		<key name="saved-custom-userstyle-css" type="s">
+			<default>''</default>
+			<summary>Saved custom userstyle CSS</summary>
+			<description>Last saved Custom CSS text, kept even when theme presets are active.</description>
+		</key>
+		<key name="custom-userstyle-word-wrap" type="b">
+			<default>true</default>
+			<summary>Custom userstyle editor word wrap</summary>
+			<description>Whether the Custom CSS editor wraps long lines.</description>
+		</key>
 			<key name="custom-card-svg" type="s">
 				<default>''</default>
 				<summary>Custom card sheet SVG</summary>
@@ -35,6 +45,11 @@
 				<default>true</default>
 				<summary>Enable HUD</summary>
 				<description>Show the toolbar area above the stock/waste/foundations row.</description>
+			</key>
+			<key name="robot-strategy" type="s">
+				<default>'balanced'</default>
+				<summary>Automation strategy profile</summary>
+				<description>Strategy profile used by automation features (Hint/Wand/Robot): fast, balanced, or deep.</description>
 			</key>
 		</schema>
 	</schemalist>

@@ -176,6 +176,7 @@ impl CardthropicWindow {
             note.add_css_class("dim-label");
             imp.game_settings_content_box.append(&note);
         }
+
     }
 
     pub(super) fn update_game_mode_menu_selection(&self) {

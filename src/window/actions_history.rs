@@ -57,11 +57,34 @@ impl CardthropicWindow {
             self.render();
             return;
         };
+        let previous_mode = self.active_game_mode();
+        let restored_mode = snapshot.mode;
+        let restored_move_count = snapshot.move_count;
+        let restored_elapsed = snapshot.elapsed_seconds;
+        let restored_draw = snapshot.draw_mode;
 
         self.clear_hint_effects();
         imp.future.borrow_mut().push(self.snapshot());
         self.restore_snapshot(snapshot);
-        *imp.status_override.borrow_mut() = Some("Undid last move.".to_string());
+        if restored_mode != previous_mode {
+            let mode_detail = match restored_mode {
+                GameMode::Klondike => format!("deal={}", restored_draw.count()),
+                GameMode::Spider => format!(
+                    "suits={}",
+                    self.imp().game.borrow().spider().suit_mode().suit_count()
+                ),
+                GameMode::Freecell => "suits=na".to_string(),
+            };
+            *imp.status_override.borrow_mut() = Some(format!(
+                "Undo restored mode={} {} moves={} elapsed={}.",
+                restored_mode.id(),
+                mode_detail,
+                restored_move_count,
+                restored_elapsed
+            ));
+        } else {
+            *imp.status_override.borrow_mut() = Some("Undid last move.".to_string());
+        }
         self.render();
     }
 
@@ -75,11 +98,34 @@ impl CardthropicWindow {
             self.render();
             return;
         };
+        let previous_mode = self.active_game_mode();
+        let restored_mode = snapshot.mode;
+        let restored_move_count = snapshot.move_count;
+        let restored_elapsed = snapshot.elapsed_seconds;
+        let restored_draw = snapshot.draw_mode;
 
         self.clear_hint_effects();
         imp.history.borrow_mut().push(self.snapshot());
         self.restore_snapshot(snapshot);
-        *imp.status_override.borrow_mut() = Some("Redid move.".to_string());
+        if restored_mode != previous_mode {
+            let mode_detail = match restored_mode {
+                GameMode::Klondike => format!("deal={}", restored_draw.count()),
+                GameMode::Spider => format!(
+                    "suits={}",
+                    self.imp().game.borrow().spider().suit_mode().suit_count()
+                ),
+                GameMode::Freecell => "suits=na".to_string(),
+            };
+            *imp.status_override.borrow_mut() = Some(format!(
+                "Redo restored mode={} {} moves={} elapsed={}.",
+                restored_mode.id(),
+                mode_detail,
+                restored_move_count,
+                restored_elapsed
+            ));
+        } else {
+            *imp.status_override.borrow_mut() = Some("Redid move.".to_string());
+        }
         self.render();
     }
 
@@ -91,6 +137,7 @@ impl CardthropicWindow {
             let mut game = imp.game.borrow_mut();
             game.set_runtime(snapshot.runtime);
             let _ = boundary::set_draw_mode(&mut game, snapshot.mode, snapshot.draw_mode);
+            imp.spider_suit_mode.set(game.spider().suit_mode());
         }
         *imp.selected_run.borrow_mut() = snapshot.selected_run;
         imp.waste_selected.set(snapshot.selected_waste);
@@ -98,6 +145,8 @@ impl CardthropicWindow {
         imp.elapsed_seconds.set(snapshot.elapsed_seconds);
         imp.timer_started.set(snapshot.timer_started);
         *imp.apm_samples.borrow_mut() = snapshot.apm_samples;
+        self.update_game_mode_menu_selection();
+        self.update_game_settings_menu();
         self.reset_hint_cycle_memory();
         self.reset_auto_play_memory();
         let state_hash = self.current_game_hash();

@@ -20,12 +20,17 @@
   </categories>
   <description>
     <p>
-      Cardthropic is a Libadwaita and Rust solitaire app for GNOME, beginning
-      with Klondike and an adaptive board designed for many window sizes.
+      Cardthropic is a modern GNOME solitaire game built with Rust and
+      Libadwaita, featuring polished Klondike and Spider gameplay with 1 to 4
+      suit modes. Play seeded deals, run winnability analysis, use smart
+      moves, and choose flexible click behavior for faster strategy.
     </p>
     <p>
-      It includes seeded deals, smart move controls, automation (wand/rapid/robot),
-      persistent sessions, and a custom CSS userstyle editor.
+      Automation includes Wand hints and Robot mode with detailed move
+      reporting. Customize visuals with CSS userstyles, monitor progress in
+      the HUD, and keep persistent game history across sessions. Cardthropic
+      is tuned for desktop comfort, with clear interactions and reliable flow
+      through long runs and challenging, replayable deals every day.
     </p>
   </description>
   <screenshots>

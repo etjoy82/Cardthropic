@@ -40,6 +40,55 @@ impl CardthropicWindow {
         }
     }
 
+    pub(super) fn setup_forever_mode_action(&self) {
+        let action = gio::SimpleAction::new_stateful("forever-mode", None, &false.to_variant());
+        action.connect_change_state(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_, value| {
+                let enabled = value
+                    .and_then(|variant| variant.get::<bool>())
+                    .unwrap_or(false);
+                window.set_robot_forever_enabled(enabled, true);
+            }
+        ));
+        self.add_action(&action);
+    }
+
+    pub(super) fn set_robot_forever_enabled(&self, enabled: bool, announce: bool) {
+        let imp = self.imp();
+        imp.robot_forever_enabled.set(enabled);
+        if enabled {
+            imp.robot_button.add_css_class("suggested-action");
+            imp.robot_button
+                .set_tooltip_text(Some("Robot Mode (Forever Mode enabled)"));
+        } else {
+            imp.robot_button.remove_css_class("suggested-action");
+            imp.robot_button.set_tooltip_text(Some("Robot Mode"));
+        }
+
+        if let Some(action) = self.lookup_action("forever-mode") {
+            if let Ok(action) = action.downcast::<gio::SimpleAction>() {
+                let current = action
+                    .state()
+                    .and_then(|variant| variant.get::<bool>())
+                    .unwrap_or(false);
+                if current != enabled {
+                    action.set_state(&enabled.to_variant());
+                }
+            }
+        }
+
+        if announce {
+            *imp.status_override.borrow_mut() = Some(if enabled {
+                "Forever Mode enabled.".to_string()
+            } else {
+                "Forever Mode disabled.".to_string()
+            });
+            self.render();
+        }
+    }
+
     pub(super) fn smart_move_mode(&self) -> SmartMoveMode {
         self.imp().smart_move_mode.get()
     }
@@ -57,6 +106,26 @@ impl CardthropicWindow {
                 SmartMoveMode::SingleClick => "Smart Move set to single click.".to_string(),
                 SmartMoveMode::DoubleClick => "Smart Move set to double click.".to_string(),
             });
+        }
+        if persist || announce {
+            self.render();
+        }
+    }
+
+    pub(super) fn robot_strategy(&self) -> RobotStrategy {
+        self.imp().robot_strategy.get()
+    }
+
+    pub(super) fn set_robot_strategy(&self, strategy: RobotStrategy, persist: bool, announce: bool) {
+        self.imp().robot_strategy.set(strategy);
+        if persist {
+            if let Some(settings) = self.imp().settings.borrow().clone() {
+                let _ = settings.set_string(SETTINGS_KEY_ROBOT_STRATEGY, strategy.as_setting());
+            }
+        }
+        if announce {
+            *self.imp().status_override.borrow_mut() =
+                Some(format!("Automation strategy set to {}.", strategy.label()));
         }
         if persist || announce {
             self.render();

@@ -20,6 +20,7 @@ impl CardthropicWindow {
         if imp.klondike_draw_mode.get() == draw_mode {
             return;
         }
+        let undo_anchor = self.snapshot();
         imp.klondike_draw_mode.set(draw_mode);
         let seed = imp.current_seed.get();
         self.start_new_game_with_seed(
@@ -30,6 +31,9 @@ impl CardthropicWindow {
                 seed
             ),
         );
+        self.imp().history.borrow_mut().push(undo_anchor);
+        self.imp().future.borrow_mut().clear();
+        self.render();
     }
 
     pub(super) fn set_spider_suit_mode(&self, suit_mode: SpiderSuitMode, persist: bool) {
@@ -47,6 +51,7 @@ impl CardthropicWindow {
             }
         }
         if self.active_game_mode() == GameMode::Spider {
+            let undo_anchor = self.snapshot();
             let seed = imp.current_seed.get();
             self.start_new_game_with_seed(
                 seed,
@@ -56,6 +61,9 @@ impl CardthropicWindow {
                     seed
                 ),
             );
+            self.imp().history.borrow_mut().push(undo_anchor);
+            self.imp().future.borrow_mut().clear();
+            self.render();
         } else {
             self.update_game_settings_menu();
         }
@@ -81,6 +89,8 @@ impl CardthropicWindow {
 
     pub(super) fn select_game_mode(&self, mode: &str) {
         let imp = self.imp();
+        let previous_mode = imp.current_game_mode.get();
+        let undo_anchor = self.snapshot();
         self.stop_robot_mode();
         let status = match spec_for_id(mode) {
             Some(spec) => {
@@ -108,6 +118,10 @@ impl CardthropicWindow {
         self.update_game_mode_menu_selection();
         self.update_game_settings_menu();
         *imp.status_override.borrow_mut() = Some(status);
+        if imp.current_game_mode.get() != previous_mode {
+            imp.history.borrow_mut().push(undo_anchor);
+            imp.future.borrow_mut().clear();
+        }
         self.popdown_main_menu_later();
         self.render();
     }

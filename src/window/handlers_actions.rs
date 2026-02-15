@@ -73,14 +73,94 @@ impl CardthropicWindow {
                 window.toggle_robot_mode();
             }
         ));
-        imp.status_clear_button.connect_clicked(glib::clone!(
+        let robot_middle_click = gtk::GestureClick::new();
+        robot_middle_click.set_button(gdk::BUTTON_MIDDLE);
+        robot_middle_click.connect_pressed(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_, _, _, _| {
+                window.start_robot_mode_forever();
+            }
+        ));
+        imp.robot_button.add_controller(robot_middle_click);
+        imp.copy_session_button.connect_clicked(glib::clone!(
             #[weak(rename_to = window)]
             self,
             move |_| {
-                let imp = window.imp();
-                imp.status_history.borrow_mut().clear();
-                imp.status_last_appended.borrow_mut().clear();
-                imp.status_text_view.buffer().set_text("");
+                let payload = window.build_saved_session();
+                window.clipboard().set_text(&payload);
+                *window.imp().status_override.borrow_mut() =
+                    Some("Copied game state to clipboard.".to_string());
+                window.render();
+            }
+        ));
+        imp.paste_session_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| {
+                let clipboard = window.clipboard();
+                clipboard.read_text_async(
+                    None::<&gio::Cancellable>,
+                    glib::clone!(
+                        #[weak(rename_to = window)]
+                        window,
+                        move |result| match result {
+                            Ok(Some(text)) => {
+                                let payload = text.to_string();
+                                match window.restore_session_from_payload(
+                                    &payload,
+                                    "Restored game from clipboard.",
+                                    true,
+                                ) {
+                                    Ok(()) => {
+                                        window.render();
+                                    }
+                                    Err(err) => {
+                                        *window.imp().status_override.borrow_mut() =
+                                            Some(format!("Paste failed: {err}."));
+                                        window.render();
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                *window.imp().status_override.borrow_mut() =
+                                    Some("Paste failed: clipboard is empty.".to_string());
+                                window.render();
+                            }
+                            Err(err) => {
+                                *window.imp().status_override.borrow_mut() =
+                                    Some(format!("Paste failed: {err}."));
+                                window.render();
+                            }
+                        }
+                    ),
+                );
+            }
+        ));
+        imp.robot_debug_toggle_button.connect_toggled(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |button| {
+                let enabled = button.is_active();
+                window.imp().robot_debug_enabled.set(enabled);
+                if enabled {
+                    button.add_css_class("suggested-action");
+                } else {
+                    button.remove_css_class("suggested-action");
+                }
+                *window.imp().status_override.borrow_mut() = Some(if enabled {
+                    "robot_debug=on".to_string()
+                } else {
+                    "robot_debug=off".to_string()
+                });
+                window.render();
+            }
+        ));
+        imp.status_history_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| {
+                window.show_status_history_dialog();
             }
         ));
     }
@@ -125,13 +205,20 @@ impl CardthropicWindow {
 
     pub(super) fn setup_keyboard_navigation_handler(&self) {
         let keyboard_nav = gtk::EventControllerKey::new();
-        keyboard_nav.set_propagation_phase(gtk::PropagationPhase::Capture);
+        keyboard_nav.set_propagation_phase(gtk::PropagationPhase::Bubble);
         keyboard_nav.connect_key_pressed(glib::clone!(
             #[weak(rename_to = window)]
             self,
             #[upgrade_or]
             glib::Propagation::Proceed,
             move |_, key, _, state| {
+                if matches!(key, gdk::Key::Return | gdk::Key::KP_Enter) {
+                    if let Some(entry) = window.seed_text_entry() {
+                        if entry.has_focus() {
+                            return glib::Propagation::Proceed;
+                        }
+                    }
+                }
                 if state.intersects(
                     gdk::ModifierType::ALT_MASK
                         | gdk::ModifierType::CONTROL_MASK
@@ -171,7 +258,7 @@ impl CardthropicWindow {
         ));
 
         if let Some(seed_entry) = self.seed_text_entry() {
-            seed_entry.set_placeholder_text(Some("Leave blank for random seed"));
+            seed_entry.set_placeholder_text(Some("Blank=random, or enter seed number/word"));
             seed_entry.set_width_chars(1);
             seed_entry.connect_changed(glib::clone!(
                 #[weak(rename_to = window)]
