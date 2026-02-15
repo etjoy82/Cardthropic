@@ -45,12 +45,43 @@ canonical_path() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --checkout-dir) CHECKOUT_DIR="${2:-}"; shift 2 ;;
-    --source-repo) SOURCE_REPO="${2:-}"; shift 2 ;;
-    --branch) BRANCH="${2:-}"; shift 2 ;;
-    --dry-run) DRY_RUN=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
+    --checkout-dir)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --checkout-dir" >&2
+        exit 2
+      fi
+      CHECKOUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --source-repo)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --source-repo" >&2
+        exit 2
+      fi
+      SOURCE_REPO="${2:-}"
+      shift 2
+      ;;
+    --branch)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --branch" >&2
+        exit 2
+      fi
+      BRANCH="${2:-}"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 

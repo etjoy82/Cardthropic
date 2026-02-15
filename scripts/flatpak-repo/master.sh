@@ -65,16 +65,67 @@ run() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo-url) REPO_URL="${2:-}"; shift 2 ;;
-    --base-url) BASE_URL="${2:-}"; shift 2 ;;
-    --checkout-dir) CHECKOUT_DIR="${2:-}"; shift 2 ;;
-    --remote) REMOTE_NAME="${2:-}"; shift 2 ;;
-    --out) FLATPAKREPO_OUT="${2:-}"; shift 2 ;;
-    --skip-test-remote) SKIP_TEST_REMOTE=1; shift ;;
-    --skip-bundle) SKIP_BUNDLE=1; shift ;;
-    --dry-run) DRY_RUN=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
+    --repo-url)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --repo-url" >&2
+        exit 2
+      fi
+      REPO_URL="${2:-}"
+      shift 2
+      ;;
+    --base-url)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --base-url" >&2
+        exit 2
+      fi
+      BASE_URL="${2:-}"
+      shift 2
+      ;;
+    --checkout-dir)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --checkout-dir" >&2
+        exit 2
+      fi
+      CHECKOUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --remote)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --remote" >&2
+        exit 2
+      fi
+      REMOTE_NAME="${2:-}"
+      shift 2
+      ;;
+    --out)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --out" >&2
+        exit 2
+      fi
+      FLATPAKREPO_OUT="${2:-}"
+      shift 2
+      ;;
+    --skip-test-remote)
+      SKIP_TEST_REMOTE=1
+      shift
+      ;;
+    --skip-bundle)
+      SKIP_BUNDLE=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -129,6 +180,7 @@ run "${ROOT_DIR}/scripts/flatpak-repo/make-flatpakrepo.sh" \
 if [[ "${SKIP_TEST_REMOTE}" -eq 0 ]]; then
   echo "[5/6] Adding/updating local test remote and installing app..."
   run "${ROOT_DIR}/scripts/flatpak-repo/add-test-remote.sh" \
+    --replace \
     --remote "${REMOTE_NAME}" \
     --url "${BASE_URL}"
 else

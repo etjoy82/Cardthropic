@@ -1,5 +1,4 @@
 use super::*;
-use crate::engine::boundary;
 use crate::engine::variant::{spec_for_id, spec_for_mode};
 use crate::engine::variant_engine::engine_for_mode;
 
@@ -12,20 +11,54 @@ impl CardthropicWindow {
         self.imp().klondike_draw_mode.get()
     }
 
+    pub(super) fn current_spider_suit_mode(&self) -> SpiderSuitMode {
+        self.imp().spider_suit_mode.get()
+    }
+
     pub(super) fn set_klondike_draw_mode(&self, draw_mode: DrawMode) {
         let imp = self.imp();
         if imp.klondike_draw_mode.get() == draw_mode {
             return;
         }
         imp.klondike_draw_mode.set(draw_mode);
-        let mode = self.active_game_mode();
-        let _ = boundary::set_draw_mode(&mut imp.game.borrow_mut(), mode, draw_mode);
-        self.reset_hint_cycle_memory();
-        self.reset_auto_play_memory();
-        let state_hash = self.current_game_hash();
-        self.start_hint_loss_analysis_if_needed(state_hash);
-        *imp.status_override.borrow_mut() = Some(format!("Deal {} selected.", draw_mode.count()));
-        self.render();
+        let seed = imp.current_seed.get();
+        self.start_new_game_with_seed(
+            seed,
+            format!(
+                "Deal {} selected. Redealt current seed {}.",
+                draw_mode.count(),
+                seed
+            ),
+        );
+    }
+
+    pub(super) fn set_spider_suit_mode(&self, suit_mode: SpiderSuitMode, persist: bool) {
+        let imp = self.imp();
+        if imp.spider_suit_mode.get() == suit_mode {
+            return;
+        }
+        imp.spider_suit_mode.set(suit_mode);
+        if persist {
+            if let Some(settings) = imp.settings.borrow().clone() {
+                let _ = settings.set_int(
+                    SETTINGS_KEY_SPIDER_SUIT_MODE,
+                    i32::from(suit_mode.suit_count()),
+                );
+            }
+        }
+        if self.active_game_mode() == GameMode::Spider {
+            let seed = imp.current_seed.get();
+            self.start_new_game_with_seed(
+                seed,
+                format!(
+                    "Spider suits {} selected. Redealt current seed {}.",
+                    suit_mode.suit_count(),
+                    seed
+                ),
+            );
+        } else {
+            self.update_game_settings_menu();
+        }
     }
 
     pub(super) fn is_mode_engine_ready(&self) -> bool {
@@ -52,6 +85,10 @@ impl CardthropicWindow {
         let status = match spec_for_id(mode) {
             Some(spec) => {
                 imp.current_game_mode.set(spec.mode);
+                if spec.mode == GameMode::Spider {
+                    imp.spider_suit_mode
+                        .set(imp.game.borrow().spider().suit_mode());
+                }
                 if spec.engine_ready {
                     format!("{} selected.", spec.label)
                 } else {

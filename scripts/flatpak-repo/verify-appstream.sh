@@ -28,10 +28,31 @@ require_cmd() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo) REPO_DIR="${2:-}"; shift 2 ;;
-    --arch) ARCH="${2:-}"; shift 2 ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
+    --repo)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --repo" >&2
+        exit 2
+      fi
+      REPO_DIR="${2:-}"
+      shift 2
+      ;;
+    --arch)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --arch" >&2
+        exit 2
+      fi
+      ARCH="${2:-}"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -45,8 +66,8 @@ require_cmd gzip
 
 if [[ -z "${ARCH}" ]]; then
   case "$(uname -m)" in
-    x86_64|amd64) ARCH="x86_64" ;;
-    aarch64|arm64) ARCH="aarch64" ;;
+    x86_64 | amd64) ARCH="x86_64" ;;
+    aarch64 | arm64) ARCH="aarch64" ;;
     *) ARCH="$(uname -m)" ;;
   esac
 fi
@@ -68,10 +89,10 @@ if ! ostree --repo="${REPO_DIR}" refs | "${SEARCH_BIN}" "${SEARCH_QUIET_OPTS[@]}
 fi
 
 echo "Inspecting appstream metadata (${APPSTREAM_REF}) in ${REPO_DIR}..."
-ostree --repo="${REPO_DIR}" cat "${APPSTREAM_REF}" /appstream.xml.gz \
-  | gzip -dc \
-  | "${SEARCH_BIN}" "${SEARCH_OPTS[@]}" "id>|project_license|screenshot|image|release version" \
-  || true
+ostree --repo="${REPO_DIR}" cat "${APPSTREAM_REF}" /appstream.xml.gz |
+  gzip -dc |
+  "${SEARCH_BIN}" "${SEARCH_OPTS[@]}" "id>|project_license|screenshot|image|release version" ||
+  true
 
 echo
 echo "Expected:"

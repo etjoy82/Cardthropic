@@ -28,7 +28,9 @@ impl CardthropicWindow {
             imp.future.borrow_mut().clear();
             imp.move_count.set(imp.move_count.get() + 1);
             imp.timer_started.set(true);
-            *imp.status_override.borrow_mut() = None;
+            if !(imp.robot_mode_running.get() || imp.auto_playing_move.get()) {
+                *imp.status_override.borrow_mut() = None;
+            }
             self.note_current_state_for_hint_cycle();
             if imp.auto_playing_move.get() {
                 self.note_current_state_for_auto_play();

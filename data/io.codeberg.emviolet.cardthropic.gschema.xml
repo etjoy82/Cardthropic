@@ -6,12 +6,17 @@
 			<summary>Board background color</summary>
 			<description>Hex color used for the game board background.</description>
 		</key>
-		<key name="smart-move-mode" type="s">
-			<default>'double-click'</default>
-			<summary>Smart Move activation mode</summary>
-			<description>Whether Smart Move is disabled, uses single click, or uses double click.</description>
-		</key>
-		<key name="saved-session" type="s">
+			<key name="smart-move-mode" type="s">
+				<default>'double-click'</default>
+				<summary>Smart Move activation mode</summary>
+				<description>Whether Smart Move is disabled, uses single click, or uses double click.</description>
+			</key>
+			<key name="spider-suit-mode" type="i">
+				<default>1</default>
+				<summary>Spider suit count</summary>
+				<description>Number of suits for Spider deals (1-4).</description>
+			</key>
+			<key name="saved-session" type="s">
 			<default>''</default>
 			<summary>Saved game session state</summary>
 			<description>Serialized game/session state used for crash-safe resume on next launch.</description>
@@ -21,10 +26,15 @@
 			<summary>Custom userstyle CSS</summary>
 			<description>Optional custom CSS applied on top of Cardthropic board styles.</description>
 		</key>
-		<key name="custom-card-svg" type="s">
-			<default>''</default>
-			<summary>Custom card sheet SVG</summary>
-			<description>Optional SVG card sheet pasted by the user and persisted in settings.</description>
-		</key>
-	</schema>
-</schemalist>
+			<key name="custom-card-svg" type="s">
+				<default>''</default>
+				<summary>Custom card sheet SVG</summary>
+				<description>Optional SVG card sheet pasted by the user and persisted in settings.</description>
+			</key>
+			<key name="enable-hud" type="b">
+				<default>true</default>
+				<summary>Enable HUD</summary>
+				<description>Show the toolbar area above the stock/waste/foundations row.</description>
+			</key>
+		</schema>
+	</schemalist>

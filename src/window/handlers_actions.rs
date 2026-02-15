@@ -73,6 +73,16 @@ impl CardthropicWindow {
                 window.toggle_robot_mode();
             }
         ));
+        imp.status_clear_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| {
+                let imp = window.imp();
+                imp.status_history.borrow_mut().clear();
+                imp.status_last_appended.borrow_mut().clear();
+                imp.status_text_view.buffer().set_text("");
+            }
+        ));
     }
 
     pub(super) fn setup_robot_stop_capture_handler(&self) {
@@ -86,12 +96,26 @@ impl CardthropicWindow {
                 if !window.imp().robot_mode_running.get() {
                     return;
                 }
-                let robot_button = window.imp().robot_button.get();
+                let imp = window.imp();
+                let robot_button = imp.robot_button.get();
                 if let Some(picked) = window.pick(x, y, gtk::PickFlags::DEFAULT) {
                     let robot_widget: gtk::Widget = robot_button.clone().upcast();
                     if picked == robot_widget || picked.is_ancestor(&robot_button) {
                         return;
                     }
+                    let in_cards_zone = picked.is_ancestor(&imp.stock_picture.get())
+                        || picked.is_ancestor(&imp.waste_overlay.get())
+                        || picked.is_ancestor(&imp.foundation_picture_1.get())
+                        || picked.is_ancestor(&imp.foundation_picture_2.get())
+                        || picked.is_ancestor(&imp.foundation_picture_3.get())
+                        || picked.is_ancestor(&imp.foundation_picture_4.get())
+                        || picked.is_ancestor(&imp.tableau_scroller.get())
+                        || picked.is_ancestor(&imp.tableau_row.get());
+                    if !in_cards_zone {
+                        return;
+                    }
+                } else {
+                    return;
                 }
                 window.stop_robot_mode();
             }
@@ -232,6 +256,32 @@ impl CardthropicWindow {
                 #[weak(rename_to = window)]
                 self,
                 move |_, n_press, _, y| {
+                    if window.active_game_mode() == GameMode::Spider {
+                        let game = window.imp().game.borrow().spider().clone();
+                        let start = window.tableau_run_start_from_y_spider(&game, index, y);
+                        match window.smart_move_mode() {
+                            SmartMoveMode::DoubleClick if n_press == 2 => {
+                                if let Some(start) = start {
+                                    window.try_smart_move_from_tableau(index, start);
+                                }
+                            }
+                            SmartMoveMode::SingleClick if n_press == 1 => {
+                                *window.imp().selected_run.borrow_mut() = None;
+                                window.imp().waste_selected.set(false);
+                                if let Some(start) = start {
+                                    window.try_smart_move_from_tableau(index, start);
+                                }
+                            }
+                            SmartMoveMode::Disabled | SmartMoveMode::DoubleClick
+                                if n_press == 1 =>
+                            {
+                                window.select_or_move_tableau_with_start(index, start);
+                            }
+                            _ => {}
+                        }
+                        return;
+                    }
+
                     match window.smart_move_mode() {
                         SmartMoveMode::DoubleClick if n_press == 2 => {
                             let start = boundary::clone_klondike_for_automation(

@@ -1,5 +1,6 @@
 use super::*;
 use crate::engine::render_plan;
+use crate::game::SpiderGame;
 
 impl CardthropicWindow {
     pub(super) fn configure_stock_waste_foundation_widgets(
@@ -44,6 +45,23 @@ impl CardthropicWindow {
     pub(super) fn render_stock_picture(
         &self,
         game: &KlondikeGame,
+        deck: &AngloDeck,
+        card_width: i32,
+        card_height: i32,
+    ) {
+        let imp = self.imp();
+        if game.stock_len() > 0 {
+            let back = deck.back_texture_scaled(card_width, card_height);
+            imp.stock_picture.set_paintable(Some(&back));
+        } else {
+            let empty = Self::blank_texture(card_width, card_height);
+            imp.stock_picture.set_paintable(Some(&empty));
+        }
+    }
+
+    pub(super) fn render_stock_picture_spider(
+        &self,
+        game: &SpiderGame,
         deck: &AngloDeck,
         card_width: i32,
         card_height: i32,
@@ -123,5 +141,31 @@ impl CardthropicWindow {
             .set_visible(foundation_empty[2]);
         imp.foundation_placeholder_4
             .set_visible(foundation_empty[3]);
+    }
+
+    pub(super) fn render_waste_fan_spider(&self) {
+        let imp = self.imp();
+        for picture in self.waste_fan_slots() {
+            picture.set_visible(false);
+            picture.set_margin_start(0);
+            picture.set_paintable(None::<&gdk::Paintable>);
+            picture.remove_css_class("waste-selected-card");
+        }
+        imp.waste_placeholder_label.set_visible(true);
+    }
+
+    pub(super) fn render_foundations_area_spider(
+        &self,
+        _game: &SpiderGame,
+        deck: &AngloDeck,
+        card_width: i32,
+        card_height: i32,
+    ) {
+        for picture in self.foundation_pictures() {
+            self.set_picture_from_card(&picture, None, deck, card_width, card_height);
+        }
+        for placeholder in self.foundation_placeholders() {
+            placeholder.set_visible(true);
+        }
     }
 }

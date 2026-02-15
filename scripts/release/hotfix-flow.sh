@@ -35,10 +35,27 @@ require_cmd() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version) VERSION="${2:-}"; shift 2 ;;
-    --skip-bundle) SKIP_BUNDLE=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
+    --version)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --version" >&2
+        exit 2
+      fi
+      VERSION="${2:-}"
+      shift 2
+      ;;
+    --skip-bundle)
+      SKIP_BUNDLE=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 

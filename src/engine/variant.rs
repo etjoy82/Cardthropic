@@ -61,8 +61,8 @@ const SPIDER_SPEC: VariantSpec = VariantSpec {
     id: "spider",
     label: "Spider",
     emoji: "🕷️",
-    engine_ready: false,
-    settings_placeholder: "Spider settings will appear once Spider is playable.",
+    engine_ready: true,
+    settings_placeholder: "Spider settings are limited in this alpha.",
 };
 
 const FREECELL_SPEC: VariantSpec = VariantSpec {

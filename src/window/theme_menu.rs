@@ -70,54 +70,51 @@ impl CardthropicWindow {
         palette_box.set_margin_end(8);
         let palette_popover = gtk::Popover::new();
         palette_popover.set_has_arrow(true);
-        palette_popover.set_width_request(260);
+        palette_popover.set_width_request(360);
+        palette_popover.set_height_request(520);
 
         let theme_label = gtk::Label::new(Some("Theme Presets"));
         theme_label.set_xalign(0.0);
         theme_label.add_css_class("dim-label");
         palette_box.append(&theme_label);
 
-        let preset_list = gtk::ListBox::new();
-        preset_list.set_selection_mode(gtk::SelectionMode::Single);
-        preset_list.add_css_class("boxed-list");
-        preset_list.set_hexpand(true);
-        preset_list.set_vexpand(true);
-
+        let preset_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let preset_row_label = gtk::Label::new(Some("Theme"));
+        preset_row_label.set_xalign(0.0);
+        preset_row_label.add_css_class("dim-label");
         let preset_names = Self::userstyle_preset_names();
-        for (index, name) in preset_names.iter().enumerate() {
-            let row = gtk::ListBoxRow::new();
-            row.set_selectable(true);
-            row.set_activatable(true);
-            row.set_tooltip_text(Some(if index == 0 {
-                "Open CSS editor"
-            } else {
-                "Apply preset"
-            }));
-            let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-            row_box.set_margin_top(8);
-            row_box.set_margin_bottom(8);
-            row_box.set_margin_start(10);
-            row_box.set_margin_end(10);
-            let label = gtk::Label::new(Some(name));
-            label.set_xalign(0.0);
-            label.set_hexpand(true);
-            row_box.append(&label);
-            row.set_child(Some(&row_box));
-            preset_list.append(&row);
-        }
-
-        let selected_idx =
+        let display_preset_names: Vec<String> = preset_names
+            .iter()
+            .skip(1)
+            .map(|name| (*name).to_string())
+            .collect();
+        let display_preset_refs: Vec<&str> = display_preset_names
+            .iter()
+            .map(|name| name.as_str())
+            .collect();
+        let preset_dropdown = gtk::DropDown::from_strings(&display_preset_refs);
+        preset_dropdown.set_hexpand(true);
+        let selected_preset_idx =
             Self::userstyle_preset_for_css(&self.imp().custom_userstyle_css.borrow());
-        if let Some(row) = preset_list.row_at_index(selected_idx as i32) {
-            preset_list.select_row(Some(&row));
+        if selected_preset_idx > 0 {
+            preset_dropdown.set_selected(selected_preset_idx - 1);
+        } else {
+            preset_dropdown.set_selected(gtk::INVALID_LIST_POSITION);
         }
+        preset_row.append(&preset_row_label);
+        preset_row.append(&preset_dropdown);
+        palette_box.append(&preset_row);
 
         let palette_popover_for_theme_list = palette_popover.clone();
-        preset_list.connect_row_activated(glib::clone!(
+        preset_dropdown.connect_selected_notify(glib::clone!(
             #[weak(rename_to = window)]
             self,
-            move |_, row| {
-                let selected = row.index() as u32;
+            move |dropdown| {
+                let selected = dropdown.selected();
+                if selected == gtk::INVALID_LIST_POSITION {
+                    return;
+                }
+                let preset_index = selected + 1;
                 glib::idle_add_local_once(glib::clone!(
                     #[weak]
                     window,
@@ -125,16 +122,11 @@ impl CardthropicWindow {
                     palette_popover_for_theme_list,
                     move || {
                         palette_popover_for_theme_list.popdown();
-                        if selected == 0 {
-                            window.open_custom_userstyle_dialog();
-                        } else {
-                            window.apply_userstyle_preset(selected, true);
-                        }
+                        window.apply_userstyle_preset(preset_index, true);
                     }
                 ));
             }
         ));
-        palette_box.append(&preset_list);
 
         let bottom_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         bottom_row.set_halign(gtk::Align::End);
@@ -238,7 +230,14 @@ impl CardthropicWindow {
         card_design_hint.add_css_class("dim-label");
         palette_box.append(&card_design_hint);
 
-        palette_popover.set_child(Some(&palette_box));
+        let palette_scroll = gtk::ScrolledWindow::new();
+        palette_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        palette_scroll.set_min_content_width(320);
+        palette_scroll.set_min_content_height(360);
+        palette_scroll.set_max_content_height(520);
+        palette_scroll.set_child(Some(&palette_box));
+
+        palette_popover.set_child(Some(&palette_scroll));
         color_menu.set_popover(Some(&palette_popover));
     }
 }

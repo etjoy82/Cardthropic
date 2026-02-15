@@ -1,6 +1,45 @@
 use super::*;
 
 impl CardthropicWindow {
+    pub(super) fn setup_hud_action(&self) {
+        let action = gio::SimpleAction::new_stateful("enable-hud", None, &true.to_variant());
+        action.connect_change_state(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_, value| {
+                let enabled = value
+                    .and_then(|variant| variant.get::<bool>())
+                    .unwrap_or(true);
+                window.set_hud_enabled(enabled, true);
+            }
+        ));
+        self.add_action(&action);
+    }
+
+    pub(super) fn set_hud_enabled(&self, hud_enabled: bool, persist: bool) {
+        let imp = self.imp();
+        imp.hud_enabled.set(hud_enabled);
+        imp.toolbar_box.set_visible(hud_enabled);
+
+        if persist {
+            if let Some(settings) = imp.settings.borrow().clone() {
+                let _ = settings.set_boolean(SETTINGS_KEY_ENABLE_HUD, hud_enabled);
+            }
+        }
+
+        if let Some(action) = self.lookup_action("enable-hud") {
+            if let Ok(action) = action.downcast::<gio::SimpleAction>() {
+                let current = action
+                    .state()
+                    .and_then(|variant| variant.get::<bool>())
+                    .unwrap_or(true);
+                if current != hud_enabled {
+                    action.set_state(&hud_enabled.to_variant());
+                }
+            }
+        }
+    }
+
     pub(super) fn smart_move_mode(&self) -> SmartMoveMode {
         self.imp().smart_move_mode.get()
     }

@@ -40,11 +40,35 @@ xml_escape() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version) VERSION="${2:-}"; shift 2 ;;
-    --note) NOTES+=("${2:-}"); shift 2 ;;
-    --dry-run) DRY_RUN=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
+    --version)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --version" >&2
+        exit 2
+      fi
+      VERSION="${2:-}"
+      shift 2
+      ;;
+    --note)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --note" >&2
+        exit 2
+      fi
+      NOTES+=("${2:-}")
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -138,7 +162,7 @@ awk -v version="${VERSION}" -v notes_block="${notes_block}" '
       exit 1
     }
   }
-' CHANGELOG.md > "${tmp}"
+' CHANGELOG.md >"${tmp}"
 apply_or_preview "CHANGELOG.md" "${tmp}"
 
 # AppStream metadata replacement
@@ -183,7 +207,7 @@ awk -v version="${VERSION}" -v new_desc="${appstream_desc}" '
       exit 1
     }
   }
-' data/io.codeberg.emviolet.cardthropic.metainfo.xml.in > "${tmp}"
+' data/io.codeberg.emviolet.cardthropic.metainfo.xml.in >"${tmp}"
 apply_or_preview "data/io.codeberg.emviolet.cardthropic.metainfo.xml.in" "${tmp}"
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then

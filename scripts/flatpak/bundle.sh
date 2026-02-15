@@ -9,8 +9,8 @@ MANIFEST="${ROOT_DIR}/io.codeberg.emviolet.cardthropic.json"
 BUILD_DIR="${ROOT_DIR}/build-dir"
 REPO_DIR="${ROOT_DIR}/build-repo"
 BUNDLE_PATH="${ROOT_DIR}/cardthropic.flatpak"
-APP_ID="io.codeberg.emviolet.cardthropic"
-BRANCH="master"
+APP_ID=""
+BRANCH=""
 
 require_cmd() {
   local cmd="$1"
@@ -27,6 +27,14 @@ fi
 
 require_cmd flatpak
 require_cmd flatpak-builder
+require_cmd jq
+
+APP_ID="$(jq -r '.id // empty' "${MANIFEST}")"
+if [[ -z "${APP_ID}" ]]; then
+  echo "Manifest is missing required .id: ${MANIFEST}" >&2
+  exit 1
+fi
+BRANCH="$(jq -r '.branch // "master"' "${MANIFEST}")"
 
 echo "Building local Flatpak repo..."
 flatpak-builder \

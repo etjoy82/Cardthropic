@@ -2,8 +2,6 @@ use super::*;
 use crate::engine::boundary;
 use crate::engine::seed_ops;
 
-const ROBOT_STATUS_PULSE_EVERY_MOVES: u32 = 5;
-
 impl CardthropicWindow {
     fn robot_move_description(hint_move: HintMove) -> &'static str {
         match hint_move {
@@ -18,16 +16,14 @@ impl CardthropicWindow {
     fn set_robot_status_running(&self, detail: &str) {
         let deals_tried = self.imp().robot_deals_tried.get();
         *self.imp().status_override.borrow_mut() = Some(format!(
-            "Robot: {detail}. Deals tried: {deals_tried}. Tip: click anywhere to stop."
+            "Robot: {detail}. Deals tried: {deals_tried}. Tip: click cards area or 🤖 to stop."
         ));
     }
 
     fn record_robot_move_and_maybe_pulse(&self, detail: &str) {
         let next_moves = self.imp().robot_moves_applied.get().saturating_add(1);
         self.imp().robot_moves_applied.set(next_moves);
-        if next_moves == 1 || next_moves % ROBOT_STATUS_PULSE_EVERY_MOVES == 0 {
-            self.set_robot_status_running(&format!("move {next_moves}: {detail}"));
-        }
+        self.set_robot_status_running(&format!("move {next_moves}: {detail}"));
     }
 
     pub(super) fn trigger_rapid_wand(&self) {
@@ -190,18 +186,22 @@ impl CardthropicWindow {
             let suggestion = self.compute_auto_play_suggestion();
             match suggestion.hint_move {
                 Some(hint_move) => {
-                    let desc = Self::robot_move_description(hint_move);
+                    let desc = suggestion
+                        .message
+                        .strip_prefix("Hint: ")
+                        .unwrap_or(suggestion.message.as_str())
+                        .to_string();
                     self.imp().auto_playing_move.set(true);
                     let changed = self.apply_hint_move(hint_move);
                     self.imp().auto_playing_move.set(false);
                     if changed {
                         *self.imp().selected_run.borrow_mut() = None;
-                        self.record_robot_move_and_maybe_pulse(desc);
+                        self.record_robot_move_and_maybe_pulse(&desc);
                         self.render();
                         true
                     } else {
                         *self.imp().status_override.borrow_mut() = Some(
-                            "Robot: move invalidated; recalculating. Tip: click anywhere to stop."
+                            "Robot: move invalidated; recalculating. Tip: click cards area or 🤖 to stop."
                                 .to_string(),
                         );
                         self.render();
@@ -210,7 +210,7 @@ impl CardthropicWindow {
                 }
                 None => {
                     *self.imp().status_override.borrow_mut() = Some(format!(
-                        "Robot: {}. Tip: click anywhere to stop.",
+                        "Robot: {}. Tip: click cards area or 🤖 to stop.",
                         suggestion.message
                     ));
                     self.render();

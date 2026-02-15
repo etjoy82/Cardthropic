@@ -34,7 +34,11 @@ pub fn fallback_tableau_run_move(
     col: usize,
     start: usize,
 ) -> Option<HintMove> {
-    (0..7)
+    let tableau_columns = match mode {
+        GameMode::Spider => 10,
+        _ => 7,
+    };
+    (0..tableau_columns)
         .find(|&dst| boundary::can_move_tableau_run_to_tableau(state, mode, col, start, dst))
         .map(|dst| HintMove::TableauRunToTableau {
             src: col,
@@ -47,7 +51,11 @@ pub fn fallback_waste_to_tableau_move(
     state: &VariantStateStore,
     mode: GameMode,
 ) -> Option<HintMove> {
-    (0..7)
+    let tableau_columns = match mode {
+        GameMode::Spider => 10,
+        _ => 7,
+    };
+    (0..tableau_columns)
         .find(|&dst| boundary::can_move_waste_to_tableau(state, mode, dst))
         .map(|dst| HintMove::WasteToTableau { dst })
 }

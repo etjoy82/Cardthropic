@@ -95,16 +95,32 @@ impl CardthropicWindow {
                 #[upgrade_or]
                 None,
                 move |_, x, y| {
-                    let Some(game) = boundary::clone_klondike_for_automation(
-                        &window.imp().game.borrow(),
-                        window.active_game_mode(),
-                        window.current_klondike_draw_mode(),
-                    ) else {
-                        drag_start.set(None);
-                        return None;
+                    let mode = window.active_game_mode();
+                    let start_and_top = match mode {
+                        GameMode::Spider => {
+                            let game = window.imp().game.borrow().spider().clone();
+                            window
+                                .tableau_run_start_from_y_spider(&game, index, y)
+                                .map(|start| {
+                                    let top =
+                                        window.tableau_card_y_offset_spider(&game, index, start);
+                                    (start, top)
+                                })
+                        }
+                        _ => boundary::clone_klondike_for_automation(
+                            &window.imp().game.borrow(),
+                            mode,
+                            window.current_klondike_draw_mode(),
+                        )
+                        .and_then(|game| {
+                            window
+                                .tableau_run_start_from_y(&game, index, y)
+                                .map(|start| {
+                                    (start, window.tableau_card_y_offset(&game, index, start))
+                                })
+                        }),
                     };
-                    if let Some(start) = window.tableau_run_start_from_y(&game, index, y) {
-                        let card_top = window.tableau_card_y_offset(&game, index, start);
+                    if let Some((start, card_top)) = start_and_top {
                         let imp = window.imp();
                         let max_x = (imp.card_width.get() - 1).max(0);
                         let max_y = (imp.card_height.get() - 1).max(0);
@@ -132,38 +148,64 @@ impl CardthropicWindow {
                         return;
                     };
                     let imp = window.imp();
-                    let Some(game) = boundary::clone_klondike_for_automation(
-                        &imp.game.borrow(),
-                        window.active_game_mode(),
-                        window.current_klondike_draw_mode(),
-                    ) else {
-                        return;
-                    };
                     let deck_slot = imp.deck.borrow();
                     let Some(deck) = deck_slot.as_ref() else {
                         return;
                     };
-                    let Some(card) = game.tableau_card(index, start) else {
-                        return;
-                    };
                     let card_width = imp.card_width.get().max(62);
                     let card_height = imp.card_height.get().max(96);
-                    let texture = window
-                        .texture_for_tableau_drag_run(
-                            &game,
-                            deck,
-                            index,
-                            start,
-                            card_width,
-                            card_height,
-                        )
-                        .unwrap_or_else(|| {
-                            if card.face_up {
-                                deck.texture_for_card_scaled(card, card_width, card_height)
-                            } else {
-                                deck.back_texture_scaled(card_width, card_height)
-                            }
-                        });
+                    let texture = match window.active_game_mode() {
+                        GameMode::Spider => {
+                            let game = imp.game.borrow().spider().clone();
+                            let Some(card) = game.tableau_card(index, start) else {
+                                return;
+                            };
+                            window
+                                .texture_for_tableau_drag_run_spider(
+                                    &game,
+                                    deck,
+                                    index,
+                                    start,
+                                    card_width,
+                                    card_height,
+                                )
+                                .unwrap_or_else(|| {
+                                    if card.face_up {
+                                        deck.texture_for_card_scaled(card, card_width, card_height)
+                                    } else {
+                                        deck.back_texture_scaled(card_width, card_height)
+                                    }
+                                })
+                        }
+                        _ => {
+                            let Some(game) = boundary::clone_klondike_for_automation(
+                                &imp.game.borrow(),
+                                window.active_game_mode(),
+                                window.current_klondike_draw_mode(),
+                            ) else {
+                                return;
+                            };
+                            let Some(card) = game.tableau_card(index, start) else {
+                                return;
+                            };
+                            window
+                                .texture_for_tableau_drag_run(
+                                    &game,
+                                    deck,
+                                    index,
+                                    start,
+                                    card_width,
+                                    card_height,
+                                )
+                                .unwrap_or_else(|| {
+                                    if card.face_up {
+                                        deck.texture_for_card_scaled(card, card_width, card_height)
+                                    } else {
+                                        deck.back_texture_scaled(card_width, card_height)
+                                    }
+                                })
+                        }
+                    };
                     let (hot_x, hot_y) = drag_hotspot.get();
                     source.set_icon(Some(&texture), hot_x, hot_y);
                     window.start_drag(DragOrigin::Tableau { col: index, start });

@@ -1,5 +1,6 @@
 use super::*;
 use crate::engine::boundary;
+use crate::game::SpiderGame;
 
 impl CardthropicWindow {
     pub(super) fn start_new_game_with_seed(&self, seed: u64, status: String) {
@@ -20,6 +21,12 @@ impl CardthropicWindow {
         self.cancel_seed_winnable_check(None);
         self.clear_hint_effects();
         let mode = self.active_game_mode();
+        if mode == GameMode::Spider {
+            let suit_mode = imp.spider_suit_mode.get();
+            imp.game
+                .borrow_mut()
+                .set_spider(SpiderGame::new_with_seed_and_mode(seed, suit_mode));
+        }
         let _ = boundary::initialize_seeded_with_draw_mode(
             &mut imp.game.borrow_mut(),
             mode,

@@ -11,10 +11,11 @@ Usage:
 
 Behavior:
   - Runs shell script policy checks
+  - Runs shell formatting checks (shfmt)
   - Runs shellcheck for scripts using .shellcheckrc
 
 Options:
-  --strict-tools  Require shellcheck to be installed
+  --strict-tools  Require shellcheck and shfmt to be installed
   -h, --help      Show this help
 EOF
 }
@@ -34,21 +35,41 @@ require_cmd() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --strict-tools) STRICT_TOOLS=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
+    --strict-tools)
+      STRICT_TOOLS=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
 require_cmd bash
-require_cmd find
 
-echo "[shell 1/2] Shell script policy checks"
+echo "[shell 1/3] Shell script policy checks"
 scripts/release/check-shell-scripts.sh
 
-echo "[shell 2/2] Shell lint (shellcheck)"
+echo "[shell 2/3] Shell formatting (shfmt)"
+if command -v shfmt >/dev/null 2>&1; then
+  scripts/release/check-shell-format.sh
+else
+  if [[ "${STRICT_TOOLS}" -eq 1 ]]; then
+    echo "shfmt is required (--strict-tools) but not installed." >&2
+    exit 1
+  fi
+  echo "shfmt not installed; skipping (non-strict mode)."
+fi
+
+echo "[shell 3/3] Shell lint (shellcheck)"
 if command -v shellcheck >/dev/null 2>&1; then
-  mapfile -t sh_files < <(find scripts -maxdepth 3 -type f -name '*.sh' | sort)
+  mapfile -t sh_files < <(scripts/release/list-shell-scripts.sh)
   shellcheck --rcfile .shellcheckrc "${sh_files[@]}"
   echo "shellcheck passed."
 else

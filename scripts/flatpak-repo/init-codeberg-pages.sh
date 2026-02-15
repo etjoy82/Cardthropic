@@ -30,11 +30,39 @@ require_cmd() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo-url) REPO_URL="${2:-}"; shift 2 ;;
-    --checkout-dir) CHECKOUT_DIR="${2:-}"; shift 2 ;;
-    --branch) BRANCH="${2:-}"; shift 2 ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
+    --repo-url)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --repo-url" >&2
+        exit 2
+      fi
+      REPO_URL="${2:-}"
+      shift 2
+      ;;
+    --checkout-dir)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --checkout-dir" >&2
+        exit 2
+      fi
+      CHECKOUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --branch)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --branch" >&2
+        exit 2
+      fi
+      BRANCH="${2:-}"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 

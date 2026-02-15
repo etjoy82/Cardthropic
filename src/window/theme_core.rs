@@ -1,4 +1,5 @@
 use super::*;
+use crate::game::SpiderGame;
 
 impl CardthropicWindow {
     pub(super) fn setup_styles(&self) {
@@ -55,6 +56,33 @@ impl CardthropicWindow {
                 .unwrap_or(SmartMoveMode::DoubleClick)
         };
         self.set_smart_move_mode(smart_move_mode, false, false);
+
+        let hud_enabled = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| settings.boolean(SETTINGS_KEY_ENABLE_HUD))
+                .unwrap_or(true)
+        };
+        self.set_hud_enabled(hud_enabled, false);
+
+        let spider_suit_mode = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .and_then(|settings| {
+                    let raw = settings.int(SETTINGS_KEY_SPIDER_SUIT_MODE);
+                    u8::try_from(raw)
+                        .ok()
+                        .and_then(SpiderSuitMode::from_suit_count)
+                })
+                .unwrap_or(SpiderSuitMode::One)
+        };
+        imp.spider_suit_mode.set(spider_suit_mode);
+        let seed = imp.current_seed.get();
+        imp.game
+            .borrow_mut()
+            .set_spider(SpiderGame::new_with_seed_and_mode(seed, spider_suit_mode));
     }
 
     pub(super) fn load_app_settings() -> Option<gio::Settings> {

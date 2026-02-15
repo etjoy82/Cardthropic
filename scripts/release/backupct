@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Maintainer-only operational script for Cardthropic.
+# Not intended as a stable public interface for third-party use.
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_PATH}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_NAME="$(basename "${REPO_ROOT}")"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  backupct
+  backupct "short description"
+  backupct [zip-working-tree options]
+
+Behavior:
+  - No args: create default timestamped backup in ~/Backups
+  - Positional description: appends a sanitized suffix to the generated zip name
+  - Option mode: forwards args to zip-working-tree.sh as-is
+EOF
+}
+
+sanitize_desc() {
+  local input="$1"
+  local sanitized=""
+  sanitized="$(printf '%s' "${input}" |
+    tr '[:upper:]' '[:lower:]' |
+    sed -E 's/[[:space:]]+/-/g; s#[/\\]+#-#g; s/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
+  printf '%s\n' "${sanitized}"
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+ZIP_ARGS=()
+DESC_PARTS=()
+HAS_NAME=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo | --output-dir)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "ERROR: missing value for $1" >&2
+        exit 2
+      fi
+      ZIP_ARGS+=("$1" "$2")
+      shift 2
+      ;;
+    --name)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "ERROR: missing value for --name" >&2
+        exit 2
+      fi
+      HAS_NAME=1
+      ZIP_ARGS+=("$1" "$2")
+      shift 2
+      ;;
+    --)
+      shift
+      while [[ $# -gt 0 ]]; do
+        DESC_PARTS+=("$1")
+        shift
+      done
+      ;;
+    -*)
+      ZIP_ARGS+=("$1")
+      shift
+      ;;
+    *)
+      DESC_PARTS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ "${HAS_NAME}" -eq 0 && "${#DESC_PARTS[@]}" -gt 0 ]]; then
+  DESC_RAW="${DESC_PARTS[*]}"
+  DESC_SAFE="$(sanitize_desc "${DESC_RAW}")"
+  if [[ -z "${DESC_SAFE}" ]]; then
+    DESC_SAFE="note"
+  fi
+  NAME="${REPO_NAME}-$(date +%Y-%m-%d-%I-%M-%S-%p)-${DESC_SAFE}"
+  ZIP_ARGS=(--name "${NAME}" "${ZIP_ARGS[@]}")
+fi
+
+exec "${REPO_ROOT}/scripts/release/zip-working-tree.sh" --repo "${REPO_ROOT}" "${ZIP_ARGS[@]}"
