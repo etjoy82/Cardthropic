@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cardthropic | Modern GNOME Solitaire</title>
+  <meta name="description" content="Cardthropic is a modern GNOME solitaire game built with Rust, GTK4, and Libadwaita. Play Klondike and Spider with seeded deals, automation, and benchmarking tools.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Cardthropic | Modern GNOME Solitaire">
+  <meta property="og:description" content="Rust + Libadwaita solitaire for GNOME with Klondike, Spider, seeded deals, robot automation, and benchmark snapshots.">
+  <meta property="og:image" content="https://codeberg.org/emviolet/Cardthropic/raw/branch/main/logo-small.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Cardthropic | Modern GNOME Solitaire">
+  <meta name="twitter:description" content="Rust + Libadwaita solitaire for GNOME with Klondike, Spider, seeded deals, and robot benchmarking.">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="hero">
+    <img src="https://codeberg.org/emviolet/Cardthropic/raw/branch/main/logo-small.png" alt="Cardthropic logo" class="logo">
+    <h1>Cardthropic</h1>
+    <p class="tagline">Modern GNOME solitaire built with Rust and Libadwaita.</p>
+    <div class="actions">
+      <a href="https://codeberg.org/emviolet/Cardthropic" target="_blank" rel="noopener noreferrer">Source</a>
+      <a href="https://codeberg.org/emviolet/Cardthropic/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+    </div>
+  </header>
+
+  <main class="content">
+    <section>
+      <h2>Screenshot (0.8.0)</h2>
+      <img
+        src="https://codeberg.org/emviolet/Cardthropic/raw/branch/main/data/screenshots/cardthropic-0.8-screenshot.png"
+        alt="Cardthropic 0.8.0 screenshot"
+        class="screenshot"
+      >
+      <p class="caption">Cardthropic v0.8.0 on GNOME.</p>
+    </section>
+
+    <section>
+      <h2>What It Includes</h2>
+      <ul>
+        <li>Klondike and Spider (1/2/3/4 suit modes)</li>
+        <li>Numeric and word seeds with deterministic mapping</li>
+        <li>Wand, Robot, Forever Mode, and automation strategy profiles</li>
+        <li>Benchmark snapshot telemetry and live status history</li>
+        <li>Undo/redo, session resume, custom CSS userstyles</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Install (Flatpak)</h2>
+      <pre><code>flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/Cardthropic-flatpak/
+flatpak update --user --appstream cardthropic
+flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
+flatpak run io.codeberg.emviolet.cardthropic</code></pre>
+    </section>
+
+    <section>
+      <h2>Project Links</h2>
+      <ul>
+        <li><a href="https://codeberg.org/emviolet/Cardthropic/src/branch/main/README.md" target="_blank" rel="noopener noreferrer">README</a></li>
+        <li><a href="https://codeberg.org/emviolet/Cardthropic/src/branch/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>Cardthropic is GPL-3.0-or-later. Built for GNOME on Linux.</p>
+  </footer>
+</body>
+</html>
