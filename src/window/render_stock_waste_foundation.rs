@@ -9,6 +9,15 @@ impl CardthropicWindow {
         card_height: i32,
     ) {
         let imp = self.imp();
+        let size = (card_width, card_height);
+        if imp.last_stock_waste_foundation_size.get() == size {
+            if imp.waste_picture.paintable().is_some() {
+                imp.waste_picture.set_paintable(None::<&gdk::Paintable>);
+            }
+            return;
+        }
+        imp.last_stock_waste_foundation_size.set(size);
+
         imp.stock_picture.set_width_request(card_width);
         imp.stock_picture.set_height_request(card_height);
         imp.stock_picture.set_can_shrink(false);

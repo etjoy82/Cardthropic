@@ -56,6 +56,8 @@ mod imp {
             obj.set_accels_for_action("win.rapid-wand", &["<primary><shift>space"]);
             obj.set_accels_for_action("win.peek", &["F3"]);
             obj.set_accels_for_action("win.robot-mode", &["F6"]);
+            obj.set_accels_for_action("win.forever-mode", &["backslash"]);
+            obj.set_accels_for_action("win.copy-benchmark-snapshot", &["<primary><shift>b"]);
             obj.set_accels_for_action("win.cyclone-shuffle", &["F5"]);
             obj.set_accels_for_action("win.enable-hud", &["grave"]);
         }

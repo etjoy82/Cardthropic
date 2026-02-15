@@ -1,4 +1,5 @@
 use super::*;
+use crate::engine::automation::AutomationProfile;
 use crate::engine::autoplay;
 use crate::engine::autoplay_search;
 use crate::engine::boundary;
@@ -10,6 +11,24 @@ const MAX_AUTO_PLAY_SEEN_STATES: usize = 50_000;
 const MAX_HINT_LOSS_CACHE: usize = 4_096;
 
 impl CardthropicWindow {
+    pub(super) fn automation_profile_with_strategy(&self) -> AutomationProfile {
+        let mut profile = self.automation_profile();
+        match self.robot_strategy() {
+            RobotStrategy::Fast => {
+                profile.auto_play_lookahead_depth = profile.auto_play_lookahead_depth.saturating_sub(1).max(1);
+                profile.auto_play_beam_width = (profile.auto_play_beam_width / 2).max(4);
+                profile.auto_play_node_budget = (profile.auto_play_node_budget / 2).max(800);
+            }
+            RobotStrategy::Balanced => {}
+            RobotStrategy::Deep => {
+                profile.auto_play_lookahead_depth = profile.auto_play_lookahead_depth.saturating_add(2).min(8);
+                profile.auto_play_beam_width = profile.auto_play_beam_width.saturating_add(8).min(40);
+                profile.auto_play_node_budget = profile.auto_play_node_budget.saturating_mul(2).min(20_000);
+            }
+        }
+        profile
+    }
+
     pub(super) fn cancel_hint_loss_analysis(&self) {
         let imp = self.imp();
         if let Some(flag) = imp.hint_loss_analysis_cancel.borrow_mut().take() {
@@ -82,10 +101,13 @@ impl CardthropicWindow {
             };
         }
 
+        let profile = self.automation_profile_with_strategy();
+
         if let Some(suggestion) = self.best_auto_play_candidate_with_filter(
             &game,
             &seen_states,
             state_hash,
+            profile,
             |candidate| candidate.hint_move.is_some(),
         ) {
             suggestion
@@ -149,10 +171,13 @@ impl CardthropicWindow {
             };
         }
 
+        let profile = self.automation_profile_with_strategy();
+
         if let Some(suggestion) = self.best_auto_play_candidate_with_filter(
             &game,
             &seen_states,
             state_hash,
+            profile,
             |candidate| {
                 candidate
                     .source
@@ -176,6 +201,7 @@ impl CardthropicWindow {
         game: &KlondikeGame,
         seen_states: &HashSet<u64>,
         state_hash: u64,
+        profile: AutomationProfile,
         mut source_filter: F,
     ) -> Option<HintSuggestion>
     where
@@ -184,7 +210,6 @@ impl CardthropicWindow {
         let candidates = hinting::enumerate_hint_candidates(game);
         let candidate_slots: Vec<Option<HintMove>> =
             candidates.iter().map(|c| c.hint_move).collect();
-        let profile = self.automation_profile();
         let best_index = autoplay_search::best_candidate_slot_index(
             game,
             &candidate_slots,

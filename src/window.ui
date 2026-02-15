@@ -45,7 +45,7 @@
               <object class="GtkBox">
                 <property name="spacing">6</property>
                 <child>
-                  <object class="GtkMenuButton" id="board_color_menu_button">
+                  <object class="GtkButton" id="board_color_menu_button">
                     <property name="tooltip-text" translatable="yes">Board color</property>
                     <property name="has-frame">True</property>
                   </object>
@@ -180,36 +180,25 @@
                           <object class="GtkBox">
                             <property name="spacing">6</property>
                             <child>
-                              <object class="GtkScrolledWindow" id="status_scroller">
+                              <object class="GtkLabel" id="status_label">
+                                <property name="xalign">0</property>
                                 <property name="hexpand">True</property>
                                 <property name="vexpand">False</property>
-                                <property name="min-content-height">44</property>
-                                <property name="max-content-height">44</property>
-                                <property name="hscrollbar-policy">never</property>
-                                <property name="vscrollbar-policy">automatic</property>
-                                <property name="overlay-scrolling">True</property>
-                                <child>
-                                  <object class="GtkTextView" id="status_text_view">
-                                    <property name="editable">False</property>
-                                    <property name="cursor-visible">False</property>
-                                    <property name="accepts-tab">False</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="hexpand">True</property>
-                                    <property name="vexpand">False</property>
-                                    <property name="wrap-mode">word-char</property>
-                                    <property name="left-margin">2</property>
-                                    <property name="right-margin">2</property>
-                                    <style>
-                                      <class name="status-line"/>
-                                    </style>
-                                  </object>
-                                </child>
+                                <property name="width-chars">1</property>
+                                <property name="max-width-chars">160</property>
+                                <property name="ellipsize">end</property>
+                                <property name="wrap">True</property>
+                                <property name="wrap-mode">word-char</property>
+                                <property name="lines">2</property>
+                                <style>
+                                  <class name="status-line"/>
+                                </style>
                               </object>
                             </child>
                             <child>
-                              <object class="GtkButton" id="status_clear_button">
-                                <property name="label" translatable="yes">Clear</property>
-                                <property name="tooltip-text" translatable="yes">Clear status log</property>
+                              <object class="GtkButton" id="status_history_button">
+                                <property name="label" translatable="yes">History</property>
+                                <property name="tooltip-text" translatable="yes">Show status history</property>
                                 <property name="has-frame">False</property>
                                 <property name="valign">center</property>
                               </object>
@@ -262,6 +251,27 @@
                             <property name="label">🤖</property>
                             <property name="tooltip-text" translatable="yes">Robot Mode</property>
                             <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="copy_session_button">
+                            <property name="label">📋</property>
+                            <property name="tooltip-text" translatable="yes">Copy current game state</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="paste_session_button">
+                            <property name="label">📥</property>
+                            <property name="tooltip-text" translatable="yes">Paste and restore game state</property>
+                            <property name="has-frame">False</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkToggleButton" id="robot_debug_toggle_button">
+                            <property name="label">⚙️</property>
+                            <property name="tooltip-text" translatable="yes">Robot debug mode</property>
+                            <property name="has-frame">True</property>
                           </object>
                         </child>
                       </object>
@@ -852,6 +862,14 @@
         <attribute name="action">win.robot-mode</attribute>
       </item>
       <item>
+        <attribute name="label" translatable="yes">_Forever Mode</attribute>
+        <attribute name="action">win.forever-mode</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Copy Benchmark Snapshot</attribute>
+        <attribute name="action">win.copy-benchmark-snapshot</attribute>
+      </item>
+      <item>
         <attribute name="label" translatable="yes">_Smart Move</attribute>
         <link name="submenu">
           <section>
@@ -866,6 +884,25 @@
             <item>
               <attribute name="label" translatable="yes">_Disabled</attribute>
               <attribute name="action">win.smart-move-disabled</attribute>
+            </item>
+          </section>
+        </link>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Automation Strategy</attribute>
+        <link name="submenu">
+          <section>
+            <item>
+              <attribute name="label" translatable="yes">_Fast</attribute>
+              <attribute name="action">win.automation-strategy-fast</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">_Balanced</attribute>
+              <attribute name="action">win.automation-strategy-balanced</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">_Deep</attribute>
+              <attribute name="action">win.automation-strategy-deep</attribute>
             </item>
           </section>
         </link>

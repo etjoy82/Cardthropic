@@ -83,18 +83,22 @@ impl CardthropicWindow {
 
         self.update_keyboard_focus_style();
         let selected_status = selected.map(|run| (run.col, run.start));
+        let show_controls_hint = imp.pending_deal_instructions.replace(false);
         let status = status_text::build_status_text(
             game,
             selected_status,
             imp.waste_selected.get(),
             imp.peek_active.get(),
             engine_ready,
+            show_controls_hint,
             mode.label(),
             self.smart_move_mode().as_setting(),
             imp.deck_error.borrow().as_deref(),
             imp.status_override.borrow().as_deref(),
         );
-        self.append_status_line(&status);
+        if !status.is_empty() {
+            self.append_status_line(&status);
+        }
 
         self.update_stats_label();
         self.mark_session_dirty();
@@ -154,6 +158,7 @@ impl CardthropicWindow {
         imp.seed_combo.set_sensitive(controls.seed_combo_enabled);
 
         self.update_keyboard_focus_style();
+        let show_controls_hint = imp.pending_deal_instructions.replace(false);
         let status = if let Some(err) = imp.deck_error.borrow().as_deref() {
             format!("Card deck load failed: {err}")
         } else if let Some(message) = imp.status_override.borrow().as_deref() {
@@ -178,10 +183,14 @@ impl CardthropicWindow {
                     run.col + 1
                 )
             }
-        } else {
+        } else if show_controls_hint {
             "Spider ready. Build suited descending runs from King to Ace.".to_string()
+        } else {
+            String::new()
         };
-        self.append_status_line(&status);
+        if !status.is_empty() {
+            self.append_status_line(&status);
+        }
 
         self.update_stats_label();
         self.mark_session_dirty();
@@ -432,6 +441,12 @@ impl CardthropicWindow {
         ]
     }
 
+    pub(super) fn invalidate_card_render_cache(&self) {
+        for col in self.imp().tableau_picture_state_cache.borrow_mut().iter_mut() {
+            col.clear();
+        }
+    }
+
     fn append_status_line(&self, status: &str) {
         const MAX_STATUS_LINES: usize = 240;
 
@@ -446,36 +461,111 @@ impl CardthropicWindow {
         while history.len() > MAX_STATUS_LINES {
             let _ = history.pop_front();
         }
-        let joined = history
+        let history_joined = if imp.status_history_buffer.borrow().is_some() {
+            Some(
+                history
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )
+        } else {
+            None
+        };
+        drop(history);
+        imp.status_label.set_label(status);
+        imp.status_label.set_tooltip_text(Some(status));
+        if let Some(joined) = history_joined {
+            if let Some(buffer) = imp.status_history_buffer.borrow().as_ref() {
+                buffer.set_text(&joined);
+            }
+        }
+    }
+
+    pub(super) fn show_status_history_dialog(&self) {
+        if let Some(existing) = self.imp().status_history_dialog.borrow().as_ref() {
+            existing.present();
+            return;
+        }
+
+        let joined = self
+            .imp()
+            .status_history
+            .borrow()
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>()
             .join("\n");
-        let buffer = imp.status_text_view.buffer();
-        buffer.set_text(&joined);
-        let mut end = buffer.end_iter();
-        imp.status_text_view
-            .scroll_to_iter(&mut end, 0.0, true, 0.0, 1.0);
-        let scroller = imp.status_scroller.get();
-        let set_bottom = move || {
-            let adj = scroller.vadjustment();
-            let bottom = (adj.upper() - adj.page_size()).max(adj.lower());
-            adj.set_value(bottom);
-        };
-        set_bottom();
 
-        let scroller = imp.status_scroller.get();
-        glib::idle_add_local_once(move || {
-            let adj = scroller.vadjustment();
-            let bottom = (adj.upper() - adj.page_size()).max(adj.lower());
-            adj.set_value(bottom);
-        });
+        let dialog = gtk::Window::builder()
+            .title("Status History")
+            .transient_for(self)
+            .modal(false)
+            .default_width(760)
+            .default_height(420)
+            .build();
+        dialog.set_hide_on_close(true);
+        dialog.set_destroy_with_parent(true);
 
-        let scroller = imp.status_scroller.get();
-        glib::timeout_add_local_once(Duration::from_millis(24), move || {
-            let adj = scroller.vadjustment();
-            let bottom = (adj.upper() - adj.page_size()).max(adj.lower());
-            adj.set_value(bottom);
-        });
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        root.set_margin_top(10);
+        root.set_margin_bottom(10);
+        root.set_margin_start(10);
+        root.set_margin_end(10);
+
+        let scroller = gtk::ScrolledWindow::new();
+        scroller.set_hexpand(true);
+        scroller.set_vexpand(true);
+        scroller.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+
+        let text = gtk::TextView::new();
+        text.set_editable(false);
+        text.set_cursor_visible(false);
+        text.set_monospace(true);
+        text.set_wrap_mode(gtk::WrapMode::WordChar);
+        text.buffer().set_text(&joined);
+        *self.imp().status_history_buffer.borrow_mut() = Some(text.buffer());
+        scroller.set_child(Some(&text));
+        root.append(&scroller);
+
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        actions.set_halign(gtk::Align::End);
+
+        let clear = gtk::Button::with_label("Clear");
+        clear.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            text,
+            move |_| {
+                let imp = window.imp();
+                imp.status_history.borrow_mut().clear();
+                imp.status_last_appended.borrow_mut().clear();
+                imp.status_label.set_label("");
+                imp.status_label.set_tooltip_text(None);
+                let buffer = imp.status_history_buffer.borrow().as_ref().cloned();
+                if let Some(buffer) = buffer {
+                    buffer.set_text("");
+                } else {
+                    text.buffer().set_text("");
+                }
+            }
+        ));
+        actions.append(&clear);
+
+        let close = gtk::Button::with_label("Close");
+        close.connect_clicked(glib::clone!(
+            #[weak]
+            dialog,
+            move |_| {
+                dialog.close();
+            }
+        ));
+        actions.append(&close);
+        root.append(&actions);
+
+        dialog.set_child(Some(&root));
+        *self.imp().status_history_dialog.borrow_mut() = Some(dialog.clone());
+        dialog.present();
     }
 }

@@ -616,6 +616,7 @@ fn status_text_reports_win_and_selection_paths() {
         false,
         false,
         true,
+        false,
         "Klondike",
         "double-click",
         None,
@@ -629,6 +630,7 @@ fn status_text_reports_win_and_selection_paths() {
         false,
         false,
         true,
+        false,
         "Klondike",
         "double-click",
         None,
@@ -669,6 +671,12 @@ fn seed_ops_parse_and_random_fallback_work() {
         crate::engine::seed_ops::parse_seed_input("   ").unwrap(),
         None
     );
+    let hello_lower = crate::engine::seed_ops::parse_seed_input("hello").unwrap();
+    let hello_upper = crate::engine::seed_ops::parse_seed_input("HELLO").unwrap();
+    assert_eq!(hello_lower, hello_upper);
+    assert!(hello_lower.unwrap() > 0);
+    let too_long_word = "a".repeat(crate::engine::seed_ops::WORD_SEED_MAX_LEN + 1);
+    assert!(crate::engine::seed_ops::parse_seed_input(&too_long_word).is_err());
     assert!(crate::engine::seed_ops::parse_seed_input("not-a-seed").is_err());
 
     let seed = crate::engine::seed_ops::seed_from_text_or_random("").unwrap();

@@ -37,7 +37,7 @@ impl CardthropicWindow {
         let text = self.seed_input_text();
         let parsed = seed_ops::parse_seed_input(&text)?;
         let seed = seed_ops::seed_from_text_or_random(&text)?;
-        if parsed.is_none() || text.trim().replace('_', "") != seed.to_string() {
+        if parsed.is_none() {
             self.set_seed_input_text(&seed.to_string());
         }
         Ok(seed)
@@ -56,6 +56,7 @@ impl CardthropicWindow {
 
         self.cancel_seed_winnable_check(None);
         self.clear_seed_entry_feedback();
+        let original_seed_label = self.seed_input_text().trim().to_string();
         let seed = match self.seed_from_controls_or_random() {
             Ok(seed) => seed,
             Err(message) => {
@@ -68,7 +69,17 @@ impl CardthropicWindow {
             }
         };
 
-        self.start_new_game_with_seed(seed, seed_ops::msg_started_seed(seed));
+        let status = if !original_seed_label.is_empty()
+            && original_seed_label.chars().all(|ch| ch.is_ascii_alphabetic())
+        {
+            format!("Started a new game. Seed {seed}, [{original_seed_label}]")
+        } else {
+            seed_ops::msg_started_seed(seed)
+        };
+        self.start_new_game_with_seed(seed, status);
+        if !original_seed_label.is_empty() {
+            self.set_seed_input_text(&original_seed_label);
+        }
     }
 
     pub(super) fn start_random_seed_game(&self) {

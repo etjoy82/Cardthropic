@@ -13,6 +13,24 @@ impl CardthropicWindow {
         let stored_color = normalized.to_string();
         let css_color = normalized.to_string();
 
+        *imp.board_color_hex.borrow_mut() = stored_color.clone();
+        let preview = imp.board_color_preview.borrow().clone();
+        if let Some(preview) = preview.as_ref() {
+            preview.queue_draw();
+        }
+
+        if persist {
+            let settings = imp.settings.borrow().clone();
+            if let Some(settings) = settings.as_ref() {
+                let _ = settings.set_string(SETTINGS_KEY_BOARD_COLOR, &stored_color);
+            }
+        }
+
+        if self.is_system_userstyle_active() {
+            self.clear_board_color_override();
+            return;
+        }
+
         let existing_provider = imp.board_color_provider.borrow().clone();
         let provider = if let Some(provider) = existing_provider {
             provider
@@ -31,18 +49,11 @@ impl CardthropicWindow {
             ".board-background {{ background-color: {}; border-radius: 12px; transition: background-color 180ms ease-in-out; }}",
             css_color
         ));
+    }
 
-        *imp.board_color_hex.borrow_mut() = stored_color.clone();
-        let preview = imp.board_color_preview.borrow().clone();
-        if let Some(preview) = preview.as_ref() {
-            preview.queue_draw();
-        }
-
-        if persist {
-            let settings = imp.settings.borrow().clone();
-            if let Some(settings) = settings.as_ref() {
-                let _ = settings.set_string(SETTINGS_KEY_BOARD_COLOR, &stored_color);
-            }
+    pub(super) fn clear_board_color_override(&self) {
+        if let Some(provider) = self.imp().board_color_provider.borrow().as_ref() {
+            provider.load_from_string("");
         }
     }
 }

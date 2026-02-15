@@ -18,6 +18,8 @@ impl CardthropicWindow {
         let mut metrics_hasher = DefaultHasher::new();
         window_width.hash(&mut metrics_hasher);
         window_height.hash(&mut metrics_hasher);
+        self.active_game_mode().hash(&mut metrics_hasher);
+        columns.hash(&mut metrics_hasher);
         self.is_maximized().hash(&mut metrics_hasher);
         profile.side_padding.hash(&mut metrics_hasher);
         profile.tableau_vertical_padding.hash(&mut metrics_hasher);
@@ -57,11 +59,12 @@ impl CardthropicWindow {
             .min(width_limited_by_window_height)
             .clamp(profile.min_card_width, profile.max_card_width);
         let card_height = (card_width * 108 / 70).max(profile.min_card_height);
+        let (face_up_step, face_down_step) = Self::tableau_steps_for_card_height(card_height);
 
         imp.card_width.set(card_width);
         imp.card_height.set(card_height);
-        imp.face_up_step.set(TABLEAU_FACE_UP_STEP_PX);
-        imp.face_down_step.set(TABLEAU_FACE_DOWN_STEP_PX);
+        imp.face_up_step.set(face_up_step);
+        imp.face_down_step.set(face_down_step);
     }
 
     fn workspace_layout_profile(&self) -> WorkspaceLayoutProfile {
@@ -163,12 +166,13 @@ impl CardthropicWindow {
         while lo <= hi {
             let mid = (lo + hi) / 2;
             let card_height = (mid * 108 / 70).max(profile.min_card_height);
+            let (face_up_step, _) = Self::tableau_steps_for_card_height(card_height);
             let available_tableau_height =
                 usable_window_height.saturating_sub(card_height + tableau_overhead);
             let tallest = self.tallest_tableau_height_with_steps(
                 profile.assumed_depth,
                 card_height,
-                TABLEAU_FACE_UP_STEP_PX,
+                face_up_step,
             );
 
             if available_tableau_height > 0 && tallest <= available_tableau_height {
@@ -217,5 +221,12 @@ impl CardthropicWindow {
     ) -> i32 {
         let depth = assumed_depth.max(1);
         card_height + (depth - 1) * face_up_step.max(1)
+    }
+
+    fn tableau_steps_for_card_height(card_height: i32) -> (i32, i32) {
+        // Keep overlap proportional as cards scale up so large windows do not look vertically cramped.
+        let face_up_step = (card_height * 24 / 108).clamp(TABLEAU_FACE_UP_STEP_PX, 44);
+        let face_down_step = (face_up_step * 11 / 24).clamp(TABLEAU_FACE_DOWN_STEP_PX, 24);
+        (face_up_step, face_down_step)
     }
 }
