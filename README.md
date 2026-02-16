@@ -1,6 +1,7 @@
 # Cardthropic
 
-Cardthropic is a modern GNOME solitaire app built with Rust, GTK4, and Libadwaita.
+Cardthropic: Solitaire with a Real Heart.
+A zero-permission GNOME solitaire game built with Rust, GTK4, and Libadwaita.
 
 ![Cardthropic Logo](/logo-small.png)
 
