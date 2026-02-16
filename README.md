@@ -22,7 +22,7 @@ App ID: `io.codeberg.emviolet.cardthropic`
   - `🫣` Peek
 - Smart Move modes: `Double Click`, `Single Click`, `Disabled`
 - Session persistence and resume
-- APM telemetry and in-app APM graph
+- APM private metrics and in-app APM graph
 - Built-in themes + custom CSS userstyle editor
 
 ## Variant Status
