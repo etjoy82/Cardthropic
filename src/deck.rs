@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
 use gtk::gdk;
@@ -20,9 +20,21 @@ struct DeckSheet {
     row_edges: [i32; 6],
     texture_cache: RefCell<HashMap<(usize, usize), gdk::Texture>>,
     scaled_texture_cache: RefCell<HashMap<(usize, usize, i32, i32), gdk::Texture>>,
+    scaled_cache_hits: Cell<u64>,
+    scaled_cache_misses: Cell<u64>,
+    scaled_cache_inserts: Cell<u64>,
+    scaled_cache_clears: Cell<u64>,
 }
 
 const MAX_SCALED_TEXTURE_CACHE_ENTRIES: usize = 512;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DeckScaledCacheStats {
+    pub hits: u64,
+    pub misses: u64,
+    pub inserts: u64,
+    pub clears: u64,
+}
 
 impl AngloDeck {
     pub fn load() -> Result<Self, String> {
@@ -86,6 +98,10 @@ impl AngloDeck {
     pub fn clear_scaled_cache(&self) {
         self.normal.clear_scaled_cache();
     }
+
+    pub fn scaled_cache_stats(&self) -> DeckScaledCacheStats {
+        self.normal.scaled_cache_stats()
+    }
 }
 
 impl DeckSheet {
@@ -127,6 +143,10 @@ impl DeckSheet {
             row_edges,
             texture_cache: RefCell::new(HashMap::new()),
             scaled_texture_cache: RefCell::new(HashMap::new()),
+            scaled_cache_hits: Cell::new(0),
+            scaled_cache_misses: Cell::new(0),
+            scaled_cache_inserts: Cell::new(0),
+            scaled_cache_clears: Cell::new(0),
         })
     }
 
@@ -159,8 +179,12 @@ impl DeckSheet {
         let height = height.max(1);
         let key = (row, col, width, height);
         if let Some(texture) = self.scaled_texture_cache.borrow().get(&key) {
+            self.scaled_cache_hits
+                .set(self.scaled_cache_hits.get().saturating_add(1));
             return texture.clone();
         }
+        self.scaled_cache_misses
+            .set(self.scaled_cache_misses.get().saturating_add(1));
 
         let x0 = self.col_edges[col];
         let x1 = self.col_edges[col + 1];
@@ -179,8 +203,12 @@ impl DeckSheet {
         let mut cache = self.scaled_texture_cache.borrow_mut();
         if cache.len() >= MAX_SCALED_TEXTURE_CACHE_ENTRIES {
             cache.clear();
+            self.scaled_cache_clears
+                .set(self.scaled_cache_clears.get().saturating_add(1));
         }
         cache.insert(key, texture.clone());
+        self.scaled_cache_inserts
+            .set(self.scaled_cache_inserts.get().saturating_add(1));
         texture
     }
 
@@ -209,6 +237,17 @@ impl DeckSheet {
 
     fn clear_scaled_cache(&self) {
         self.scaled_texture_cache.borrow_mut().clear();
+        self.scaled_cache_clears
+            .set(self.scaled_cache_clears.get().saturating_add(1));
+    }
+
+    fn scaled_cache_stats(&self) -> DeckScaledCacheStats {
+        DeckScaledCacheStats {
+            hits: self.scaled_cache_hits.get(),
+            misses: self.scaled_cache_misses.get(),
+            inserts: self.scaled_cache_inserts.get(),
+            clears: self.scaled_cache_clears.get(),
+        }
     }
 }
 

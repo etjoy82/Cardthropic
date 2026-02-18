@@ -11,7 +11,7 @@
 }
 
 .game-mode-emoji-button {
-  font-size: 2.25rem;
+  font-size: 2.93rem;
   min-width: 56px;
   min-height: 48px;
   padding: 0;
@@ -28,7 +28,28 @@
 }
 
 .game-settings-menu-icon {
-  font-size: 1.35rem;
+  font-size: 1.76rem;
+}
+
+/* Keep MenuButton popovers but hide the built-in chevron arrow glyph. */
+#game_settings_menu_button arrow,
+#main_menu_button arrow {
+  min-width: 0;
+  min-height: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+}
+
+#seed_random_button,
+#seed_rescue_button,
+#seed_repeat_button,
+#board_color_menu_button,
+#auto_hint_button,
+#cyclone_shuffle_button,
+#peek_button,
+#robot_button {
+  font-size: 1.3em;
 }
 
 .hud-toggle:checked {
@@ -36,6 +57,25 @@
   box-shadow: inset 0 0 0 2px @accent_color;
   background-color: alpha(@accent_bg_color, 0.22);
   color: @accent_color;
+}
+
+#board_box.mobile-phone-mode {
+  margin: 2px;
+  border-radius: 10px;
+}
+
+#tableau_scroller.tableau-overflow-left {
+  box-shadow: inset 14px 0 14px -12px alpha(#ffffff, 0.40);
+}
+
+#tableau_scroller.tableau-overflow-right {
+  box-shadow: inset -14px 0 14px -12px alpha(#ffffff, 0.40);
+}
+
+#tableau_scroller.tableau-overflow-left.tableau-overflow-right {
+  box-shadow:
+    inset 14px 0 14px -12px alpha(#ffffff, 0.36),
+    inset -14px 0 14px -12px alpha(#ffffff, 0.36);
 }
 
 .tableau-selected-card,
@@ -93,7 +133,7 @@
 }
 
 .slot-emoji {
-  font-size: 2.4rem;
+  font-size: 3.12rem;
   opacity: 0.75;
 }
 

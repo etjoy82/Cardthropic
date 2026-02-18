@@ -6,6 +6,7 @@ impl CardthropicWindow {
         let imp = self.imp();
 
         let waste_hotspot = Rc::new(Cell::new((18_i32, 24_i32)));
+        let freecell_drag_slot = Rc::new(Cell::new(None::<usize>));
         let waste_drag = gtk::DragSource::new();
         waste_drag.set_actions(gdk::DragAction::MOVE);
         waste_drag.connect_prepare(glib::clone!(
@@ -13,9 +14,33 @@ impl CardthropicWindow {
             self,
             #[strong]
             waste_hotspot,
+            #[strong]
+            freecell_drag_slot,
             #[upgrade_or]
             None,
             move |_, x, y| {
+                if window.active_game_mode() == GameMode::Freecell {
+                    let idx = window.freecell_slot_index_from_waste_x(x);
+                    freecell_drag_slot.set(Some(idx));
+                    if window
+                        .imp()
+                        .game
+                        .borrow()
+                        .freecell()
+                        .freecell_card(idx)
+                        .is_some()
+                    {
+                        let imp = window.imp();
+                        let max_x = (imp.card_width.get() - 1).max(0);
+                        let max_y = (imp.card_height.get() - 1).max(0);
+                        let hot_x = (x.round() as i32).clamp(0, max_x);
+                        let hot_y = (y.round() as i32).clamp(0, max_y);
+                        waste_hotspot.set((hot_x, hot_y));
+                        let payload = format!("freecell:{idx}");
+                        return Some(gdk::ContentProvider::for_value(&payload.to_value()));
+                    }
+                    return None;
+                }
                 if boundary::waste_top(&window.imp().game.borrow(), window.active_game_mode())
                     .is_some()
                 {
@@ -36,24 +61,46 @@ impl CardthropicWindow {
             self,
             #[strong]
             waste_hotspot,
+            #[strong]
+            freecell_drag_slot,
             move |source, _| {
                 let imp = window.imp();
-                let Some(game) = boundary::clone_klondike_for_automation(
-                    &imp.game.borrow(),
-                    window.active_game_mode(),
-                    window.current_klondike_draw_mode(),
-                ) else {
-                    return;
-                };
                 let deck_slot = imp.deck.borrow();
                 let Some(deck) = deck_slot.as_ref() else {
                     return;
                 };
-                let Some(card) = game.waste_top() else {
-                    return;
+                let card = if window.active_game_mode() == GameMode::Freecell {
+                    let Some(idx) = freecell_drag_slot.get() else {
+                        return;
+                    };
+                    let Some(card) = imp.game.borrow().freecell().freecell_card(idx) else {
+                        return;
+                    };
+                    card
+                } else {
+                    let Some(game) = boundary::clone_klondike_for_automation(
+                        &imp.game.borrow(),
+                        window.active_game_mode(),
+                        window.current_klondike_draw_mode(),
+                    ) else {
+                        return;
+                    };
+                    let Some(card) = game.waste_top() else {
+                        return;
+                    };
+                    card
                 };
-                let card_width = imp.card_width.get().max(62);
-                let card_height = imp.card_height.get().max(96);
+                let mobile = imp.mobile_phone_mode.get();
+                let card_width = if mobile {
+                    imp.card_width.get().max(1)
+                } else {
+                    imp.card_width.get().max(62)
+                };
+                let card_height = if mobile {
+                    imp.card_height.get().max(1)
+                } else {
+                    imp.card_height.get().max(96)
+                };
                 let texture = deck.texture_for_card_scaled(card, card_width, card_height);
                 let (hot_x, hot_y) = waste_hotspot.get();
                 source.set_icon(Some(&texture), hot_x, hot_y);
@@ -107,6 +154,16 @@ impl CardthropicWindow {
                                     (start, top)
                                 })
                         }
+                        GameMode::Freecell => {
+                            let game = window.imp().game.borrow().freecell().clone();
+                            window
+                                .tableau_run_start_from_y_freecell(&game, index, y)
+                                .map(|start| {
+                                    let top =
+                                        window.tableau_card_y_offset_freecell(&game, index, start);
+                                    (start, top)
+                                })
+                        }
                         _ => boundary::clone_klondike_for_automation(
                             &window.imp().game.borrow(),
                             mode,
@@ -152,8 +209,17 @@ impl CardthropicWindow {
                     let Some(deck) = deck_slot.as_ref() else {
                         return;
                     };
-                    let card_width = imp.card_width.get().max(62);
-                    let card_height = imp.card_height.get().max(96);
+                    let mobile = imp.mobile_phone_mode.get();
+                    let card_width = if mobile {
+                        imp.card_width.get().max(1)
+                    } else {
+                        imp.card_width.get().max(62)
+                    };
+                    let card_height = if mobile {
+                        imp.card_height.get().max(1)
+                    } else {
+                        imp.card_height.get().max(96)
+                    };
                     let texture = match window.active_game_mode() {
                         GameMode::Spider => {
                             let game = imp.game.borrow().spider().clone();
@@ -175,6 +241,24 @@ impl CardthropicWindow {
                                     } else {
                                         deck.back_texture_scaled(card_width, card_height)
                                     }
+                                })
+                        }
+                        GameMode::Freecell => {
+                            let game = imp.game.borrow().freecell().clone();
+                            let Some(card) = game.tableau_card(index, start) else {
+                                return;
+                            };
+                            window
+                                .texture_for_tableau_drag_run_freecell(
+                                    &game,
+                                    deck,
+                                    index,
+                                    start,
+                                    card_width,
+                                    card_height,
+                                )
+                                .unwrap_or_else(|| {
+                                    deck.texture_for_card_scaled(card, card_width, card_height)
                                 })
                         }
                         _ => {

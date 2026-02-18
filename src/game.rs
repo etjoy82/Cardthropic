@@ -1,3 +1,5 @@
+#[path = "game/freecell.rs"]
+mod freecell;
 #[path = "game/klondike_moves.rs"]
 mod klondike_moves;
 #[path = "game/session_codec.rs"]
@@ -10,6 +12,7 @@ mod solver;
 mod spider;
 #[path = "game/types.rs"]
 mod types;
+pub use freecell::*;
 pub use spider::*;
 pub use types::*;
 

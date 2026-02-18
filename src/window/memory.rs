@@ -22,17 +22,18 @@ fn parse_kib_line(line: &str) -> Option<u64> {
 }
 
 impl CardthropicWindow {
+    pub(super) fn current_memory_mib(&self) -> Option<u64> {
+        let kib = read_status_kib("RssAnon:")
+            .or_else(|| read_smaps_rollup_kib("RssAnon:"))
+            .or_else(|| read_status_kib("VmRSS:"))?;
+        Some((kib as f64 / 1024.0).round() as u64)
+    }
+
     pub(super) fn current_memory_mib_text(&self) -> String {
         // GNOME System Monitor's "Memory" for processes maps closer to private
         // resident usage than full RSS. RssAnon tracks that best for us.
-        let kib = read_status_kib("RssAnon:")
-            .or_else(|| read_smaps_rollup_kib("RssAnon:"))
-            .or_else(|| read_status_kib("VmRSS:"));
-        match kib {
-            Some(kib) => {
-                let mib = (kib as f64 / 1024.0).round() as u64;
-                format!("{mib} MiB")
-            }
+        match self.current_memory_mib() {
+            Some(mib) => format!("{mib} MiB"),
             None => "n/a".to_string(),
         }
     }

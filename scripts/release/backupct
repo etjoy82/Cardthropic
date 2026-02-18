@@ -4,10 +4,12 @@ set -euo pipefail
 # Maintainer-only operational script for Cardthropic.
 # Not intended as a stable public interface for third-party use.
 
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_PATH}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-REPO_NAME="$(basename "${REPO_ROOT}")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+SCRIPT_ZIP_WORKING_TREE="${SCRIPT_REPO_ROOT}/scripts/release/zip-working-tree.sh"
+REPO_ROOT=""
+REPO_NAME=""
+ZIP_WORKING_TREE=""
 
 usage() {
   cat <<'EOF'
@@ -32,6 +34,37 @@ sanitize_desc() {
   printf '%s\n' "${sanitized}"
 }
 
+set_repo_context() {
+  local requested_repo="${1:-}"
+
+  if [[ -n "${requested_repo}" ]]; then
+    REPO_ROOT="$(cd "${requested_repo}" 2>/dev/null && pwd || printf '%s' "${requested_repo}")"
+  elif [[ -x "${SCRIPT_ZIP_WORKING_TREE}" ]]; then
+    REPO_ROOT="${SCRIPT_REPO_ROOT}"
+  elif [[ -x "${PWD}/scripts/release/zip-working-tree.sh" ]]; then
+    REPO_ROOT="${PWD}"
+  elif git_root="$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null)"; then
+    if [[ -x "${git_root}/scripts/release/zip-working-tree.sh" ]]; then
+      REPO_ROOT="${git_root}"
+    fi
+  fi
+
+  if [[ -z "${REPO_ROOT}" ]]; then
+    cat >&2 <<'EOF'
+ERROR: Could not locate Cardthropic repository root.
+Run from the repository directory, pass --repo <path>, or keep backupct under scripts/release/.
+EOF
+    exit 2
+  fi
+
+  REPO_NAME="$(basename "${REPO_ROOT}")"
+  ZIP_WORKING_TREE="${REPO_ROOT}/scripts/release/zip-working-tree.sh"
+  if [[ ! -x "${ZIP_WORKING_TREE}" ]]; then
+    echo "ERROR: expected executable not found: ${ZIP_WORKING_TREE}" >&2
+    exit 2
+  fi
+}
+
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   usage
   exit 0
@@ -40,6 +73,8 @@ fi
 ZIP_ARGS=()
 DESC_PARTS=()
 HAS_NAME=0
+HAS_REPO=0
+REPO_ARG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,6 +82,10 @@ while [[ $# -gt 0 ]]; do
       if [[ $# -lt 2 || -z "${2:-}" ]]; then
         echo "ERROR: missing value for $1" >&2
         exit 2
+      fi
+      if [[ "$1" == "--repo" ]]; then
+        HAS_REPO=1
+        REPO_ARG="$2"
       fi
       ZIP_ARGS+=("$1" "$2")
       shift 2
@@ -78,6 +117,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+set_repo_context "${REPO_ARG}"
+
 if [[ "${HAS_NAME}" -eq 0 && "${#DESC_PARTS[@]}" -gt 0 ]]; then
   DESC_RAW="${DESC_PARTS[*]}"
   DESC_SAFE="$(sanitize_desc "${DESC_RAW}")"
@@ -88,4 +129,8 @@ if [[ "${HAS_NAME}" -eq 0 && "${#DESC_PARTS[@]}" -gt 0 ]]; then
   ZIP_ARGS=(--name "${NAME}" "${ZIP_ARGS[@]}")
 fi
 
-exec "${REPO_ROOT}/scripts/release/zip-working-tree.sh" --repo "${REPO_ROOT}" "${ZIP_ARGS[@]}"
+if [[ "${HAS_REPO}" -eq 0 ]]; then
+  exec "${ZIP_WORKING_TREE}" --repo "${REPO_ROOT}" "${ZIP_ARGS[@]}"
+else
+  exec "${ZIP_WORKING_TREE}" "${ZIP_ARGS[@]}"
+fi

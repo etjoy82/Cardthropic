@@ -45,5 +45,16 @@ teardown() {
 
   [ "${status}" -eq 0 ]
   grep -q "^remote-delete --user cardthropic$" "${LOG_FILE}"
+  grep -q "^remote-add --if-not-exists --user cardthropic https://example.com/repo/$" "${LOG_FILE}"
+}
+
+@test "add-test-remote supports explicit --no-gpg-verify" {
+  run "${REPO_ROOT}/scripts/flatpak-repo/add-test-remote.sh" \
+    --replace \
+    --remote cardthropic \
+    --url "https://example.com/repo/" \
+    --no-gpg-verify
+
+  [ "${status}" -eq 0 ]
   grep -q "^remote-add --if-not-exists --user --no-gpg-verify cardthropic https://example.com/repo/$" "${LOG_FILE}"
 }

@@ -14,5 +14,6 @@ impl CardthropicWindow {
         self.setup_game_mode_menu_item();
         self.setup_game_settings_menu();
         self.setup_drag_and_drop();
+        self.setup_tableau_overflow_hints();
     }
 }

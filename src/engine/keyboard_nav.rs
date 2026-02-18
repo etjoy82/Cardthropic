@@ -4,6 +4,7 @@ use crate::game::KlondikeGame;
 pub enum KeyboardTarget {
     Stock,
     Waste,
+    Freecell(usize),
     Foundation(usize),
     Tableau { col: usize, start: Option<usize> },
 }
@@ -18,6 +19,7 @@ pub fn move_horizontal(game: &KlondikeGame, target: KeyboardTarget, delta: i32) 
                 KeyboardTarget::Stock
             }
         }
+        KeyboardTarget::Freecell(idx) => KeyboardTarget::Freecell(idx.min(3)),
         KeyboardTarget::Waste => {
             if delta > 0 {
                 KeyboardTarget::Foundation(0)
@@ -57,6 +59,7 @@ pub fn move_vertical(game: &KlondikeGame, target: KeyboardTarget, delta: i32) ->
                 current
             }
         }
+        KeyboardTarget::Freecell(idx) => KeyboardTarget::Freecell(idx.min(3)),
         KeyboardTarget::Tableau { col, start } => {
             let faceups = tableau_face_up_indices(game, col);
             if delta < 0 {
@@ -124,6 +127,7 @@ pub fn normalize_target(game: &KlondikeGame, target: KeyboardTarget) -> Keyboard
     match target {
         KeyboardTarget::Stock => KeyboardTarget::Stock,
         KeyboardTarget::Waste => KeyboardTarget::Waste,
+        KeyboardTarget::Freecell(idx) => KeyboardTarget::Freecell(idx.min(3)),
         KeyboardTarget::Foundation(idx) => KeyboardTarget::Foundation(idx.min(3)),
         KeyboardTarget::Tableau { col, start } => {
             let col = col.min(6);

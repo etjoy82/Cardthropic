@@ -2209,30 +2209,30 @@ impl CardthropicWindow {
                         #[weak]
                         status,
                         move |result: Result<gio::File, glib::Error>| {
-                        match result {
-                            Ok(file) => match file.load_contents(None::<&gio::Cancellable>) {
-                                Ok((contents, _)) => {
-                                    let text =
-                                        String::from_utf8_lossy(contents.as_ref()).to_string();
-                                    buffer.set_text(&text);
-                                    status.set_label("Imported CSS from file.");
-                                }
+                            match result {
+                                Ok(file) => match file.load_contents(None::<&gio::Cancellable>) {
+                                    Ok((contents, _)) => {
+                                        let text =
+                                            String::from_utf8_lossy(contents.as_ref()).to_string();
+                                        buffer.set_text(&text);
+                                        status.set_label("Imported CSS from file.");
+                                    }
+                                    Err(err) => {
+                                        *window.imp().status_override.borrow_mut() =
+                                            Some(format!("Import CSS failed: {err}"));
+                                        window.render();
+                                    }
+                                },
                                 Err(err) => {
+                                    // Ignore user-cancel; report other failures.
+                                    if err.matches(gio::IOErrorEnum::Cancelled) {
+                                        return;
+                                    }
                                     *window.imp().status_override.borrow_mut() =
                                         Some(format!("Import CSS failed: {err}"));
                                     window.render();
                                 }
-                            },
-                            Err(err) => {
-                                // Ignore user-cancel; report other failures.
-                                if err.matches(gio::IOErrorEnum::Cancelled) {
-                                    return;
-                                }
-                                *window.imp().status_override.borrow_mut() =
-                                    Some(format!("Import CSS failed: {err}"));
-                                window.render();
                             }
-                        }
                         }
                     ),
                 );
@@ -2274,37 +2274,37 @@ impl CardthropicWindow {
                         #[weak]
                         status,
                         move |result: Result<gio::File, glib::Error>| {
-                        match result {
-                            Ok(file) => {
-                                let text = buffer
-                                    .text(&buffer.start_iter(), &buffer.end_iter(), true)
-                                    .to_string();
-                                match file.replace_contents(
-                                    text.as_bytes(),
-                                    None,
-                                    false,
-                                    gio::FileCreateFlags::REPLACE_DESTINATION,
-                                    None::<&gio::Cancellable>,
-                                ) {
-                                    Ok(_) => {
-                                        status.set_label("Exported CSS to file.");
-                                    }
-                                    Err(err) => {
-                                        *window.imp().status_override.borrow_mut() =
-                                            Some(format!("Export CSS failed: {err}"));
-                                        window.render();
+                            match result {
+                                Ok(file) => {
+                                    let text = buffer
+                                        .text(&buffer.start_iter(), &buffer.end_iter(), true)
+                                        .to_string();
+                                    match file.replace_contents(
+                                        text.as_bytes(),
+                                        None,
+                                        false,
+                                        gio::FileCreateFlags::REPLACE_DESTINATION,
+                                        None::<&gio::Cancellable>,
+                                    ) {
+                                        Ok(_) => {
+                                            status.set_label("Exported CSS to file.");
+                                        }
+                                        Err(err) => {
+                                            *window.imp().status_override.borrow_mut() =
+                                                Some(format!("Export CSS failed: {err}"));
+                                            window.render();
+                                        }
                                     }
                                 }
-                            }
-                            Err(err) => {
-                                if err.matches(gio::IOErrorEnum::Cancelled) {
-                                    return;
+                                Err(err) => {
+                                    if err.matches(gio::IOErrorEnum::Cancelled) {
+                                        return;
+                                    }
+                                    *window.imp().status_override.borrow_mut() =
+                                        Some(format!("Export CSS failed: {err}"));
+                                    window.render();
                                 }
-                                *window.imp().status_override.borrow_mut() =
-                                    Some(format!("Export CSS failed: {err}"));
-                                window.render();
                             }
-                        }
                         }
                     ),
                 );

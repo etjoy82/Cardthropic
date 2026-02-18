@@ -58,7 +58,7 @@ pub const FREECELL_AUTOMATION_PROFILE: AutomationProfile = AutomationProfile {
     dialog_find_winnable_state_budget: 15_000,
     rapid_wand_interval_ms: 750,
     rapid_wand_total_steps: 5,
-    robot_step_interval_ms: 250,
+    robot_step_interval_ms: 50,
 };
 
 impl AutomationProfile {

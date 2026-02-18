@@ -89,12 +89,33 @@ if ! ostree --repo="${REPO_DIR}" refs | "${SEARCH_BIN}" "${SEARCH_QUIET_OPTS[@]}
 fi
 
 echo "Inspecting appstream metadata (${APPSTREAM_REF}) in ${REPO_DIR}..."
+tmp_xml="$(mktemp)"
+cleanup() {
+  rm -f "${tmp_xml}"
+}
+trap cleanup EXIT
+
 ostree --repo="${REPO_DIR}" cat "${APPSTREAM_REF}" /appstream.xml.gz |
-  gzip -dc |
-  "${SEARCH_BIN}" "${SEARCH_OPTS[@]}" "id>|project_license|screenshot|image|release version" ||
+  gzip -dc >"${tmp_xml}"
+
+"${SEARCH_BIN}" "${SEARCH_OPTS[@]}" "id>|project_license|screenshot|image|release version" "${tmp_xml}" ||
   true
+
+missing=0
+if ! "${SEARCH_BIN}" "${SEARCH_QUIET_OPTS[@]}" "project_license" "${tmp_xml}"; then
+  echo "Missing project_license in ${APPSTREAM_REF}" >&2
+  missing=1
+fi
+if ! "${SEARCH_BIN}" "${SEARCH_QUIET_OPTS[@]}" "screenshot|image type=\"source\"" "${tmp_xml}"; then
+  echo "Missing screenshot/image entries in ${APPSTREAM_REF}" >&2
+  missing=1
+fi
 
 echo
 echo "Expected:"
 echo "- project_license should be present"
 echo "- screenshot/image URL should be present"
+
+if [[ "${missing}" -ne 0 ]]; then
+  exit 1
+fi

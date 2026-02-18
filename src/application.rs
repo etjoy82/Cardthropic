@@ -48,7 +48,10 @@ mod imp {
             obj.set_accels_for_action("win.help", &["F1"]);
             obj.set_accels_for_action("win.random-seed", &["<primary>r"]);
             obj.set_accels_for_action("win.winnable-seed", &["<primary><shift>r"]);
-            obj.set_accels_for_action("win.draw", &["space"]);
+            obj.set_accels_for_action("win.seed-picker", &["<primary>l"]);
+            obj.set_accels_for_action("win.repeat-seed", &["<primary><shift>g"]);
+            obj.set_accels_for_action("win.check-seed-winnable", &["F7"]);
+            obj.set_accels_for_action("win.draw", &["<primary>d"]);
             obj.set_accels_for_action("win.undo", &["<primary>z"]);
             obj.set_accels_for_action("win.redo", &["<primary>y"]);
             obj.set_accels_for_action("win.toggle-fullscreen", &["F11"]);
@@ -57,9 +60,38 @@ mod imp {
             obj.set_accels_for_action("win.peek", &["F3"]);
             obj.set_accels_for_action("win.robot-mode", &["F6"]);
             obj.set_accels_for_action("win.forever-mode", &["backslash"]);
+            obj.set_accels_for_action("win.robot-auto-new-game-on-loss", &["F9"]);
+            obj.set_accels_for_action("win.robot-strict-debug-invariants", &["F10"]);
+            obj.set_accels_for_action("win.ludicrous-speed", &["equal"]);
             obj.set_accels_for_action("win.copy-benchmark-snapshot", &["<primary><shift>b"]);
             obj.set_accels_for_action("win.cyclone-shuffle", &["F5"]);
             obj.set_accels_for_action("win.enable-hud", &["grave"]);
+            obj.set_accels_for_action("win.copy-game-state", &["<primary><shift>c"]);
+            obj.set_accels_for_action("win.paste-game-state", &["<primary><shift>v"]);
+            obj.set_accels_for_action("win.mode-klondike-deal-1", &["<shift>1"]);
+            obj.set_accels_for_action("win.mode-klondike-deal-2", &["<shift>2"]);
+            obj.set_accels_for_action("win.mode-klondike-deal-3", &["<shift>3"]);
+            obj.set_accels_for_action("win.mode-klondike-deal-4", &["<shift>4"]);
+            obj.set_accels_for_action("win.mode-klondike-deal-5", &["<shift>5"]);
+            obj.set_accels_for_action("win.mode-spider-suit-1", &["<primary>1"]);
+            obj.set_accels_for_action("win.mode-spider-suit-2", &["<primary>2"]);
+            obj.set_accels_for_action("win.mode-spider-suit-3", &["<primary>3"]);
+            obj.set_accels_for_action("win.mode-spider-suit-4", &["<primary>4"]);
+            obj.set_accels_for_action("win.mode-freecell-card-26", &["<primary><shift>1"]);
+            obj.set_accels_for_action("win.mode-freecell-card-39", &["<primary><shift>2"]);
+            obj.set_accels_for_action(
+                "win.mode-freecell-card-52",
+                &["<primary><shift>3", "<primary><shift>4"],
+            );
+            obj.set_accels_for_action("win.smart-move-double-click", &["<primary><alt>d"]);
+            obj.set_accels_for_action("win.smart-move-single-click", &["<primary><alt>s"]);
+            obj.set_accels_for_action("win.smart-move-right-click", &["<primary><alt>r"]);
+            obj.set_accels_for_action("win.smart-move-disabled", &["<primary><alt>0"]);
+            obj.set_accels_for_action("win.robot-debug-toggle", &["F8"]);
+            obj.set_accels_for_action("win.open-theme-presets", &["<primary><shift>t"]);
+            obj.set_accels_for_action("win.status-history", &["<primary><shift>h"]);
+            obj.set_accels_for_action("win.apm-graph", &["<primary><shift>a"]);
+            obj.set_accels_for_action("app.about", &["<primary>i"]);
         }
     }
 

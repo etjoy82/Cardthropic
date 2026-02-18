@@ -3,22 +3,27 @@ use crate::engine::boundary;
 use crate::engine::seed_ops;
 
 impl CardthropicWindow {
-    pub(super) fn seed_history_file_path() -> std::path::PathBuf {
-        let mut path = glib::user_data_dir();
-        path.push(APP_DATA_DIR_NAME);
-        path.push(SEED_HISTORY_FILE_NAME);
-        path
-    }
-
     pub(super) fn load_seed_history(&self) {
-        let path = Self::seed_history_file_path();
-        let data = SeedHistoryStore::load_from_path(&path, MAX_SEED_HISTORY_ENTRIES);
+        let raw = self
+            .imp()
+            .settings
+            .borrow()
+            .as_ref()
+            .map(|settings| settings.string(SETTINGS_KEY_SEED_HISTORY).to_string())
+            .or_else(|| {
+                Self::load_app_settings()
+                    .map(|settings| settings.string(SETTINGS_KEY_SEED_HISTORY).to_string())
+            })
+            .unwrap_or_default();
+        let data = SeedHistoryStore::load_from_string(&raw, MAX_SEED_HISTORY_ENTRIES);
         *self.imp().seed_history.borrow_mut() = data;
     }
 
     pub(super) fn save_seed_history(&self) {
-        let path = Self::seed_history_file_path();
-        self.imp().seed_history.borrow().save_to_path(&path);
+        if let Some(settings) = self.imp().settings.borrow().as_ref() {
+            let payload = self.imp().seed_history.borrow().serialize();
+            let _ = settings.set_string(SETTINGS_KEY_SEED_HISTORY, &payload);
+        }
     }
 
     pub(super) fn note_seed_play_started(&self, seed: u64) {

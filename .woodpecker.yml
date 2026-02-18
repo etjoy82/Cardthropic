@@ -1,12 +1,55 @@
 steps:
   maintainer_gate:
-    image: rust:1.84-bookworm
+    image: rust:bookworm
     commands:
       - apt-get update
       - apt-get install -y --no-install-recommends shellcheck ripgrep
-      - scripts/release/maintainer-gate.sh --strict-tools
+      - scripts/release/maintainer-gate.sh --strict-tools --skip-cargo
+
+  tooling_ci_local:
+    image: rust:bookworm
+    environment:
+      CARGO_HOME: .cargo-home-ci
+      CARGO_TARGET_DIR: target-ci
+    commands:
+      - apt-get update
+      - apt-get install -y --no-install-recommends pkg-config libssl-dev
+      - cargo install --locked just
+      - cargo install --locked cargo-audit cargo-deny
+      - just doctor
+      - just ci-local
 
 when:
   event:
     - push
     - pull_request
+
+---
+steps:
+  tooling_ci_nightly:
+    image: rust:bookworm
+    environment:
+      CARGO_HOME: .cargo-home-ci
+      CARGO_TARGET_DIR: target-ci
+    commands:
+      - apt-get update
+      - apt-get install -y --no-install-recommends pkg-config libssl-dev
+      - rustup toolchain install nightly
+      - rustup component add --toolchain nightly rust-src llvm-tools-preview
+      - cargo install --locked just
+      - cargo install --locked cargo-audit cargo-deny cargo-llvm-cov cargo-bloat cargo-machete cargo-msrv
+      - cargo install --locked cargo-udeps || true
+      - just doctor
+      - just ci-nightly
+      - ls -lh reports/ci-bundle.tgz
+
+  nightly_artifact_upload:
+    image: rust:bookworm
+    commands:
+      - apt-get update
+      - apt-get install -y --no-install-recommends ca-certificates curl awscli
+      - scripts/ci/upload-artifacts.sh reports/ci-bundle.tgz
+
+when:
+  event:
+    - cron

@@ -1,163 +1,248 @@
 use super::*;
 
 impl CardthropicWindow {
-    fn accel_suffix_for_action(&self, action_name: &str) -> String {
-        let Some(app) = self.application() else {
-            return String::new();
-        };
-        let accels = app.accels_for_action(action_name);
-        if accels.is_empty() {
-            return String::new();
-        }
+    fn manual_pages() -> [(&'static str, &'static str); 3] {
+        [
+            (
+                "Philosophy",
+                r#"# Cardthropic Manual
 
-        let labels: Vec<String> = accels
-            .iter()
-            .map(|accel| {
-                if let Some((key, mods)) = gtk::accelerator_parse(accel) {
-                    gtk::accelerator_get_label(key, mods).to_string()
-                } else {
-                    accel.to_string()
-                }
-            })
-            .collect();
-        format!(" ({})", labels.join(", "))
+## What You Can Do Here
+- Play Klondike, Spider, and FreeCell with mode-specific constraints
+- Use seeds to replay, compare, and practice the same deal repeatedly
+- Use automation to explore candidate lines and tactical branches
+- Recover and iterate quickly with robust state history and reseeding workflows
+
+## Why Cardthropic Exists
+Cardthropic exists to make solitaire feel alive, inspectable, and playful while still respecting the strategy depth that makes the genre worth mastering.
+
+This project treats solitaire as:
+- A strategy sandbox, not just a time filler
+- A systems game where decisions have measurable effects
+- A place where humans and automation can collaborate
+
+## Design Values
+- **Transparent state**: runs, seeds, and outcomes should be understandable.
+- **Fast iteration**: switch modes quickly, replay ideas quickly, and test hypotheses quickly.
+- **Intentional imperfection**: automation is useful but not omniscient.
+
+## What “Good” Looks Like
+A good Cardthropic session is one where you can:
+1. Select a mode and constraints intentionally.
+2. Explore a deal with confidence that input latency and rendering stay out of the way.
+3. Use automation as an assistant, not a replacement for your thinking.
+4. Learn from both wins and losses.
+"#,
+            ),
+            (
+                "Playing & Workflow",
+                r#"## Core Workflow
+1. Pick a game family and mode constraints.
+2. Start from a random or seed-driven deal.
+3. Use manual play first to establish structure.
+4. Bring in hint/automation tools when the position gets tactical.
+5. Replay or reseed to compare approaches.
+
+## Seed-Centric Practice
+Seeds make strategy reproducible.
+
+Use seed workflows to:
+- Re-test a difficult line.
+- Compare two different opening plans on identical initial states.
+- Validate if a difficult position was execution-limited or structurally bad.
+
+## Performance and Keyboard
+Cardthropic tracks pace and rhythm so you can improve execution:
+- Move economy matters more than speed spikes.
+- Avoid reversible churn when it does not improve board potential.
+- Preserve flexibility in free spaces and temporary storage.
+
+## Keyboard-First Strategy
+Cardthropic supports keyboard-driven play and menu access so the game remains fully operable without pointer-only interactions.
+
+This makes repeated testing, reseeding, and automation control much faster over long sessions.
+"#,
+            ),
+            (
+                "Automation & Solver",
+                r#"## Automation Model
+Automation in Cardthropic is pragmatic:
+- It can solve many deals.
+- It can fail on solvable deals.
+- It can win through persistence and controlled retries.
+
+This is intentional. The system is built to be robust and observable, not magical.
+
+## How to Use Automation Well
+1. Let automation handle mechanical branches and repetitive candidate testing.
+2. Intervene manually when structure or tempo looks wrong.
+3. Re-run from seed to evaluate whether failure is heuristic, not impossibility.
+
+## Solver Nuances
+The planner/solver stack is heuristic-driven and bounded:
+- Prioritizes progress signals (foundation movement, mobility, flexibility).
+- Penalizes repeated-state churn and obvious cycles.
+- Applies loss guards (for example, progress drought windows) to avoid endless loops.
+
+Normal automation is policy-limited. Forever Mode is intentionally unbounded exploration.
+
+Because of this, results are best interpreted as:
+- **Found a practical line under current heuristics**, or
+- **Did not find one within policy limits**
+
+not absolute proof of global impossibility.
+
+## Forever Mode and Ludicrous Speed
+- **Forever Mode** keeps automation running across outcomes and reseeds by design.
+- **Ludicrous Speed** removes pacing delay so actions execute as fast as policy allows.
+
+Use them intentionally:
+1. Turn on Forever Mode for long unattended exploration runs.
+2. Turn on Ludicrous Speed when you want throughput over readability.
+3. Turn off Ludicrous Speed when you want to inspect behavior move-by-move.
+
+These toggles are strongest when used with seed replay and benchmark snapshots.
+
+## Quick Recipes
+### If You Are Stuck
+1. Run Smart Move once.
+2. If progress stalls, run automation for 30 to 60 seconds.
+3. Undo several moves.
+4. Try a different structural plan from that branch.
+
+### If You Are Practicing
+1. Pick a seed and play manually for two minutes.
+2. Run robot automation on the same deal.
+3. Replay the seed and compare your line to the robot line.
+
+## Human + Robot Collaboration Pattern
+- Human opens structure.
+- Robot explores tactical branches.
+- Human resolves strategic forks.
+- Robot finishes conversion where execution density is high.
+
+This hybrid style typically outperforms either side used alone.
+"#,
+            ),
+        ]
     }
 
-    fn help_entries(&self) -> Vec<(String, String)> {
-        let imp = self.imp();
-        let mut rows = Vec::new();
-        let mut push = |icon: &str, text: Option<String>, action: Option<&str>| {
-            if let Some(text) = text {
-                let suffix = action
-                    .map(|name| self.accel_suffix_for_action(name))
-                    .unwrap_or_default();
-                rows.push((icon.to_string(), format!("{text}{suffix}")));
+    fn render_inline_markdown(raw: &str) -> String {
+        let mut out = String::new();
+        let mut plain_start = 0usize;
+        let mut i = 0usize;
+        while i < raw.len() {
+            let rest = &raw[i..];
+            if rest.starts_with("**") {
+                if let Some(rel_end) = raw[i + 2..].find("**") {
+                    let end = i + 2 + rel_end;
+                    out.push_str(&glib::markup_escape_text(&raw[plain_start..i]));
+                    let content = glib::markup_escape_text(&raw[i + 2..end]);
+                    out.push_str(&format!("<b>{content}</b>"));
+                    i = end + 2;
+                    plain_start = i;
+                    continue;
+                }
+            } else if rest.starts_with('`') {
+                if let Some(rel_end) = raw[i + 1..].find('`') {
+                    let end = i + 1 + rel_end;
+                    out.push_str(&glib::markup_escape_text(&raw[plain_start..i]));
+                    let content = glib::markup_escape_text(&raw[i + 1..end]);
+                    out.push_str(&format!("<tt>{content}</tt>"));
+                    i = end + 1;
+                    plain_start = i;
+                    continue;
+                }
+            } else if rest.starts_with('*') {
+                if let Some(rel_end) = raw[i + 1..].find('*') {
+                    let end = i + 1 + rel_end;
+                    out.push_str(&glib::markup_escape_text(&raw[plain_start..i]));
+                    let content = glib::markup_escape_text(&raw[i + 1..end]);
+                    out.push_str(&format!("<i>{content}</i>"));
+                    i = end + 1;
+                    plain_start = i;
+                    continue;
+                }
             }
-        };
+            if let Some(ch) = rest.chars().next() {
+                i += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        out.push_str(&glib::markup_escape_text(&raw[plain_start..]));
+        out
+    }
 
-        push(
-            "❓",
-            imp.help_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.help"),
-        );
-        push(
-            "⛶",
-            imp.fullscreen_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.toggle-fullscreen"),
-        );
-        push(
-            "HUD",
-            imp.hud_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.enable-hud"),
-        );
-        push(
-            "↶",
-            imp.undo_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.undo"),
-        );
-        push(
-            "↷",
-            imp.redo_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.redo"),
-        );
-        push(
-            "🪄",
-            imp.auto_hint_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.play-hint-move"),
-        );
-        push("⚡", Some("Rapid Wand".to_string()), Some("win.rapid-wand"));
-        push(
-            "🌀",
-            imp.cyclone_shuffle_button
-                .tooltip_text()
-                .map(|s| s.to_string()),
-            Some("win.cyclone-shuffle"),
-        );
-        push(
-            "🫣",
-            imp.peek_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.peek"),
-        );
-        push(
-            "🤖",
-            imp.robot_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.robot-mode"),
-        );
-        push(
-            "📋",
-            imp.copy_session_button
-                .tooltip_text()
-                .map(|s| s.to_string()),
-            None,
-        );
-        push(
-            "📥",
-            imp.paste_session_button
-                .tooltip_text()
-                .map(|s| s.to_string()),
-            None,
-        );
-        push(
-            "ⓘ",
-            Some("Robot Mode stop: click cards area or 🤖 button.".to_string()),
-            None,
-        );
-        push(
-            "🎨",
-            imp.board_color_menu_button
-                .tooltip_text()
-                .map(|s| s.to_string()),
-            None,
-        );
-        push(
-            imp.game_settings_menu_button
-                .label()
-                .as_deref()
-                .unwrap_or("🎮"),
-            imp.game_settings_menu_button
-                .tooltip_text()
-                .map(|s| s.to_string()),
-            None,
-        );
-        push(
-            "☰",
-            imp.main_menu_button.tooltip_text().map(|s| s.to_string()),
-            None,
-        );
-        push(
-            "🎲",
-            imp.seed_random_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.random-seed"),
-        );
-        push(
-            "🛟",
-            imp.seed_rescue_button.tooltip_text().map(|s| s.to_string()),
-            Some("win.winnable-seed"),
-        );
-        push(
-            "W?",
-            imp.seed_winnable_button
-                .tooltip_text()
-                .map(|s| s.to_string()),
-            None,
-        );
-        push(
-            "🔁",
-            imp.seed_repeat_button.tooltip_text().map(|s| s.to_string()),
-            None,
-        );
-        push(
-            "Go",
-            imp.seed_go_button.tooltip_text().map(|s| s.to_string()),
-            None,
-        );
-        push(
-            "📈",
-            Some("Show APM graph".to_string()),
-            Some("win.apm-graph"),
-        );
+    fn markdown_to_pango_markup(markdown: &str) -> String {
+        let mut out = String::new();
+        let mut in_code = false;
+        for raw_line in markdown.lines() {
+            let line = raw_line.trim_end();
+            if line.starts_with("```") {
+                in_code = !in_code;
+                if !out.ends_with('\n') {
+                    out.push('\n');
+                }
+                continue;
+            }
+            if in_code {
+                let text = glib::markup_escape_text(line);
+                out.push_str(&format!("<tt>{text}</tt>\n"));
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("# ") {
+                out.push_str(&format!(
+                    "<span size=\"xx-large\" weight=\"bold\">{}</span>\n",
+                    Self::render_inline_markdown(rest)
+                ));
+            } else if let Some(rest) = line.strip_prefix("## ") {
+                out.push_str(&format!(
+                    "<span size=\"x-large\" weight=\"bold\">{}</span>\n",
+                    Self::render_inline_markdown(rest)
+                ));
+            } else if let Some(rest) = line.strip_prefix("### ") {
+                out.push_str(&format!(
+                    "<span size=\"large\" weight=\"bold\">{}</span>\n",
+                    Self::render_inline_markdown(rest)
+                ));
+            } else if let Some(rest) = line.strip_prefix("- ") {
+                out.push_str(&format!("• {}\n", Self::render_inline_markdown(rest)));
+            } else if line.is_empty() {
+                out.push('\n');
+            } else {
+                out.push_str(&format!("{}\n", Self::render_inline_markdown(line)));
+            }
+        }
+        out
+    }
 
-        rows
+    fn markdown_page_view(title: &str, markdown: &str) -> gtk::ScrolledWindow {
+        let label = gtk::Label::new(None);
+        label.set_use_markup(true);
+        label.set_markup(&Self::markdown_to_pango_markup(markdown));
+        label.set_selectable(true);
+        label.set_wrap(true);
+        label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        label.set_xalign(0.0);
+        label.set_yalign(0.0);
+        label.set_margin_top(10);
+        label.set_margin_bottom(10);
+        label.set_margin_start(12);
+        label.set_margin_end(12);
+        label.set_tooltip_text(Some(title));
+
+        let clamp = adw::Clamp::new();
+        clamp.set_child(Some(&label));
+        clamp.set_maximum_size(860);
+        clamp.set_tightening_threshold(620);
+
+        let scroller = gtk::ScrolledWindow::new();
+        scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        scroller.set_hexpand(true);
+        scroller.set_vexpand(true);
+        scroller.set_child(Some(&clamp));
+        scroller
     }
 
     pub(super) fn show_help_dialog(&self) {
@@ -166,18 +251,17 @@ impl CardthropicWindow {
             return;
         }
 
-        let entries = self.help_entries();
-        let row_count = entries.len() as i32;
-        let estimated_height = 170 + (row_count * 34);
-        let dialog_height = estimated_height.clamp(460, 820);
-
         let dialog = gtk::Window::builder()
-            .title("Cardthropic Help")
-            .transient_for(self)
+            .title("Cardthropic Manual")
             .modal(false)
-            .default_width(620)
-            .default_height(dialog_height)
+            .default_width(760)
+            .default_height(640)
             .build();
+        if let Some(app) = self.application() {
+            dialog.set_application(Some(&app));
+        }
+        dialog.set_resizable(true);
+        dialog.set_deletable(true);
         dialog.set_hide_on_close(true);
         dialog.set_destroy_with_parent(true);
 
@@ -203,29 +287,49 @@ impl CardthropicWindow {
         root.set_margin_start(14);
         root.set_margin_end(14);
 
-        let title = gtk::Label::new(Some("Controls"));
+        let title = gtk::Label::new(Some("Manual"));
         title.set_xalign(0.0);
         title.add_css_class("title-4");
         root.append(&title);
 
-        let content = gtk::Box::new(gtk::Orientation::Vertical, 6);
-        content.set_hexpand(true);
-        content.set_vexpand(true);
-        for (icon, text) in entries {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-            let icon_label = gtk::Label::new(Some(&icon));
-            icon_label.set_width_chars(4);
-            icon_label.set_xalign(0.0);
-            let text_label = gtk::Label::new(Some(&text));
-            text_label.set_xalign(0.0);
-            text_label.set_wrap(true);
-            text_label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
-            text_label.set_hexpand(true);
-            row.append(&icon_label);
-            row.append(&text_label);
-            content.append(&row);
+        let stack = adw::ViewStack::new();
+        stack.set_hexpand(true);
+        stack.set_vexpand(true);
+        let pages = Self::manual_pages();
+        for (name, markdown) in pages {
+            let page = Self::markdown_page_view(name, markdown);
+            stack.add_titled(&page, Some(name), name);
         }
-        root.append(&content);
+        stack.set_visible_child_name("Philosophy");
+
+        let tabs = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        tabs.set_halign(gtk::Align::Start);
+        let mut group_anchor: Option<gtk::CheckButton> = None;
+        for (idx, (name, _)) in Self::manual_pages().iter().enumerate() {
+            let tab = gtk::CheckButton::with_label(name);
+            if let Some(anchor) = group_anchor.as_ref() {
+                tab.set_group(Some(anchor));
+            } else {
+                group_anchor = Some(tab.clone());
+            }
+            if idx == 0 {
+                tab.set_active(true);
+            }
+            tab.connect_toggled(glib::clone!(
+                #[weak]
+                stack,
+                #[strong]
+                name,
+                move |btn| {
+                    if btn.is_active() {
+                        stack.set_visible_child_name(name);
+                    }
+                }
+            ));
+            tabs.append(&tab);
+        }
+        root.append(&tabs);
+        root.append(&stack);
 
         let close = gtk::Button::with_label("Close");
         close.set_halign(gtk::Align::End);

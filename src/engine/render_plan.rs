@@ -76,15 +76,6 @@ pub fn waste_overlay_width(card_width: i32) -> i32 {
     card_width + (waste_fan_step(card_width) * 4)
 }
 
-pub fn foundation_empty_flags(game: &KlondikeGame) -> [bool; 4] {
-    [
-        game.foundations()[0].is_empty(),
-        game.foundations()[1].is_empty(),
-        game.foundations()[2].is_empty(),
-        game.foundations()[3].is_empty(),
-    ]
-}
-
 pub fn tableau_stack_height(
     column: &[Card],
     card_height: i32,

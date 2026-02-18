@@ -1,6 +1,15 @@
 use super::*;
 
 impl CardthropicWindow {
+    pub(super) fn show_theme_presets_window(&self) {
+        if self.imp().theme_presets_window.borrow().is_none() {
+            self.setup_board_color_dropdown();
+        }
+        if let Some(window) = self.imp().theme_presets_window.borrow().as_ref() {
+            window.present();
+        }
+    }
+
     fn normalize_pasted_svg(input: &str) -> Result<String, String> {
         let trimmed = input.trim();
         if trimmed.is_empty() {
@@ -49,7 +58,8 @@ impl CardthropicWindow {
                 move || match receiver.try_recv() {
                     Ok(Ok(normalized_svg)) => {
                         if let Some(settings) = window.imp().settings.borrow().as_ref() {
-                            let _ = settings.set_string(SETTINGS_KEY_CUSTOM_CARD_SVG, &normalized_svg);
+                            let _ =
+                                settings.set_string(SETTINGS_KEY_CUSTOM_CARD_SVG, &normalized_svg);
                         }
                         window.imp().deck_load_attempted.set(false);
                         *window.imp().deck.borrow_mut() = None;
@@ -177,6 +187,88 @@ impl CardthropicWindow {
         preset_list_scroll.set_vexpand(true);
         preset_list_scroll.set_child(Some(&preset_list));
         palette_box.append(&preset_list_scroll);
+
+        let interface_font_label = gtk::Label::new(Some("Interface and Emoji Font"));
+        interface_font_label.set_xalign(0.0);
+        interface_font_label.add_css_class("dim-label");
+        palette_box.append(&interface_font_label);
+
+        let mut family_names: Vec<String> = self
+            .imp()
+            .status_label
+            .pango_context()
+            .list_families()
+            .into_iter()
+            .map(|family| family.name().to_string())
+            .collect();
+        family_names.sort_unstable();
+        family_names.dedup();
+
+        let default_family = self.default_interface_font_family();
+        let mut font_options = Vec::with_capacity(family_names.len() + 1);
+        font_options.push(format!("App Default ({})", default_family));
+        font_options.extend(family_names.clone());
+        let font_option_refs: Vec<&str> = font_options.iter().map(String::as_str).collect();
+        let interface_font_dropdown = gtk::DropDown::from_strings(&font_option_refs);
+        interface_font_dropdown.set_hexpand(true);
+        let interface_font_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        interface_font_row.set_hexpand(true);
+        interface_font_row.append(&interface_font_dropdown);
+
+        let reset_interface_font_button = gtk::Button::with_label("Reset");
+        reset_interface_font_button.add_css_class("flat");
+        interface_font_row.append(&reset_interface_font_button);
+
+        let saved_font = self
+            .imp()
+            .settings
+            .borrow()
+            .as_ref()
+            .map(|settings| {
+                settings
+                    .string(SETTINGS_KEY_INTERFACE_EMOJI_FONT)
+                    .to_string()
+            })
+            .unwrap_or_default();
+        let selected_index = if saved_font.trim().is_empty() {
+            0
+        } else {
+            family_names
+                .iter()
+                .position(|name| name == &saved_font)
+                .map(|idx| idx + 1)
+                .unwrap_or(0)
+        };
+        interface_font_dropdown.set_selected(selected_index as u32);
+        palette_box.append(&interface_font_row);
+
+        interface_font_dropdown.connect_selected_notify(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[strong]
+            family_names,
+            move |dropdown| {
+                let selected = dropdown.selected() as usize;
+                if selected == 0 {
+                    window.apply_interface_emoji_font(None, true);
+                } else if let Some(name) = family_names.get(selected.saturating_sub(1)) {
+                    window.apply_interface_emoji_font(Some(name.as_str()), true);
+                }
+                window.render();
+            }
+        ));
+
+        reset_interface_font_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            interface_font_dropdown,
+            move |_| {
+                interface_font_dropdown.set_selected(0);
+                window.apply_interface_emoji_font(None, true);
+                window.render();
+            }
+        ));
 
         theme_filter_entry.connect_search_changed(glib::clone!(
             #[weak]
@@ -333,10 +425,9 @@ impl CardthropicWindow {
                                         window,
                                         move |result| match result {
                                             Ok((contents, _)) => {
-                                                let svg_text = String::from_utf8_lossy(
-                                                    contents.as_ref(),
-                                                )
-                                                .to_string();
+                                                let svg_text =
+                                                    String::from_utf8_lossy(contents.as_ref())
+                                                        .to_string();
                                                 window.apply_custom_card_svg_from_text_async(
                                                     svg_text,
                                                     "Loading SVG card design",

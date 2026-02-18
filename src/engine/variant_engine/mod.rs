@@ -125,6 +125,28 @@ pub trait VariantEngine: Sync {
         false
     }
 
+    fn move_tableau_top_to_freecell(
+        &self,
+        _state: &mut VariantStateStore,
+        _src: usize,
+        _cell: usize,
+    ) -> bool {
+        false
+    }
+
+    fn move_freecell_to_foundation(&self, _state: &mut VariantStateStore, _cell: usize) -> bool {
+        false
+    }
+
+    fn move_freecell_to_tableau(
+        &self,
+        _state: &mut VariantStateStore,
+        _cell: usize,
+        _dst: usize,
+    ) -> bool {
+        false
+    }
+
     fn move_foundation_top_to_tableau(
         &self,
         _state: &mut VariantStateStore,
@@ -143,6 +165,28 @@ pub trait VariantEngine: Sync {
     }
 
     fn can_move_tableau_top_to_foundation(&self, _state: &VariantStateStore, _src: usize) -> bool {
+        false
+    }
+
+    fn can_move_tableau_top_to_freecell(
+        &self,
+        _state: &VariantStateStore,
+        _src: usize,
+        _cell: usize,
+    ) -> bool {
+        false
+    }
+
+    fn can_move_freecell_to_foundation(&self, _state: &VariantStateStore, _cell: usize) -> bool {
+        false
+    }
+
+    fn can_move_freecell_to_tableau(
+        &self,
+        _state: &VariantStateStore,
+        _cell: usize,
+        _dst: usize,
+    ) -> bool {
         false
     }
 

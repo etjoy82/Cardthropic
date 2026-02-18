@@ -323,7 +323,7 @@ fn game_mode_metadata_is_stable() {
     assert_eq!(GameMode::Freecell.emoji(), "🗽");
     assert!(GameMode::Klondike.engine_ready());
     assert!(GameMode::Spider.engine_ready());
-    assert!(!GameMode::Freecell.engine_ready());
+    assert!(GameMode::Freecell.engine_ready());
 }
 
 #[test]
@@ -383,19 +383,18 @@ fn spider_deal_adds_one_face_up_card_per_column() {
 }
 
 #[test]
-fn spider_deal_allows_empty_tableau() {
+fn spider_deal_rejects_empty_tableau() {
     let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
     tableau[0].push(card(Suit::Spades, 13, true));
     for pile in &mut tableau[1..9] {
         pile.push(card(Suit::Spades, 12, true));
     }
     let stock = vec![card(Suit::Spades, 1, false); 10];
-    let mut game = SpiderGame::debug_new(SpiderSuitMode::One, stock, tableau, 0);
-    assert!(game.can_deal_from_stock());
-    assert!(game.deal_from_stock());
-    assert_eq!(game.stock_len(), 0);
-    assert_eq!(game.tableau()[9].len(), 1);
-    assert!(game.tableau()[9][0].face_up);
+    let mut game = SpiderGame::debug_new(SpiderSuitMode::One, stock, tableau.clone(), 0);
+    assert!(!game.can_deal_from_stock());
+    assert!(!game.deal_from_stock());
+    assert_eq!(game.stock_len(), 10);
+    assert_eq!(game.tableau(), &tableau);
 }
 
 #[test]
@@ -403,7 +402,7 @@ fn spider_move_run_moves_descending_sequence_and_flips_source() {
     let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
     tableau[0] = vec![
         card(Suit::Spades, 9, false),
-        card(Suit::Hearts, 8, true),
+        card(Suit::Spades, 8, true),
         card(Suit::Spades, 7, true),
     ];
     tableau[1] = vec![card(Suit::Diamonds, 9, true)];
@@ -470,7 +469,7 @@ fn spider_session_codec_round_trip_preserves_three_suit_mode() {
 #[test]
 fn spider_rule_001_valid_descending_same_suit_run_can_move() {
     let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
-    tableau[0] = vec![card(Suit::Spades, 9, true), card(Suit::Hearts, 8, true)];
+    tableau[0] = vec![card(Suit::Spades, 9, true), card(Suit::Spades, 8, true)];
     tableau[1] = vec![card(Suit::Clubs, 9, true)];
     let mut game = SpiderGame::debug_new(SpiderSuitMode::Four, Vec::new(), tableau, 0);
 
@@ -481,6 +480,23 @@ fn spider_rule_001_valid_descending_same_suit_run_can_move() {
     assert_eq!(game.tableau()[1][0].rank, 9);
     assert_eq!(game.tableau()[1][1].rank, 8);
     assert!(game.tableau()[1][1].face_up);
+}
+
+#[test]
+fn spider_rule_001b_mixed_suit_run_cannot_move_as_stack() {
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    tableau[0] = vec![
+        card(Suit::Spades, 9, true),
+        card(Suit::Hearts, 8, true),
+        card(Suit::Spades, 7, true),
+    ];
+    tableau[1] = vec![card(Suit::Clubs, 10, true)];
+    let mut game = SpiderGame::debug_new(SpiderSuitMode::Four, Vec::new(), tableau, 0);
+    let before = game.clone();
+
+    assert!(!game.can_move_run(0, 0, 1));
+    assert!(!game.move_run(0, 0, 1));
+    assert_eq!(game, before);
 }
 
 #[test]
@@ -585,7 +601,7 @@ fn spider_rule_007_completed_suit_run_is_extracted_correctly() {
 }
 
 #[test]
-fn spider_rule_008_deal_allowed_with_empty_tableau() {
+fn spider_rule_008_deal_rejected_with_empty_tableau() {
     let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
     // Make col 9 empty; all others non-empty.
     for pile in &mut tableau[0..9] {
@@ -594,14 +610,10 @@ fn spider_rule_008_deal_allowed_with_empty_tableau() {
     let stock = vec![card(Suit::Spades, 1, false); 10];
     let mut game = SpiderGame::debug_new(SpiderSuitMode::One, stock, tableau.clone(), 0);
 
-    assert!(game.can_deal_from_stock());
-    assert!(game.deal_from_stock());
-    assert_eq!(game.stock_len(), 0);
-    for col in 0..10 {
-        let expected = tableau[col].len() + 1;
-        assert_eq!(game.tableau()[col].len(), expected);
-        assert!(game.tableau()[col].last().is_some_and(|card| card.face_up));
-    }
+    assert!(!game.can_deal_from_stock());
+    assert!(!game.deal_from_stock());
+    assert_eq!(game.stock_len(), 10);
+    assert_eq!(game.tableau(), &tableau);
 }
 
 #[test]
@@ -687,4 +699,199 @@ fn spider_cyclone_shuffle_noops_for_tiny_tableau() {
 
     assert!(!game.cyclone_shuffle_tableau());
     assert_eq!(game, before);
+}
+
+#[test]
+fn freecell_seeded_setup_is_deterministic_and_counts_are_correct() {
+    let a = FreecellGame::new_with_seed(4242);
+    let b = FreecellGame::new_with_seed(4242);
+    let c = FreecellGame::new_with_seed(4243);
+    assert_eq!(a, b);
+    assert_ne!(a, c);
+
+    let tableau_count: usize = a.tableau().iter().map(Vec::len).sum();
+    let freecell_count = a.freecells().iter().filter(|slot| slot.is_some()).count();
+    let foundation_count: usize = a.foundations().iter().map(Vec::len).sum();
+    assert_eq!(tableau_count, 52);
+    assert_eq!(freecell_count, 0);
+    assert_eq!(foundation_count, 0);
+    for col in 0..8 {
+        let expected = if col < 4 { 7 } else { 6 };
+        assert_eq!(a.tableau()[col].len(), expected);
+    }
+}
+
+#[test]
+fn freecell_seeded_setup_respects_card_count_modes() {
+    let g26 = FreecellGame::new_with_seed_and_card_count(4242, FreecellCardCountMode::TwentySix);
+    let g39 = FreecellGame::new_with_seed_and_card_count(4242, FreecellCardCountMode::ThirtyNine);
+    let g52 = FreecellGame::new_with_seed_and_card_count(4242, FreecellCardCountMode::FiftyTwo);
+
+    assert_eq!(g26.card_count_mode(), FreecellCardCountMode::TwentySix);
+    assert_eq!(g39.card_count_mode(), FreecellCardCountMode::ThirtyNine);
+    assert_eq!(g52.card_count_mode(), FreecellCardCountMode::FiftyTwo);
+
+    let c26: usize = g26.tableau().iter().map(Vec::len).sum();
+    let c39: usize = g39.tableau().iter().map(Vec::len).sum();
+    let c52: usize = g52.tableau().iter().map(Vec::len).sum();
+    assert_eq!(c26, 26);
+    assert_eq!(c39, 39);
+    assert_eq!(c52, 52);
+
+    for col in 0..8 {
+        assert_eq!(g26.tableau()[col].len(), if col < 2 { 4 } else { 3 });
+        assert_eq!(g39.tableau()[col].len(), if col < 7 { 5 } else { 4 });
+        assert_eq!(g52.tableau()[col].len(), if col < 4 { 7 } else { 6 });
+    }
+}
+
+#[test]
+fn freecell_win_condition_respects_card_count_mode() {
+    let make_foundations = |total: usize| {
+        let mut remaining = total;
+        std::array::from_fn(|_| {
+            let take = remaining.min(13);
+            remaining = remaining.saturating_sub(take);
+            (0..take)
+                .map(|idx| card(Suit::Clubs, (idx + 1) as u8, true))
+                .collect::<Vec<_>>()
+        })
+    };
+
+    let g26 = FreecellGame::debug_new_with_mode(
+        FreecellCardCountMode::TwentySix,
+        make_foundations(26),
+        [None, None, None, None],
+        std::array::from_fn(|_| Vec::new()),
+    );
+    let g39 = FreecellGame::debug_new_with_mode(
+        FreecellCardCountMode::ThirtyNine,
+        make_foundations(39),
+        [None, None, None, None],
+        std::array::from_fn(|_| Vec::new()),
+    );
+    let g52 = FreecellGame::debug_new_with_mode(
+        FreecellCardCountMode::FiftyTwo,
+        make_foundations(52),
+        [None, None, None, None],
+        std::array::from_fn(|_| Vec::new()),
+    );
+    let not_won_39 = FreecellGame::debug_new_with_mode(
+        FreecellCardCountMode::ThirtyNine,
+        make_foundations(38),
+        [None, None, None, None],
+        std::array::from_fn(|_| Vec::new()),
+    );
+
+    assert!(g26.is_won());
+    assert!(g39.is_won());
+    assert!(g52.is_won());
+    assert!(!not_won_39.is_won());
+}
+
+#[test]
+fn freecell_tableau_run_move_obeys_alternating_and_capacity() {
+    let tableau: [Vec<Card>; 8] = [
+        vec![
+            card(Suit::Spades, 9, true),
+            card(Suit::Hearts, 8, true),
+            card(Suit::Clubs, 7, true),
+        ],
+        vec![card(Suit::Diamonds, 8, true)],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    ];
+    let mut game = FreecellGame::debug_new(
+        std::array::from_fn(|_| Vec::new()),
+        [None, None, None, None],
+        tableau,
+    );
+    assert!(game.can_move_tableau_run_to_tableau(0, 2, 1));
+    assert!(game.move_tableau_run_to_tableau(0, 2, 1));
+    assert_eq!(game.tableau()[0].len(), 2);
+    assert_eq!(game.tableau()[1].len(), 2);
+
+    // Not alternating-color descending from start.
+    assert!(!game.can_move_tableau_run_to_tableau(1, 0, 0));
+}
+
+#[test]
+fn freecell_foundation_requires_next_rank_same_suit() {
+    let tableau: [Vec<Card>; 8] = [
+        vec![card(Suit::Clubs, 1, true), card(Suit::Clubs, 2, true)],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    ];
+    let mut game = FreecellGame::debug_new(
+        std::array::from_fn(|_| Vec::new()),
+        [None, None, None, None],
+        tableau,
+    );
+
+    assert!(!game.move_tableau_top_to_foundation(0)); // 2C cannot start foundation.
+    assert!(game.move_tableau_run_to_tableau(0, 1, 1));
+    assert!(game.move_tableau_top_to_foundation(0)); // AC starts clubs foundation.
+    assert!(game.move_tableau_top_to_foundation(1)); // 2C follows AC.
+}
+
+#[test]
+fn freecell_foundation_to_tableau_is_disallowed() {
+    let foundations: [Vec<Card>; 4] = [
+        vec![card(Suit::Clubs, 1, true)],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    ];
+    let tableau: [Vec<Card>; 8] = std::array::from_fn(|_| Vec::new());
+    let mut game = FreecellGame::debug_new(foundations, [None, None, None, None], tableau);
+
+    assert!(!game.can_move_foundation_top_to_tableau(0, 0));
+    assert!(!game.move_foundation_top_to_tableau(0, 0));
+}
+
+#[test]
+fn freecell_session_codec_round_trip_preserves_state() {
+    let mut game = FreecellGame::new_with_seed(111);
+    let _ = game.move_tableau_top_to_freecell(0, 0);
+    if game.can_move_tableau_top_to_foundation(1) {
+        let _ = game.move_tableau_top_to_foundation(1);
+    }
+    let encoded = game.encode_for_session();
+    let decoded = FreecellGame::decode_from_session(&encoded).expect("decode freecell session");
+    assert_eq!(decoded, game);
+}
+
+#[test]
+fn freecell_loss_detection_when_no_legal_moves() {
+    let foundations: [Vec<Card>; 4] = std::array::from_fn(|_| Vec::new());
+    let freecells = [
+        Some(card(Suit::Clubs, 13, true)),
+        Some(card(Suit::Diamonds, 13, true)),
+        Some(card(Suit::Hearts, 13, true)),
+        Some(card(Suit::Spades, 13, true)),
+    ];
+    let tableau: [Vec<Card>; 8] = [
+        vec![card(Suit::Clubs, 13, true)],
+        vec![card(Suit::Diamonds, 13, true)],
+        vec![card(Suit::Hearts, 13, true)],
+        vec![card(Suit::Spades, 13, true)],
+        vec![card(Suit::Clubs, 13, true)],
+        vec![card(Suit::Diamonds, 13, true)],
+        vec![card(Suit::Hearts, 13, true)],
+        vec![card(Suit::Spades, 13, true)],
+    ];
+    let game = FreecellGame::debug_new(foundations, freecells, tableau);
+
+    assert!(!game.is_won());
+    assert!(!game.has_legal_moves());
+    assert!(game.is_lost());
 }
