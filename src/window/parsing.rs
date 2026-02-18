@@ -11,3 +11,8 @@ pub(super) fn parse_tableau_payload(payload: &str) -> Option<(usize, usize)> {
     let start = start.parse::<usize>().ok()?;
     Some((src, start))
 }
+
+pub(super) fn parse_freecell_payload(payload: &str) -> Option<usize> {
+    let rest = payload.strip_prefix("freecell:")?;
+    rest.parse::<usize>().ok()
+}

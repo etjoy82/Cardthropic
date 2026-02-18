@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "generated_at_unix": 1771376554,
+  "mode": "freecell",
+  "card_count": 52,
+  "start_seed": 4954934047608000431,
+  "attempts": 200,
+  "find_winnable": {
+    "checked": 38,
+    "elapsed_seconds": 1.015,
+    "seeds_per_second": 37.436,
+    "found": {"seed":4954934047608000465,"checked":35}
+  },
+  "wcheck": {
+    "checked": 0,
+    "wins": 0,
+    "win_rate": 0.000000,
+    "timed_out": 0,
+    "seed_timeout_ms": 200,
+    "elapsed_seconds": 0.000
+  },
+  "memory": {
+    "peak_rss_mib": 23
+  }
+}

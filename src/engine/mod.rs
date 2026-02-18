@@ -4,6 +4,7 @@ pub mod autoplay_search;
 pub mod boundary;
 pub mod commands;
 pub mod foundation_safety;
+pub mod freecell_planner;
 pub mod game_mode;
 pub mod hinting;
 pub mod keyboard_nav;

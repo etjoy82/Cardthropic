@@ -6,6 +6,7 @@ use crate::game::KlondikeGame;
 pub enum HintNode {
     Stock,
     Waste,
+    Freecell(usize),
     Foundation(usize),
     Tableau { col: usize, index: Option<usize> },
 }

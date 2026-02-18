@@ -1,15 +1,19 @@
 use super::*;
 use crate::engine::render_plan;
-use crate::game::SpiderGame;
+use crate::game::{FreecellGame, SpiderGame};
 
 impl CardthropicWindow {
+    fn freecell_slot_step(card_width: i32) -> i32 {
+        card_width.max(1)
+    }
+
     pub(super) fn configure_stock_waste_foundation_widgets(
         &self,
         card_width: i32,
         card_height: i32,
     ) {
         let imp = self.imp();
-        let size = (card_width, card_height);
+        let size = (card_width, card_height, self.active_game_mode());
         if imp.last_stock_waste_foundation_size.get() == size {
             if imp.waste_picture.paintable().is_some() {
                 imp.waste_picture.set_paintable(None::<&gdk::Paintable>);
@@ -136,20 +140,22 @@ impl CardthropicWindow {
         card_width: i32,
         card_height: i32,
     ) {
-        let imp = self.imp();
-        for (idx, picture) in self.foundation_pictures().into_iter().enumerate() {
-            let top = game.foundations()[idx].last().copied();
+        self.sync_foundation_slots_with_state();
+        for (slot, picture) in self.foundation_pictures().into_iter().enumerate() {
+            let top = self
+                .foundation_slot_suit(slot)
+                .and_then(|suit| game.foundations()[suit.foundation_index()].last().copied());
             self.set_picture_from_card(&picture, top, deck, card_width, card_height);
         }
-        let foundation_empty = render_plan::foundation_empty_flags(game);
-        imp.foundation_placeholder_1
-            .set_visible(foundation_empty[0]);
-        imp.foundation_placeholder_2
-            .set_visible(foundation_empty[1]);
-        imp.foundation_placeholder_3
-            .set_visible(foundation_empty[2]);
-        imp.foundation_placeholder_4
-            .set_visible(foundation_empty[3]);
+        let placeholders = self.foundation_placeholders();
+        for (slot, placeholder) in placeholders.into_iter().enumerate() {
+            placeholder.set_label("");
+            let empty = self
+                .foundation_slot_suit(slot)
+                .map(|suit| game.foundations()[suit.foundation_index()].is_empty())
+                .unwrap_or(true);
+            placeholder.set_visible(empty);
+        }
     }
 
     pub(super) fn render_waste_fan_spider(&self) {
@@ -174,7 +180,91 @@ impl CardthropicWindow {
             self.set_picture_from_card(&picture, None, deck, card_width, card_height);
         }
         for placeholder in self.foundation_placeholders() {
+            placeholder.set_label("");
             placeholder.set_visible(true);
+        }
+    }
+
+    pub(super) fn freecell_slot_index_from_waste_x(&self, x: f64) -> usize {
+        let card_width = self.imp().card_width.get();
+        let step = Self::freecell_slot_step(card_width);
+        let idx = (x.max(0.0) as i32) / step.max(1);
+        idx.clamp(0, 3) as usize
+    }
+
+    pub(super) fn render_freecell_slots(
+        &self,
+        game: &FreecellGame,
+        deck: &AngloDeck,
+        card_width: i32,
+        card_height: i32,
+    ) {
+        let imp = self.imp();
+        let slots = self.waste_fan_slots();
+        let selected = imp.selected_freecell.get();
+        let step = Self::freecell_slot_step(card_width);
+        let strip_width = card_width + (step * 3);
+        imp.waste_overlay.set_width_request(strip_width);
+        imp.waste_heading_box.set_width_request(strip_width);
+
+        imp.waste_picture.set_paintable(None::<&gdk::Paintable>);
+        imp.waste_placeholder_label.set_visible(false);
+
+        for (idx, picture) in slots.iter().enumerate() {
+            if idx < 4 {
+                picture.set_visible(true);
+                picture.set_margin_start((idx as i32) * step);
+                let card = game.freecells()[idx];
+                if let Some(card) = card {
+                    let texture = deck.texture_for_card_scaled(card, card_width, card_height);
+                    picture.set_paintable(Some(&texture));
+                } else {
+                    let empty = Self::blank_texture(card_width, card_height);
+                    picture.set_paintable(Some(&empty));
+                }
+                if selected == Some(idx) {
+                    picture.add_css_class("waste-selected-card");
+                } else {
+                    picture.remove_css_class("waste-selected-card");
+                }
+            } else {
+                picture.set_visible(false);
+                picture.set_margin_start(0);
+                picture.set_paintable(None::<&gdk::Paintable>);
+                picture.remove_css_class("waste-selected-card");
+            }
+        }
+
+        let occupied = game
+            .freecells()
+            .iter()
+            .filter(|slot| slot.is_some())
+            .count();
+        imp.waste_label
+            .set_label(&format!("Free Cells: {occupied}/4"));
+    }
+
+    pub(super) fn render_foundations_area_freecell(
+        &self,
+        game: &FreecellGame,
+        deck: &AngloDeck,
+        card_width: i32,
+        card_height: i32,
+    ) {
+        self.sync_foundation_slots_with_state();
+        for (slot, picture) in self.foundation_pictures().into_iter().enumerate() {
+            let top = self
+                .foundation_slot_suit(slot)
+                .and_then(|suit| game.foundations()[suit.foundation_index()].last().copied());
+            self.set_picture_from_card(&picture, top, deck, card_width, card_height);
+        }
+        for (slot, placeholder) in self.foundation_placeholders().into_iter().enumerate() {
+            placeholder.set_label("");
+            let empty = self
+                .foundation_slot_suit(slot)
+                .map(|suit| game.foundations()[suit.foundation_index()].is_empty())
+                .unwrap_or(true);
+            placeholder.set_visible(empty);
         }
     }
 }

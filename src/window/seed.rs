@@ -1,5 +1,6 @@
 use super::*;
 use crate::engine::boundary;
+use crate::game::FreecellGame;
 use crate::game::SpiderGame;
 
 impl CardthropicWindow {
@@ -26,6 +27,14 @@ impl CardthropicWindow {
             imp.game
                 .borrow_mut()
                 .set_spider(SpiderGame::new_with_seed_and_mode(seed, suit_mode));
+        } else if mode == GameMode::Freecell {
+            let card_count_mode = imp.freecell_card_count_mode.get();
+            imp.game
+                .borrow_mut()
+                .set_freecell(FreecellGame::new_with_seed_and_card_count(
+                    seed,
+                    card_count_mode,
+                ));
         }
         let _ = boundary::initialize_seeded_with_draw_mode(
             &mut imp.game.borrow_mut(),
@@ -34,25 +43,38 @@ impl CardthropicWindow {
             imp.klondike_draw_mode.get(),
         );
         imp.robot_playback.borrow_mut().clear();
+        imp.robot_freecell_playback.borrow_mut().clear();
         imp.current_seed.set(seed);
         self.set_seed_input_text(&seed.to_string());
         self.clear_seed_entry_feedback();
         *imp.selected_run.borrow_mut() = None;
+        imp.selected_freecell.set(None);
         imp.waste_selected.set(false);
         *imp.deck_error.borrow_mut() = None;
-        *imp.status_override.borrow_mut() = Some(status);
         imp.pending_deal_instructions.set(true);
         imp.history.borrow_mut().clear();
         imp.future.borrow_mut().clear();
-        imp.apm_samples.borrow_mut().clear();
+        self.roll_apm_timeline_forward();
         imp.move_count.set(0);
         imp.elapsed_seconds.set(0);
         imp.timer_started.set(false);
         self.note_seed_play_started(seed);
         self.reset_hint_cycle_memory();
         self.reset_auto_play_memory();
+        if preserve_robot {
+            self.reset_robot_search_tracking_for_current_deal();
+        }
         let state_hash = self.current_game_hash();
         self.start_hint_loss_analysis_if_needed(state_hash);
+        if imp.robot_debug_enabled.get() {
+            let snapshot = self.build_saved_session();
+            self.append_status_history_only(&format!("game_state_begin\n{snapshot}"));
+            *imp.status_override.borrow_mut() =
+                Some(format!("{status} | {}", snapshot.replace('\n', " | ")));
+        } else {
+            *imp.status_override.borrow_mut() = Some(status);
+        }
         self.render();
+        self.grab_focus();
     }
 }

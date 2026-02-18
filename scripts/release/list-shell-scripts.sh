@@ -7,9 +7,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
+if ! command -v rg >/dev/null 2>&1; then
+  echo "rg is required but not installed." >&2
+  exit 1
+fi
+
 while IFS= read -r script; do
   shebang="$(sed -n '1p' "${script}")"
   if [[ "${script}" == *.sh || "${shebang}" == "#!/usr/bin/env bash" ]]; then
     echo "${script}"
   fi
-done < <(find scripts -maxdepth 3 -type f | sort)
+done < <(rg --files scripts | sort)

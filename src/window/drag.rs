@@ -1,8 +1,18 @@
 use super::*;
 use crate::engine::boundary;
-use crate::game::SpiderGame;
+use crate::game::{FreecellGame, SpiderGame};
 
 impl CardthropicWindow {
+    fn adjusted_tableau_hit_y(&self, y: f64) -> f64 {
+        // Mobile cards are small; add a small vertical hit slop so taps near a
+        // card edge still resolve to a useful run start.
+        if self.imp().mobile_phone_mode.get() {
+            (y + 8.0).max(0.0)
+        } else {
+            y.max(0.0)
+        }
+    }
+
     pub(super) fn tableau_card_y_offset(
         &self,
         game: &KlondikeGame,
@@ -248,6 +258,7 @@ impl CardthropicWindow {
         col: usize,
         y: f64,
     ) -> Option<usize> {
+        let y = self.adjusted_tableau_hit_y(y);
         let len = game.tableau_len(col)?;
         if len == 0 {
             return None;
@@ -289,6 +300,7 @@ impl CardthropicWindow {
         col: usize,
         y: f64,
     ) -> Option<usize> {
+        let y = self.adjusted_tableau_hit_y(y);
         let len = game.tableau().get(col).map(Vec::len)?;
         if len == 0 {
             return None;
@@ -322,5 +334,71 @@ impl CardthropicWindow {
         } else {
             None
         }
+    }
+
+    pub(super) fn tableau_card_y_offset_freecell(
+        &self,
+        _game: &FreecellGame,
+        _col: usize,
+        index: usize,
+    ) -> i32 {
+        (index as i32) * self.imp().face_up_step.get()
+    }
+
+    pub(super) fn tableau_run_start_from_y_freecell(
+        &self,
+        game: &FreecellGame,
+        col: usize,
+        y: f64,
+    ) -> Option<usize> {
+        let y = self.adjusted_tableau_hit_y(y);
+        let len = game.tableau().get(col).map(Vec::len)?;
+        if len == 0 {
+            return None;
+        }
+        let step = f64::from(self.imp().face_up_step.get().max(1));
+        let idx = (y / step).floor().max(0.0) as usize;
+        Some(idx.min(len - 1))
+    }
+
+    pub(super) fn texture_for_tableau_drag_run_freecell(
+        &self,
+        game: &FreecellGame,
+        deck: &AngloDeck,
+        col: usize,
+        start: usize,
+        card_width: i32,
+        card_height: i32,
+    ) -> Option<gdk::Texture> {
+        let len = game.tableau().get(col).map(Vec::len)?;
+        if start >= len {
+            return None;
+        }
+        let face_up_step = self.imp().face_up_step.get();
+        let mut y = 0_i32;
+        let mut layers: Vec<(gdk_pixbuf::Pixbuf, i32)> = Vec::new();
+        for idx in start..len {
+            let card = game.tableau_card(col, idx)?;
+            let pixbuf = deck.pixbuf_for_card_scaled(card, card_width, card_height);
+            layers.push((pixbuf, y));
+            y += face_up_step;
+        }
+        let run_height = layers
+            .last()
+            .map(|(_, pos_y)| pos_y + card_height)
+            .unwrap_or(card_height)
+            .max(card_height);
+        let composed = gdk_pixbuf::Pixbuf::new(
+            gdk_pixbuf::Colorspace::Rgb,
+            true,
+            8,
+            card_width.max(1),
+            run_height.max(1),
+        )?;
+        composed.fill(0x00000000);
+        for (layer, pos_y) in layers {
+            layer.copy_area(0, 0, card_width, card_height, &composed, 0, pos_y);
+        }
+        Some(gdk::Texture::for_pixbuf(&composed))
     }
 }

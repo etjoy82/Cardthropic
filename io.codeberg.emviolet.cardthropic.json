@@ -11,9 +11,7 @@
         "--share=ipc",
         "--socket=fallback-x11",
         "--device=dri",
-        "--socket=wayland",
-        "--env=GSK_RENDERER=cairo",
-        "--env=LIBGL_ALWAYS_SOFTWARE=1"
+        "--socket=wayland"
     ],
     "build-options" : {
         "append-path" : "/usr/lib/sdk/rust-stable/bin",

@@ -1,75 +1,70 @@
 # Cardthropic
 
 Cardthropic: Solitaire with a Real Heart.
-A zero-permission GNOME solitaire game built with Rust, GTK4, and Libadwaita.
+Cardthropic is a GNOME solitaire app built with Rust, GTK4, and Libadwaita.
 
-![Cardthropic Logo](/logo-small.png)
-
-Current version: `0.8.0` (alpha channel)
+Current version: `0.9.0-beta.1` (beta channel)
 License: `GPL-3.0-or-later`
 App ID: `io.codeberg.emviolet.cardthropic`
 
-![Cardthropic screenshot](data/screenshots/cardthropic-0.8-screenshot.png)
+![Cardthropic screenshot](data/screenshots/cardthropic-0.9-screenshot.png)
 
-## What It Includes
+## What Cardthropic Includes
 
-- Native GNOME UX with keyboard, mouse, and drag-and-drop interaction
-- Seed-first workflow with history and replay controls (`🎲`, `🛟`, `W?`, `🔁`, `Go`)
-- Automation tools:
-  - `🪄` Magic Wand
-  - `⚡` Rapid Wand
-  - `🤖` Robot Mode
-  - `🌀` Cyclone Shuffle
-  - `🫣` Peek
-- Smart Move modes: `Double Click`, `Single Click`, `Disabled`
-- Session persistence and resume
-- APM private metrics and in-app APM graph
-- Built-in themes + custom CSS userstyle editor
+### Gameplay
+
+- Klondike, Spider, and FreeCell in one app
+- Spider suit modes: 1, 2, 3, or 4 suits
+- Smart Move with click-mode control (single, double, disabled)
+- Undo/redo, move counting, timers, and run progress tracking
+
+### Automation
+
+- Magic Wand and Rapid Wand hint actions
+- Robot mode for continuous auto-play
+- Cyclone Shuffle and Peek utilities
+- Automation settings, including auto-start-new-game on loss toggle
+
+### Seeds and Reproducibility
+
+- Deterministic seed-first workflow for replayable deals
+- Numeric (`u64`) and word seeds (letters + underscores)
+- Random seed and random winnable-seed actions
+- Seed history with fast back/forward navigation
+- `W?` winnability analysis and mode-specific solver routing
+
+### UX and Controls
+
+- Native GTK4/Libadwaita desktop experience
+- Mouse, keyboard, and drag-and-drop interaction
+- Focus-safe seed input behavior for uninterrupted seed entry
+- In-app history/status reporting for solver and robot activity
+
+### Visuals and Customization
+
+- Built-in themes for quick style switching
+- Custom CSS userstyle support
+- Responsive layout behavior across compact and desktop windows
+
+### Persistence and Runtime
+
+- Session persistence and resume on relaunch
+- Runtime metrics in HUD (APM/memory/status)
+- Flatpak-first distribution and GNOME runtime integration
 
 ## Variant Status
 
 | Variant | Status | Notes |
 |---|---|---|
-| Klondike | Playable | Full gameplay flow with draw-mode settings, automation, and seed tooling |
-| Spider | Playable | Multi-suit modes (`1/2/3/4`), automation, Smart Move, and `W?` support |
-| FreeCell | Not yet available | Menu entry is visible but disabled until engine-ready |
+| Klondike | Playable | Core gameplay, draw modes, automation, and seed tooling |
+| Spider | Playable | 1/2/3/4 suit modes, automation, Smart Move, and winnability tooling |
+| FreeCell | Playable | Full gameplay loop with Free Cells, Foundations, Smart Move, and automation tooling |
 
-## Controls and Shortcuts
-
-- `F1` Help
-- `F11` Fullscreen
-- `Space` Draw/Deal from stock
-- `Ctrl+Z` Undo
-- `Ctrl+Y` Redo
-- `Ctrl+Space` Magic Wand
-- `Ctrl+Shift+Space` Rapid Wand
-- `F3` Peek
-- `F5` Cyclone Shuffle
-- `F6` Robot Mode
-- `Ctrl+R` Random seed
-- `Ctrl+Shift+R` Random winnable-seed search
-- `Ctrl+Q` Quit
-
-Custom CSS editor:
-
-- `Ctrl+C` Copy CSS
-- `Ctrl+V` Paste CSS
-- `Ctrl+Shift+C` Copy preset + CSS
-
-## Install
+## Installation
 
 Cardthropic is currently distributed as Flatpak.
 
-### Option A: Install from Codeberg Pages Remote (alpha)
-
-```bash
-flatpak remote-add --if-not-exists --user --no-gpg-verify cardthropic https://emviolet.codeberg.page/Cardthropic-flatpak/
-flatpak update --user --appstream cardthropic
-flatpak install --user cardthropic io.codeberg.emviolet.cardthropic
-flatpak run io.codeberg.emviolet.cardthropic
-```
-
-### Option B: Install from Bundle (`cardthropic.flatpak`)
+### Local Bundle (`cardthropic.flatpak`)
 
 ```bash
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -77,22 +72,22 @@ flatpak install ./cardthropic.flatpak
 flatpak run io.codeberg.emviolet.cardthropic
 ```
 
-## Build and Run (Developer)
+## Build and Run
 
-### Native (cargo)
+### Native
 
 ```bash
 cargo check
 cargo run
 ```
 
-Optional:
+Optional tests:
 
 ```bash
 cargo test -q
 ```
 
-### Flatpak local workflow
+### Flatpak Dev Loop
 
 ```bash
 scripts/flatpak/bootstrap.sh
@@ -100,50 +95,56 @@ scripts/flatpak/build-install.sh
 scripts/flatpak/run.sh
 ```
 
-## Maintainer Tooling
+## Seed Workflow
 
-This repository is an alpha testbed. Scripts under `scripts/` are maintainer-oriented operational tooling for this project.
+Cardthropic is designed around deterministic, replayable seeds.
 
-Quality gate:
+- Enter a numeric seed (`u64`) or a word seed in the seed box
+- Word seeds accept letters and underscores
+- Use random seed and random winnable-seed actions for fast exploration
+- Use seed history to jump backward/forward through prior runs
+
+## Robot Behavior
+
+Robot mode is practical but intentionally non-perfect.
+
+- It can recover from many bad lines
+- It can still lose games a skilled human could win
+- Loss handling and auto-start behavior are configurable in Automation settings
+
+## Keyboard Notes
+
+- Seed box input is preserved; Enter is intentionally not globally bound
+- Core gameplay shortcuts remain available through the app shortcut layer
+
+## Maintainer and Release Workflow
+
+This repository is a beta testbed. Scripts under `scripts/` are maintainer-focused tooling.
+
+Core release flow:
 
 ```bash
+scripts/release/check-release-consistency.sh
 scripts/release/maintainer-gate.sh
+scripts/flatpak/release.sh
 ```
 
-Strict shell tooling pass:
-
-```bash
-scripts/release/lint-shell.sh --strict-tools
-```
-
-Version bump helper:
+Manual version bump helper:
 
 ```bash
 scripts/release/bump-version.sh --version X.Y.Z
 ```
 
-Release-note finalizer:
-
-```bash
-scripts/release/finalize-release-notes.sh --version X.Y.Z --note "First note" --note "Second note"
-```
-
-Automated release pipeline:
-
-```bash
-scripts/flatpak/release.sh
-```
-
-For full release procedure, see `RELEASE.md`.
-
-## Notes
-
-- Runtime target: `org.gnome.Platform//48`
-- Current Codeberg alpha remote is intentionally unsigned (`--no-gpg-verify`)
-- Flatpak is the official distribution channel for this project right now
+Full process details: `RELEASE.md`
 
 ## Project Docs
 
 - `CHANGELOG.md`
 - `RELEASE.md`
+- `TOOLING_WORKFLOW.md`
 - `data/io.codeberg.emviolet.cardthropic.metainfo.xml.in`
+
+## Notes
+
+- Runtime target: `org.gnome.Platform//48`
+- Flatpak is the official distribution channel for now

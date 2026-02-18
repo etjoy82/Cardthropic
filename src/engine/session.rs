@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::engine::game_mode::VariantRuntime;
 use crate::engine::variant_state::VariantStateStore;
-use crate::game::{DrawMode, GameMode, KlondikeGame};
+use crate::game::{DrawMode, FreecellCardCountMode, GameMode, KlondikeGame};
 
 #[derive(Debug, Clone)]
 pub struct PersistedSession {
@@ -13,6 +13,7 @@ pub struct PersistedSession {
     pub timer_started: bool,
     pub runtime: VariantRuntime,
     pub klondike_draw_mode: DrawMode,
+    pub freecell_card_count_mode: FreecellCardCountMode,
 }
 
 pub fn encode_persisted_session(
@@ -25,15 +26,23 @@ pub fn encode_persisted_session(
     klondike_draw_mode: DrawMode,
 ) -> String {
     format!(
-        "v=2\nseed={}\nmode={}\nmoves={}\nelapsed={}\ntimer={}\ndraw={}\nruntime={}",
+        "v=2\nseed={}\nmode={}\nmoves={}\nelapsed={}\ntimer={}\ndraw={}\nfreecell-card-count={}\nruntime={}",
         seed,
         mode.id(),
         move_count,
         elapsed_seconds,
         if timer_started { 1 } else { 0 },
         klondike_draw_mode.count(),
+        state.freecell().card_count_mode().card_count(),
         state.encode_runtime_for_session(mode),
     )
+}
+
+fn derive_freecell_card_count_mode(runtime: &VariantRuntime) -> FreecellCardCountMode {
+    match runtime {
+        VariantRuntime::Freecell(game) => game.card_count_mode(),
+        VariantRuntime::Klondike(_) | VariantRuntime::Spider(_) => FreecellCardCountMode::FiftyTwo,
+    }
 }
 
 pub fn decode_persisted_session(raw: &str) -> Option<PersistedSession> {
@@ -59,6 +68,11 @@ pub fn decode_persisted_session(raw: &str) -> Option<PersistedSession> {
             let draw_mode = DrawMode::from_count(fields.get("draw")?.parse::<u8>().ok()?)?;
             let runtime =
                 VariantStateStore::decode_runtime_for_session(mode, fields.get("runtime")?)?;
+            let freecell_card_count_mode = fields
+                .get("freecell-card-count")
+                .and_then(|value| value.parse::<u8>().ok())
+                .and_then(FreecellCardCountMode::from_card_count)
+                .unwrap_or_else(|| derive_freecell_card_count_mode(&runtime));
             Some(PersistedSession {
                 seed,
                 mode,
@@ -67,6 +81,7 @@ pub fn decode_persisted_session(raw: &str) -> Option<PersistedSession> {
                 timer_started,
                 runtime,
                 klondike_draw_mode: draw_mode,
+                freecell_card_count_mode,
             })
         }
         // Backward compatibility for older Klondike-only sessions.
@@ -81,6 +96,7 @@ pub fn decode_persisted_session(raw: &str) -> Option<PersistedSession> {
                 timer_started,
                 runtime: VariantRuntime::Klondike(game),
                 klondike_draw_mode: draw_mode,
+                freecell_card_count_mode: FreecellCardCountMode::FiftyTwo,
             })
         }
         _ => None,

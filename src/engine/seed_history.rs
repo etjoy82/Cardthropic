@@ -1,7 +1,5 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SeedHistoryStats {
@@ -17,55 +15,49 @@ pub struct SeedHistoryStore {
 }
 
 impl SeedHistoryStore {
-    pub fn load_from_path(path: &Path, max_entries: usize) -> Self {
+    pub fn load_from_string(contents: &str, max_entries: usize) -> Self {
         let mut data = SeedHistoryStore::default();
         let mut max_play_order = 0_u64;
-        if let Ok(contents) = fs::read_to_string(path) {
-            for line in contents.lines() {
-                let mut parts = line.split_whitespace();
-                let Some(seed_raw) = parts.next() else {
-                    continue;
-                };
-                let Some(plays_raw) = parts.next() else {
-                    continue;
-                };
-                let Some(wins_raw) = parts.next() else {
-                    continue;
-                };
-                let Ok(seed) = seed_raw.parse::<u64>() else {
-                    continue;
-                };
-                let Ok(plays) = plays_raw.parse::<u32>() else {
-                    continue;
-                };
-                let Ok(wins) = wins_raw.parse::<u32>() else {
-                    continue;
-                };
-                let play_order = parts
-                    .next()
-                    .and_then(|raw| raw.parse::<u64>().ok())
-                    .unwrap_or(0);
-                max_play_order = max_play_order.max(play_order);
-                data.seeds.insert(
-                    seed,
-                    SeedHistoryStats {
-                        plays,
-                        wins: wins.min(plays),
-                        last_play_order: play_order,
-                    },
-                );
-            }
+        for line in contents.lines() {
+            let mut parts = line.split_whitespace();
+            let Some(seed_raw) = parts.next() else {
+                continue;
+            };
+            let Some(plays_raw) = parts.next() else {
+                continue;
+            };
+            let Some(wins_raw) = parts.next() else {
+                continue;
+            };
+            let Ok(seed) = seed_raw.parse::<u64>() else {
+                continue;
+            };
+            let Ok(plays) = plays_raw.parse::<u32>() else {
+                continue;
+            };
+            let Ok(wins) = wins_raw.parse::<u32>() else {
+                continue;
+            };
+            let play_order = parts
+                .next()
+                .and_then(|raw| raw.parse::<u64>().ok())
+                .unwrap_or(0);
+            max_play_order = max_play_order.max(play_order);
+            data.seeds.insert(
+                seed,
+                SeedHistoryStats {
+                    plays,
+                    wins: wins.min(plays),
+                    last_play_order: play_order,
+                },
+            );
         }
         data.next_play_order = max_play_order.saturating_add(1).max(1);
         data.prune(max_entries);
         data
     }
 
-    pub fn save_to_path(&self, path: &Path) {
-        if let Some(parent) = path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-
+    pub fn serialize(&self) -> String {
         let mut rows: Vec<(u64, SeedHistoryStats)> = self
             .seeds
             .iter()
@@ -81,7 +73,7 @@ impl SeedHistoryStore {
                 stats.plays, stats.last_play_order
             ));
         }
-        let _ = fs::write(path, serialized);
+        serialized
     }
 
     pub fn note_play_started(&mut self, seed: u64, max_entries: usize) {

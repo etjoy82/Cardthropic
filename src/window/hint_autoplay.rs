@@ -13,19 +13,10 @@ const MAX_HINT_LOSS_CACHE: usize = 4_096;
 impl CardthropicWindow {
     pub(super) fn automation_profile_with_strategy(&self) -> AutomationProfile {
         let mut profile = self.automation_profile();
-        match self.robot_strategy() {
-            RobotStrategy::Fast => {
-                profile.auto_play_lookahead_depth = profile.auto_play_lookahead_depth.saturating_sub(1).max(1);
-                profile.auto_play_beam_width = (profile.auto_play_beam_width / 2).max(4);
-                profile.auto_play_node_budget = (profile.auto_play_node_budget / 2).max(800);
-            }
-            RobotStrategy::Balanced => {}
-            RobotStrategy::Deep => {
-                profile.auto_play_lookahead_depth = profile.auto_play_lookahead_depth.saturating_add(2).min(8);
-                profile.auto_play_beam_width = profile.auto_play_beam_width.saturating_add(8).min(40);
-                profile.auto_play_node_budget = profile.auto_play_node_budget.saturating_mul(2).min(20_000);
-            }
-        }
+        profile.auto_play_lookahead_depth =
+            profile.auto_play_lookahead_depth.saturating_add(2).min(8);
+        profile.auto_play_beam_width = profile.auto_play_beam_width.saturating_add(8).min(40);
+        profile.auto_play_node_budget = profile.auto_play_node_budget.saturating_mul(2).min(20_000);
         profile
     }
 
@@ -231,20 +222,27 @@ impl CardthropicWindow {
         let mut recent = self.imp().hint_recent_states.borrow_mut();
         recent.clear();
         drop(recent);
+        self.imp().rapid_wand_nonproductive_streak.set(0);
+        self.imp().rapid_wand_foundation_drought_streak.set(0);
+        *self.imp().rapid_wand_blocked_state_hash.borrow_mut() = None;
         self.note_current_state_for_hint_cycle();
     }
 
     pub(super) fn note_current_state_for_hint_cycle(&self) {
-        let hash = {
-            let game = self.imp().game.borrow();
-            hash_game_state(&game)
-        };
+        let hash = self.current_game_hash();
         let mut recent = self.imp().hint_recent_states.borrow_mut();
         if recent.back().copied() == Some(hash) {
             return;
         }
+        let cap = match self.active_game_mode() {
+            // Shared FreeCell wand policy needs a long memory window to avoid
+            // re-entering medium/long oscillation cycles.
+            GameMode::Freecell => 4096,
+            GameMode::Spider => 128,
+            GameMode::Klondike => 128,
+        };
         recent.push_back(hash);
-        while recent.len() > 48 {
+        while recent.len() > cap {
             recent.pop_front();
         }
     }
@@ -314,8 +312,13 @@ impl CardthropicWindow {
         let game = self.imp().game.borrow();
         match self.active_game_mode() {
             GameMode::Spider => Self::hash_spider_game_state(game.spider()),
-            _ => hash_game_state(&game),
+            GameMode::Freecell => Self::hash_freecell_game_state(game.freecell()),
+            GameMode::Klondike => hash_game_state(&game),
         }
+    }
+
+    pub(super) fn hash_freecell_game_state(game: &crate::game::FreecellGame) -> u64 {
+        crate::engine::freecell_planner::zobrist_hash(game)
     }
 
     pub(super) fn cached_loss_verdict_for_hash(&self, state_hash: u64) -> Option<LossVerdict> {

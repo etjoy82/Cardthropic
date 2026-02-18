@@ -36,6 +36,7 @@ pub fn fallback_tableau_run_move(
 ) -> Option<HintMove> {
     let tableau_columns = match mode {
         GameMode::Spider => 10,
+        GameMode::Freecell => 8,
         _ => 7,
     };
     (0..tableau_columns)
@@ -53,6 +54,7 @@ pub fn fallback_waste_to_tableau_move(
 ) -> Option<HintMove> {
     let tableau_columns = match mode {
         GameMode::Spider => 10,
+        GameMode::Freecell => 8,
         _ => 7,
     };
     (0..tableau_columns)

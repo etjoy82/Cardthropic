@@ -16,6 +16,11 @@
 				<summary>Spider suit count</summary>
 				<description>Number of suits for Spider deals (1-4).</description>
 			</key>
+			<key name="freecell-card-count-mode" type="i">
+				<default>52</default>
+				<summary>FreeCell card count</summary>
+				<description>Number of cards for FreeCell deals (26, 39, or 52).</description>
+			</key>
 			<key name="saved-session" type="s">
 			<default>''</default>
 			<summary>Saved game session state</summary>
@@ -46,10 +51,40 @@
 				<summary>Enable HUD</summary>
 				<description>Show the toolbar area above the stock/waste/foundations row.</description>
 			</key>
-			<key name="robot-strategy" type="s">
-				<default>'balanced'</default>
-				<summary>Automation strategy profile</summary>
-				<description>Strategy profile used by automation features (Hint/Wand/Robot): fast, balanced, or deep.</description>
+			<key name="forever-mode" type="b">
+				<default>false</default>
+				<summary>Enable Forever Mode</summary>
+				<description>When enabled, Robot Mode keeps running across outcomes and reseeds.</description>
+			</key>
+			<key name="ludicrous-speed" type="b">
+				<default>false</default>
+				<summary>Enable Ludicrous Speed</summary>
+				<description>When enabled, Robot Mode runs at 40 milliseconds per move.</description>
+			</key>
+			<key name="robot-debug-enabled" type="b">
+				<default>false</default>
+				<summary>Enable Robot Debug Mode</summary>
+				<description>When enabled, automation status strings include advanced robot and planner diagnostics.</description>
+			</key>
+			<key name="robot-strict-debug-invariants" type="b">
+				<default>true</default>
+				<summary>Enable strict debug invariants</summary>
+				<description>When enabled, Robot Mode runs additional debug-only state invariant checks and stops immediately on violations.</description>
+			</key>
+			<key name="robot-auto-new-game-on-loss" type="b">
+				<default>true</default>
+				<summary>Robot auto new game on loss</summary>
+				<description>When enabled, normal Robot Mode automatically starts a new random game after a loss.</description>
+			</key>
+			<key name="interface-emoji-font" type="s">
+				<default>''</default>
+				<summary>Interface and emoji font family</summary>
+				<description>Optional font family override used for UI text and emoji. Empty uses the app/system default font.</description>
+			</key>
+			<key name="seed-history" type="s">
+				<default>''</default>
+				<summary>Seed history store</summary>
+				<description>Serialized per-seed play and win history used by the seed dropdown.</description>
 			</key>
 		</schema>
 	</schemalist>

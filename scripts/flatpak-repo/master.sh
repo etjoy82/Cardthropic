@@ -10,11 +10,12 @@ Cardthropic Flatpak Repo Master Script
 
 Runs the full publish flow:
   1) Build Flatpak payload (scripts/flatpak/bundle.sh)
-  2) Init/update Codeberg Pages checkout
-  3) Publish build-repo -> pages
-  4) Generate .flatpakrepo descriptor
-  5) (Optional) add/update local test remote and install app
-  6) Verify appstream metadata in build-repo
+  2) Refresh AppStream refs offline (preserve screenshots/URLs in no-net environments)
+  3) Init/update Codeberg Pages checkout
+  4) Publish build-repo -> pages
+  5) Generate .flatpakrepo descriptor
+  6) (Optional) add/update local test remote and install app
+  7) Verify appstream metadata in build-repo
 
 Usage:
   scripts/flatpak-repo/master.sh [options]
@@ -30,6 +31,9 @@ Options:
                           default: cardthropic
   --out <path>            Output path for .flatpakrepo descriptor
                           default: <cardthropic-root>/cardthropic.flatpakrepo
+  --test-remote-no-gpg-verify
+                          For local testing only: disable GPG verification when
+                          adding the test remote.
   --skip-test-remote      Skip local remote add/install test
   --skip-bundle           Skip scripts/flatpak/bundle.sh (reuse existing build-repo)
   --dry-run               Print commands without executing publish actions
@@ -46,6 +50,7 @@ FLATPAKREPO_OUT="${ROOT_DIR}/cardthropic.flatpakrepo"
 SKIP_TEST_REMOTE=0
 SKIP_BUNDLE=0
 DRY_RUN=0
+TEST_REMOTE_NO_GPG_VERIFY=0
 
 require_cmd() {
   local cmd="$1"
@@ -109,6 +114,10 @@ while [[ $# -gt 0 ]]; do
       SKIP_TEST_REMOTE=1
       shift
       ;;
+    --test-remote-no-gpg-verify)
+      TEST_REMOTE_NO_GPG_VERIFY=1
+      shift
+      ;;
     --skip-bundle)
       SKIP_BUNDLE=1
       shift
@@ -138,6 +147,7 @@ if [[ "${SKIP_TEST_REMOTE}" -eq 0 ]]; then
   require_cmd flatpak
 fi
 require_cmd ostree
+require_cmd appstreamcli
 
 publish_args=(
   --checkout-dir "${CHECKOUT_DIR}"
@@ -157,37 +167,48 @@ echo "Dry run:       $([[ "${DRY_RUN}" -eq 1 ]] && echo yes || echo no)"
 echo
 
 if [[ "${SKIP_BUNDLE}" -eq 0 ]]; then
-  echo "[1/6] Building Flatpak payload..."
+  echo "[1/7] Building Flatpak payload..."
   run "${ROOT_DIR}/scripts/flatpak/bundle.sh"
 else
-  echo "[1/6] Skipped Flatpak payload build."
+  echo "[1/7] Skipped Flatpak payload build."
 fi
 
-echo "[2/6] Initializing Codeberg Pages checkout..."
+echo "[2/7] Refreshing AppStream refs (offline compose)..."
+run "${ROOT_DIR}/scripts/flatpak-repo/refresh-appstream-offline.sh" \
+  --repo "${ROOT_DIR}/build-repo" \
+  --base-url "${BASE_URL}"
+
+echo "[3/7] Initializing Codeberg Pages checkout..."
 run "${ROOT_DIR}/scripts/flatpak-repo/init-codeberg-pages.sh" \
   --repo-url "${REPO_URL}" \
   --checkout-dir "${CHECKOUT_DIR}"
 
-echo "[3/6] Publishing build-repo to Pages checkout..."
+echo "[4/7] Publishing build-repo to Pages checkout..."
 run "${ROOT_DIR}/scripts/flatpak-repo/publish-codeberg-pages.sh" \
   "${publish_args[@]}"
 
-echo "[4/6] Generating .flatpakrepo descriptor..."
+echo "[5/7] Generating .flatpakrepo descriptor..."
 run "${ROOT_DIR}/scripts/flatpak-repo/make-flatpakrepo.sh" \
   --base-url "${BASE_URL}" \
   --out "${FLATPAKREPO_OUT}"
 
 if [[ "${SKIP_TEST_REMOTE}" -eq 0 ]]; then
-  echo "[5/6] Adding/updating local test remote and installing app..."
-  run "${ROOT_DIR}/scripts/flatpak-repo/add-test-remote.sh" \
-    --replace \
-    --remote "${REMOTE_NAME}" \
+  echo "[6/7] Adding/updating local test remote and installing app..."
+  test_remote_args=(
+    --replace
+    --remote "${REMOTE_NAME}"
     --url "${BASE_URL}"
+  )
+  if [[ "${TEST_REMOTE_NO_GPG_VERIFY}" -eq 1 ]]; then
+    test_remote_args+=(--no-gpg-verify)
+  fi
+  run "${ROOT_DIR}/scripts/flatpak-repo/add-test-remote.sh" \
+    "${test_remote_args[@]}"
 else
-  echo "[5/6] Skipped local test remote."
+  echo "[6/7] Skipped local test remote."
 fi
 
-echo "[6/6] Verifying AppStream metadata in build-repo..."
+echo "[7/7] Verifying AppStream metadata in build-repo..."
 run "${ROOT_DIR}/scripts/flatpak-repo/verify-appstream.sh" \
   --repo "${ROOT_DIR}/build-repo"
 

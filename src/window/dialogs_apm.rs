@@ -7,7 +7,7 @@ impl CardthropicWindow {
         let elapsed = imp.elapsed_seconds.get();
         if elapsed > 0 {
             let current = ApmSample {
-                elapsed_seconds: elapsed,
+                elapsed_seconds: self.current_apm_timeline_seconds(),
                 apm: self.current_apm(),
             };
             if points
@@ -45,13 +45,6 @@ impl CardthropicWindow {
         let _ = cr.stroke();
 
         let points = self.apm_samples_for_graph();
-        if points.len() < 2 {
-            cr.set_source_rgba(1.0, 1.0, 1.0, 0.75);
-            cr.move_to(left + 8.0, top + 22.0);
-            let _ = cr.show_text("Play for at least 10 seconds to plot APM.");
-            return;
-        }
-
         let max_t = points.last().map(|p| p.elapsed_seconds.max(1)).unwrap_or(1) as f64;
         let max_apm = points
             .iter()
@@ -66,31 +59,47 @@ impl CardthropicWindow {
             cr.line_to(left + plot_w, y);
             let _ = cr.stroke();
         }
-
-        cr.set_source_rgba(0.35, 0.75, 1.0, 0.95);
-        for (i, p) in points.iter().enumerate() {
-            let x = left + ((p.elapsed_seconds as f64 / max_t) * plot_w);
-            let y = top + (1.0 - (p.apm / max_apm).clamp(0.0, 1.0)) * plot_h;
-            if i == 0 {
-                cr.move_to(x, y);
-            } else {
-                cr.line_to(x, y);
-            }
+        for i in 1..=3 {
+            let x = left + (plot_w * f64::from(i) / 4.0);
+            cr.move_to(x, top);
+            cr.line_to(x, top + plot_h);
+            let _ = cr.stroke();
         }
-        let _ = cr.stroke();
 
-        if let Some(last) = points.last() {
-            let x = left + ((last.elapsed_seconds as f64 / max_t) * plot_w);
-            let y = top + (1.0 - (last.apm / max_apm).clamp(0.0, 1.0)) * plot_h;
-            cr.arc(x, y, 3.5, 0.0, std::f64::consts::TAU);
-            let _ = cr.fill();
+        if !points.is_empty() {
+            cr.set_source_rgba(0.35, 0.75, 1.0, 0.95);
+            for (i, p) in points.iter().enumerate() {
+                let x = left + ((p.elapsed_seconds as f64 / max_t) * plot_w);
+                let y = top + (1.0 - (p.apm / max_apm).clamp(0.0, 1.0)) * plot_h;
+                if i == 0 {
+                    cr.move_to(x, y);
+                } else {
+                    cr.line_to(x, y);
+                }
+            }
+            if points.len() >= 2 {
+                let _ = cr.stroke();
+            }
+
+            if let Some(last) = points.last() {
+                let x = left + ((last.elapsed_seconds as f64 / max_t) * plot_w);
+                let y = top + (1.0 - (last.apm / max_apm).clamp(0.0, 1.0)) * plot_h;
+                cr.arc(x, y, 3.5, 0.0, std::f64::consts::TAU);
+                let _ = cr.fill();
+            }
+        } else {
+            cr.set_source_rgba(1.0, 1.0, 1.0, 0.75);
+            cr.move_to(left + 8.0, top + 22.0);
+            let _ = cr.show_text("APM graph starts plotting immediately after your first move.");
         }
 
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.8);
-        cr.move_to(left, h - 10.0);
-        let _ = cr.show_text("0s");
-        cr.move_to(left + plot_w - 36.0, h - 10.0);
-        let _ = cr.show_text(&format!("{max_t:.0}s"));
+        for i in 0..=4 {
+            let x = left + (plot_w * f64::from(i) / 4.0);
+            let t = (max_t * f64::from(i) / 4.0).round() as u32;
+            cr.move_to(x - 10.0, h - 10.0);
+            let _ = cr.show_text(&format!("{t}s"));
+        }
         cr.move_to(6.0, top + 4.0);
         let _ = cr.show_text(&format!("{max_apm:.0} APM"));
     }

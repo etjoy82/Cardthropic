@@ -11,6 +11,7 @@ screenshots, releases) in GNOME Software.
 - `publish-codeberg-pages.sh`: sync local `build-repo/` into Pages checkout and push.
 - `make-flatpakrepo.sh`: generate a `.flatpakrepo` file users can open directly.
 - `add-test-remote.sh`: add/update a remote locally and install from it.
+- `refresh-appstream-offline.sh`: rebuild AppStream refs with `--no-net` so release/screenshot metadata is retained in no-network compose environments.
 - `verify-appstream.sh`: inspect repo AppStream branch for license/screenshot entries.
 
 ## One Command (Recommended)
@@ -79,6 +80,15 @@ scripts/flatpak-repo/add-test-remote.sh \
   --url "https://emviolet.codeberg.page/Cardthropic-flatpak/"
 ```
 
+If your Pages repo is intentionally unsigned for local testing only:
+
+```bash
+scripts/flatpak-repo/add-test-remote.sh \
+  --remote cardthropic \
+  --url "https://emviolet.codeberg.page/Cardthropic-flatpak/" \
+  --no-gpg-verify
+```
+
 6. Verify repo AppStream metadata includes license/screenshot:
 
 ```bash
@@ -95,5 +105,6 @@ scripts/flatpak-repo/verify-appstream.sh --repo "$HOME/Projects/Cardthropic/buil
 
 - These scripts assume your Flatpak payload exists at `build-repo/`.
 - No network permissions are added to the app itself.
+- `add-test-remote.sh` verifies GPG signatures by default; unsigned mode is opt-in.
 - Screenshot visibility in GNOME Software is best when installed from a remote
   repo (not just sideloading a single `.flatpak` file).

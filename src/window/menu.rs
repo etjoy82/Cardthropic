@@ -1,56 +1,195 @@
 use super::*;
-use crate::engine::variant::all_variants;
+use crate::engine::variant::variant_for_mode;
 use crate::engine::variant_engine::engine_for_mode;
 
 impl CardthropicWindow {
-    pub(super) fn setup_game_mode_menu_item(&self) {
-        let imp = self.imp();
+    fn refresh_main_menu_model(&self) {
+        let model = self.build_main_menu_model();
+        self.imp().main_menu_popover.set_menu_model(Some(&model));
+    }
 
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        row.set_margin_top(4);
-        row.set_margin_bottom(4);
-        row.set_margin_start(8);
-        row.set_margin_end(8);
+    fn build_main_menu_model(&self) -> gio::Menu {
+        let root = gio::Menu::new();
+        let section = gio::Menu::new();
 
-        let label = gtk::Label::new(Some("Game"));
-        label.set_xalign(0.0);
-        label.set_hexpand(true);
-        row.append(&label);
-
-        let button_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        let mut buttons = HashMap::new();
-        for variant in all_variants() {
-            let spec = variant.spec();
-            let button = gtk::Button::with_label(spec.emoji);
-            button.add_css_class("flat");
-            button.add_css_class("game-mode-emoji-button");
-            if spec.engine_ready {
-                button.set_tooltip_text(Some(spec.label));
+        let klondike = gio::Menu::new();
+        let current_draw = self.current_klondike_draw_mode();
+        for (draw_mode, action) in [
+            (DrawMode::One, "win.mode-klondike-deal-1"),
+            (DrawMode::Two, "win.mode-klondike-deal-2"),
+            (DrawMode::Three, "win.mode-klondike-deal-3"),
+            (DrawMode::Four, "win.mode-klondike-deal-4"),
+            (DrawMode::Five, "win.mode-klondike-deal-5"),
+        ] {
+            let marker = if draw_mode == current_draw {
+                "● "
             } else {
-                button.set_tooltip_text(Some(&format!("{} (coming soon)", spec.label)));
-                button.set_sensitive(false);
-            }
-            button.connect_clicked(glib::clone!(
-                #[weak(rename_to = window)]
-                self,
-                #[strong]
-                spec,
-                move |_| {
-                    window.select_game_mode(spec.id);
-                }
-            ));
-            button_box.append(&button);
-            buttons.insert(spec.mode, button);
+                ""
+            };
+            klondike.append(
+                Some(&format!("{marker}Deal {}", draw_mode.count())),
+                Some(action),
+            );
         }
+        section.append_submenu(Some("Klondike"), &klondike);
 
-        row.append(&button_box);
-        imp.main_menu_popover.add_child(&row, "game-mode-row");
-        *imp.game_mode_buttons.borrow_mut() = buttons;
-        self.update_game_mode_menu_selection();
+        let spider = gio::Menu::new();
+        let current_suit = self.current_spider_suit_mode();
+        for (suit_mode, action) in [
+            (SpiderSuitMode::One, "win.mode-spider-suit-1"),
+            (SpiderSuitMode::Two, "win.mode-spider-suit-2"),
+            (SpiderSuitMode::Three, "win.mode-spider-suit-3"),
+            (SpiderSuitMode::Four, "win.mode-spider-suit-4"),
+        ] {
+            let marker = if suit_mode == current_suit {
+                "● "
+            } else {
+                ""
+            };
+            spider.append(
+                Some(&format!("{marker}Suit {}", suit_mode.suit_count())),
+                Some(action),
+            );
+        }
+        section.append_submenu(Some("Spider"), &spider);
+
+        let freecell = gio::Menu::new();
+        let current_card_count = self.current_freecell_card_count_mode();
+        for (card_count_mode, action) in [
+            (
+                FreecellCardCountMode::TwentySix,
+                "win.mode-freecell-card-26",
+            ),
+            (
+                FreecellCardCountMode::ThirtyNine,
+                "win.mode-freecell-card-39",
+            ),
+            (FreecellCardCountMode::FiftyTwo, "win.mode-freecell-card-52"),
+        ] {
+            let marker = if card_count_mode == current_card_count {
+                "● "
+            } else {
+                ""
+            };
+            freecell.append(
+                Some(&format!(
+                    "{marker}Card Count {}",
+                    card_count_mode.card_count()
+                )),
+                Some(action),
+            );
+        }
+        section.append_submenu(Some("FreeCell"), &freecell);
+
+        let deal = gio::Menu::new();
+        deal.append(Some("Start Random Deal"), Some("win.random-seed"));
+        deal.append(Some("Winnable Deal"), Some("win.winnable-seed"));
+        deal.append(Some("Seed Picker"), Some("win.seed-picker"));
+        deal.append(Some("Repeat Current Seed"), Some("win.repeat-seed"));
+        deal.append(
+            Some("Check Seed Winnability"),
+            Some("win.check-seed-winnable"),
+        );
+        deal.append(Some("Copy Game State"), Some("win.copy-game-state"));
+        deal.append(Some("Load Game State"), Some("win.paste-game-state"));
+        section.append_submenu(Some("Deal"), &deal);
+
+        let play = gio::Menu::new();
+        play.append(Some("Draw"), Some("win.draw"));
+        play.append(Some("Undo"), Some("win.undo"));
+        play.append(Some("Redo"), Some("win.redo"));
+        play.append(Some("Wave Magic Wand"), Some("win.play-hint-move"));
+        play.append(Some("Rapid Wand"), Some("win.rapid-wand"));
+        play.append(Some("Cyclone Shuffle Tableau"), Some("win.cyclone-shuffle"));
+        play.append(Some("Peek"), Some("win.peek"));
+        section.append_submenu(Some("Play"), &play);
+
+        let smart_move = gio::Menu::new();
+        smart_move.append(Some("Double Click"), Some("win.smart-move-double-click"));
+        smart_move.append(Some("Single Click"), Some("win.smart-move-single-click"));
+        smart_move.append(Some("Right Click"), Some("win.smart-move-right-click"));
+        smart_move.append(Some("Disabled"), Some("win.smart-move-disabled"));
+        section.append_submenu(Some("Smart Move"), &smart_move);
+
+        let automation = gio::Menu::new();
+        automation.append(Some("Robot Mode"), Some("win.robot-mode"));
+        automation.append(Some("Forever Mode"), Some("win.forever-mode"));
+        automation.append(
+            Some("Auto New Game On Loss"),
+            Some("win.robot-auto-new-game-on-loss"),
+        );
+        automation.append(Some("Ludicrous Speed"), Some("win.ludicrous-speed"));
+        automation.append(Some("Robot Debug Mode"), Some("win.robot-debug-toggle"));
+        automation.append(
+            Some("Strict Debug Invariants"),
+            Some("win.robot-strict-debug-invariants"),
+        );
+        automation.append(
+            Some("Copy Benchmark Snapshot"),
+            Some("win.copy-benchmark-snapshot"),
+        );
+        section.append_submenu(Some("Automation"), &automation);
+
+        let view_help = gio::Menu::new();
+        view_help.append(Some("Enable HUD"), Some("win.enable-hud"));
+        view_help.append(Some("Fullscreen"), Some("win.toggle-fullscreen"));
+        view_help.append(Some("Theme Presets"), Some("win.open-theme-presets"));
+        view_help.append(Some("Status History"), Some("win.status-history"));
+        view_help.append(Some("APM Graph"), Some("win.apm-graph"));
+        section.append_submenu(Some("View"), &view_help);
+
+        section.append(Some("Help"), Some("win.help"));
+        section.append(Some("About Cardthropic"), Some("app.about"));
+        section.append(Some("Quit"), Some("app.quit"));
+        root.append_section(None, &section);
+        root
+    }
+
+    pub(super) fn setup_game_mode_menu_item(&self) {
+        self.refresh_main_menu_model();
     }
 
     pub(super) fn setup_game_settings_menu(&self) {
         self.update_game_settings_menu();
+    }
+
+    pub(super) fn apply_mode_option_by_index(&self, idx: usize) {
+        match self.active_game_mode() {
+            GameMode::Klondike => {
+                let modes = [
+                    DrawMode::One,
+                    DrawMode::Two,
+                    DrawMode::Three,
+                    DrawMode::Four,
+                    DrawMode::Five,
+                ];
+                if let Some(mode) = modes.get(idx).copied() {
+                    self.set_klondike_draw_mode(mode);
+                }
+            }
+            GameMode::Spider => {
+                let modes = [
+                    SpiderSuitMode::One,
+                    SpiderSuitMode::Two,
+                    SpiderSuitMode::Three,
+                    SpiderSuitMode::Four,
+                ];
+                if let Some(mode) = modes.get(idx).copied() {
+                    self.set_spider_suit_mode(mode, true);
+                }
+            }
+            GameMode::Freecell => {
+                let modes = [
+                    FreecellCardCountMode::TwentySix,
+                    FreecellCardCountMode::ThirtyNine,
+                    FreecellCardCountMode::FiftyTwo,
+                ];
+                if let Some(mode) = modes.get(idx).copied() {
+                    self.set_freecell_card_count_mode(mode, true);
+                }
+            }
+        }
+        self.refresh_main_menu_model();
     }
 
     pub(super) fn popdown_main_menu_later(&self) {
@@ -63,35 +202,29 @@ impl CardthropicWindow {
         ));
     }
 
-    fn clear_game_settings_menu_content(&self) {
-        let imp = self.imp();
-        while let Some(child) = imp.game_settings_content_box.first_child() {
-            imp.game_settings_content_box.remove(&child);
+    fn clear_settings_content_box(content_box: &gtk::Box) {
+        while let Some(child) = content_box.first_child() {
+            content_box.remove(&child);
         }
     }
 
-    pub(super) fn update_game_settings_menu(&self) {
-        let imp = self.imp();
-        let mode = imp.current_game_mode.get();
-        let spec = self.mode_settings_spec();
+    fn populate_game_settings_content_for_mode(&self, mode: GameMode, content_box: &gtk::Box) {
+        let spec = variant_for_mode(mode).spec();
         let caps = engine_for_mode(mode).capabilities();
         let mode_name = spec.label;
-        imp.game_settings_menu_button.set_label(spec.emoji);
-        imp.game_settings_menu_button
-            .set_tooltip_text(Some(&format!("{mode_name} Settings")));
 
-        self.clear_game_settings_menu_content();
+        Self::clear_settings_content_box(content_box);
 
         let heading = gtk::Label::new(Some(&format!("{mode_name} Settings")));
         heading.set_xalign(0.0);
         heading.add_css_class("heading");
-        imp.game_settings_content_box.append(&heading);
+        content_box.append(&heading);
 
         if mode == GameMode::Spider {
             let suit_label = gtk::Label::new(Some("Suits"));
             suit_label.set_xalign(0.0);
             suit_label.add_css_class("dim-label");
-            imp.game_settings_content_box.append(&suit_label);
+            content_box.append(&suit_label);
 
             let suit_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
             suit_row.set_hexpand(true);
@@ -126,12 +259,51 @@ impl CardthropicWindow {
                 ));
                 suit_row.append(&button);
             }
-            imp.game_settings_content_box.append(&suit_row);
+            content_box.append(&suit_row);
+        } else if mode == GameMode::Freecell {
+            let card_count_label = gtk::Label::new(Some("Card Count"));
+            card_count_label.set_xalign(0.0);
+            card_count_label.add_css_class("dim-label");
+            content_box.append(&card_count_label);
+
+            let card_count_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+            card_count_row.set_hexpand(true);
+            let modes = [
+                FreecellCardCountMode::TwentySix,
+                FreecellCardCountMode::ThirtyNine,
+                FreecellCardCountMode::FiftyTwo,
+            ];
+            let current_card_count_mode = self.current_freecell_card_count_mode();
+            let mut group_anchor: Option<gtk::CheckButton> = None;
+
+            for card_count_mode in modes {
+                let label = format!("{}", card_count_mode.card_count());
+                let button = gtk::CheckButton::with_label(&label);
+                if let Some(anchor) = group_anchor.as_ref() {
+                    button.set_group(Some(anchor));
+                } else {
+                    group_anchor = Some(button.clone());
+                }
+                if card_count_mode == current_card_count_mode {
+                    button.set_active(true);
+                }
+                button.connect_toggled(glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |btn| {
+                        if btn.is_active() {
+                            window.set_freecell_card_count_mode(card_count_mode, true);
+                        }
+                    }
+                ));
+                card_count_row.append(&button);
+            }
+            content_box.append(&card_count_row);
         } else if caps.draw_mode_selection {
             let draw_label = gtk::Label::new(Some("Deal"));
             draw_label.set_xalign(0.0);
             draw_label.add_css_class("dim-label");
-            imp.game_settings_content_box.append(&draw_label);
+            content_box.append(&draw_label);
 
             let draw_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
             draw_row.set_hexpand(true);
@@ -168,15 +340,21 @@ impl CardthropicWindow {
                 ));
                 draw_row.append(&button);
             }
-            imp.game_settings_content_box.append(&draw_row);
+            content_box.append(&draw_row);
         } else {
             let note = gtk::Label::new(Some(spec.settings_placeholder));
             note.set_xalign(0.0);
             note.set_wrap(true);
             note.add_css_class("dim-label");
-            imp.game_settings_content_box.append(&note);
+            content_box.append(&note);
         }
+    }
 
+    pub(super) fn update_game_settings_menu(&self) {
+        let imp = self.imp();
+        let mode = imp.current_game_mode.get();
+        self.populate_game_settings_content_for_mode(mode, &imp.game_settings_content_box);
+        self.refresh_main_menu_model();
     }
 
     pub(super) fn update_game_mode_menu_selection(&self) {

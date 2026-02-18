@@ -1,19 +1,101 @@
 use super::*;
 use crate::engine::boundary;
 use crate::engine::commands::EngineCommand;
-use crate::game::Suit;
 use crate::window::motion::MotionTarget;
 
-fn foundation_index_for_suit(suit: Suit) -> usize {
-    match suit {
-        Suit::Clubs => 0,
-        Suit::Diamonds => 1,
-        Suit::Hearts => 2,
-        Suit::Spades => 3,
-    }
-}
-
 impl CardthropicWindow {
+    fn freecell_movable_capacity_for_dst(&self, dst: usize) -> usize {
+        let game = self.imp().game.borrow();
+        let freecell = game.freecell();
+        let free_empty = freecell
+            .freecells()
+            .iter()
+            .filter(|slot| slot.is_none())
+            .count();
+        let mut empty_tableau = freecell
+            .tableau()
+            .iter()
+            .filter(|pile| pile.is_empty())
+            .count();
+        if freecell
+            .tableau()
+            .get(dst)
+            .is_some_and(|pile| pile.is_empty())
+        {
+            empty_tableau = empty_tableau.saturating_sub(1);
+        }
+        (free_empty + 1) * (1usize << empty_tableau)
+    }
+
+    fn is_descending_alternating(cards: &[Card]) -> bool {
+        cards.windows(2).all(|pair| {
+            let a = pair[0];
+            let b = pair[1];
+            a.rank == b.rank + 1 && a.color_red() != b.color_red()
+        })
+    }
+
+    fn freecell_tableau_run_failure_message(&self, src: usize, start: usize, dst: usize) -> String {
+        let game = self.imp().game.borrow();
+        let freecell = game.freecell();
+        if src == dst {
+            return "Source and destination tableau columns are the same.".to_string();
+        }
+        let Some(source) = freecell.tableau().get(src) else {
+            return "That source tableau column does not exist.".to_string();
+        };
+        let Some(dest) = freecell.tableau().get(dst) else {
+            return "That destination tableau column does not exist.".to_string();
+        };
+        if start >= source.len() {
+            return "That run start is outside the source column.".to_string();
+        }
+        let run = &source[start..];
+        if run.is_empty() || !Self::is_descending_alternating(run) {
+            return "The selected run must descend by one and alternate colors.".to_string();
+        }
+        let first = run[0];
+        if let Some(top) = dest.last().copied() {
+            if top.rank != first.rank + 1 || top.color_red() == first.color_red() {
+                return format!(
+                    "{} cannot move to {}. Need opposite color and one rank higher.",
+                    first.label(),
+                    top.label()
+                );
+            }
+        }
+        let capacity = self.freecell_movable_capacity_for_dst(dst);
+        if run.len() > capacity {
+            return format!(
+                "Need capacity {}, have {}. Free up cells/columns to move this run.",
+                run.len(),
+                capacity
+            );
+        }
+        "That tableau move is not legal.".to_string()
+    }
+
+    fn freecell_freecell_to_tableau_failure_message(&self, cell: usize, dst: usize) -> String {
+        let game = self.imp().game.borrow();
+        let freecell = game.freecell();
+        let Some(card) = freecell.freecell_card(cell) else {
+            return format!("Free cell F{} is empty.", cell + 1);
+        };
+        let Some(dest) = freecell.tableau().get(dst) else {
+            return "That destination tableau column does not exist.".to_string();
+        };
+        if let Some(top) = dest.last().copied() {
+            if top.rank != card.rank + 1 || top.color_red() == card.color_red() {
+                return format!(
+                    "{} cannot move to {}. Need opposite color and one rank higher.",
+                    card.label(),
+                    top.label()
+                );
+            }
+        }
+        format!("{} cannot move to T{}.", card.label(), dst + 1)
+    }
+
     pub(super) fn is_face_up_tableau_run(&self, col: usize, start: usize) -> bool {
         match self.active_game_mode() {
             GameMode::Spider => {
@@ -26,6 +108,14 @@ impl CardthropicWindow {
                     return false;
                 }
                 (start..len).all(|idx| spider.tableau_card(col, idx).is_some_and(|c| c.face_up))
+            }
+            GameMode::Freecell => {
+                let game = self.imp().game.borrow();
+                let freecell = game.freecell();
+                let Some(len) = freecell.tableau().get(col).map(Vec::len) else {
+                    return false;
+                };
+                start < len
             }
             _ => {
                 let Some(game) = boundary::clone_klondike_for_automation(
@@ -140,18 +230,24 @@ impl CardthropicWindow {
     }
 
     pub(super) fn move_waste_to_foundation(&self) -> bool {
+        self.move_waste_to_foundation_into_slot(None)
+    }
+
+    pub(super) fn move_waste_to_foundation_into_slot(&self, preferred_slot: Option<usize>) -> bool {
         if !self.guard_mode_engine("Waste-to-foundation move") {
             return false;
         }
         let mode = self.active_game_mode();
         let should_animate = self.should_play_non_drag_move_animation();
         let waste_top = boundary::waste_top(&self.imp().game.borrow(), mode);
+        let Some(card) = waste_top else {
+            return false;
+        };
+        let Some(target_slot) = self.resolve_foundation_slot_for_card(card, preferred_slot) else {
+            return false;
+        };
         let animation_from = self.capture_motion_source(MotionTarget::WasteTop);
-        let animation_to = waste_top.and_then(|card| {
-            self.capture_motion_source(MotionTarget::Foundation(foundation_index_for_suit(
-                card.suit,
-            )))
-        });
+        let animation_to = self.capture_motion_source(MotionTarget::Foundation(target_slot));
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
             &mut self.imp().game.borrow_mut(),
@@ -160,9 +256,12 @@ impl CardthropicWindow {
         )
         .changed;
         let changed = self.apply_changed_move(snapshot, changed);
+        if changed {
+            self.establish_foundation_slot_for_card(card, target_slot);
+        }
         self.render();
         if changed && should_animate {
-            if let (Some(card), Some(from), Some(to)) = (waste_top, animation_from, animation_to) {
+            if let (Some(from), Some(to)) = (animation_from, animation_to) {
                 if let Some(texture) = self.glitched_texture_for_card_motion(card) {
                     self.play_move_animation_to_point(texture, from, to);
                 }
@@ -225,6 +324,10 @@ impl CardthropicWindow {
         )
         .changed;
         let changed = self.apply_changed_move(snapshot, changed);
+        if !changed && mode == GameMode::Freecell {
+            *self.imp().status_override.borrow_mut() =
+                Some(self.freecell_tableau_run_failure_message(src, start, dst));
+        }
         self.render();
         if changed && should_animate {
             if let (Some(texture), Some(from), Some(to)) =
@@ -237,22 +340,32 @@ impl CardthropicWindow {
     }
 
     pub(super) fn move_tableau_to_foundation(&self, src: usize) -> bool {
+        self.move_tableau_to_foundation_into_slot(src, None)
+    }
+
+    pub(super) fn move_tableau_to_foundation_into_slot(
+        &self,
+        src: usize,
+        preferred_slot: Option<usize>,
+    ) -> bool {
         if !self.guard_mode_engine("Tableau-to-foundation move") {
             return false;
         }
         let mode = self.active_game_mode();
         let should_animate = self.should_play_non_drag_move_animation();
         let top_card = boundary::tableau_top(&self.imp().game.borrow(), mode, src);
+        let Some(card) = top_card else {
+            return false;
+        };
+        let Some(target_slot) = self.resolve_foundation_slot_for_card(card, preferred_slot) else {
+            return false;
+        };
         let animation_from = boundary::tableau_len(&self.imp().game.borrow(), mode, src)
             .and_then(|len| len.checked_sub(1))
             .and_then(|index| {
                 self.capture_motion_source(MotionTarget::TableauCard { col: src, index })
             });
-        let animation_to = top_card.and_then(|card| {
-            self.capture_motion_source(MotionTarget::Foundation(foundation_index_for_suit(
-                card.suit,
-            )))
-        });
+        let animation_to = self.capture_motion_source(MotionTarget::Foundation(target_slot));
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
             &mut self.imp().game.borrow_mut(),
@@ -261,9 +374,12 @@ impl CardthropicWindow {
         )
         .changed;
         let changed = self.apply_changed_move(snapshot, changed);
+        if changed {
+            self.establish_foundation_slot_for_card(card, target_slot);
+        }
         self.render();
         if changed && should_animate {
-            if let (Some(card), Some(from), Some(to)) = (top_card, animation_from, animation_to) {
+            if let (Some(from), Some(to)) = (animation_from, animation_to) {
                 if let Some(texture) = self.glitched_texture_for_card_motion(card) {
                     self.play_move_animation_to_point(texture, from, to);
                 }
@@ -272,19 +388,37 @@ impl CardthropicWindow {
         changed
     }
 
-    pub(super) fn move_foundation_to_tableau(&self, foundation_idx: usize, dst: usize) -> bool {
+    pub(super) fn move_foundation_to_tableau(
+        &self,
+        foundation_slot_idx: usize,
+        dst: usize,
+    ) -> bool {
         if !self.guard_mode_engine("Foundation-to-tableau move") {
             return false;
         }
+        let Some(foundation_idx) = self.foundation_suit_index_for_slot(foundation_slot_idx) else {
+            return false;
+        };
         let mode = self.active_game_mode();
         let should_animate = self.should_play_non_drag_move_animation();
-        let card = boundary::clone_klondike_for_automation(
-            &self.imp().game.borrow(),
-            mode,
-            self.current_klondike_draw_mode(),
-        )
-        .and_then(|game| game.foundations()[foundation_idx].last().copied());
-        let animation_from = self.capture_motion_source(MotionTarget::Foundation(foundation_idx));
+        let card = if mode == GameMode::Freecell {
+            self.imp()
+                .game
+                .borrow()
+                .freecell()
+                .foundations()
+                .get(foundation_idx)
+                .and_then(|pile| pile.last().copied())
+        } else {
+            boundary::clone_klondike_for_automation(
+                &self.imp().game.borrow(),
+                mode,
+                self.current_klondike_draw_mode(),
+            )
+            .and_then(|game| game.foundations()[foundation_idx].last().copied())
+        };
+        let animation_from =
+            self.capture_motion_source(MotionTarget::Foundation(foundation_slot_idx));
         let animation_to = self.capture_tableau_landing_point(dst);
         let snapshot = self.snapshot();
         let changed = boundary::execute_command(
@@ -305,6 +439,79 @@ impl CardthropicWindow {
                 }
             }
         }
+        changed
+    }
+
+    pub(super) fn move_tableau_to_freecell(&self, src: usize, cell: usize) -> bool {
+        if !self.guard_mode_engine("Tableau-to-freecell move") {
+            return false;
+        }
+        let mode = self.active_game_mode();
+        let snapshot = self.snapshot();
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::MoveTableauTopToFreecell { src, cell },
+        )
+        .changed;
+        let changed = self.apply_changed_move(snapshot, changed);
+        self.render();
+        changed
+    }
+
+    pub(super) fn move_freecell_to_tableau(&self, cell: usize, dst: usize) -> bool {
+        if !self.guard_mode_engine("Freecell-to-tableau move") {
+            return false;
+        }
+        let mode = self.active_game_mode();
+        let snapshot = self.snapshot();
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::MoveFreecellToTableau { cell, dst },
+        )
+        .changed;
+        let changed = self.apply_changed_move(snapshot, changed);
+        if !changed && mode == GameMode::Freecell {
+            *self.imp().status_override.borrow_mut() =
+                Some(self.freecell_freecell_to_tableau_failure_message(cell, dst));
+        }
+        self.render();
+        changed
+    }
+
+    pub(super) fn move_freecell_to_foundation(&self, cell: usize) -> bool {
+        self.move_freecell_to_foundation_into_slot(cell, None)
+    }
+
+    pub(super) fn move_freecell_to_foundation_into_slot(
+        &self,
+        cell: usize,
+        preferred_slot: Option<usize>,
+    ) -> bool {
+        if !self.guard_mode_engine("Freecell-to-foundation move") {
+            return false;
+        }
+        let mode = self.active_game_mode();
+        let card = self.imp().game.borrow().freecell().freecell_card(cell);
+        let Some(card) = card else {
+            return false;
+        };
+        let Some(target_slot) = self.resolve_foundation_slot_for_card(card, preferred_slot) else {
+            return false;
+        };
+        let snapshot = self.snapshot();
+        let changed = boundary::execute_command(
+            &mut self.imp().game.borrow_mut(),
+            mode,
+            EngineCommand::MoveFreecellToFoundation { cell },
+        )
+        .changed;
+        let changed = self.apply_changed_move(snapshot, changed);
+        if changed {
+            self.establish_foundation_slot_for_card(card, target_slot);
+        }
+        self.render();
         changed
     }
 }

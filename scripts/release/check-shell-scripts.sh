@@ -20,6 +20,19 @@ require_cmd sed
 require_cmd rg
 require_cmd stat
 
+portable_stat_mode() {
+  local path="$1"
+  if stat -c '%a' "${path}" >/dev/null 2>&1; then
+    stat -c '%a' "${path}"
+    return
+  fi
+  if stat -f '%Lp' "${path}" >/dev/null 2>&1; then
+    stat -f '%Lp' "${path}"
+    return
+  fi
+  fail "unable to determine file mode for ${path}; unsupported stat implementation"
+}
+
 fail() {
   echo "shell-check: $*" >&2
   exit 1
@@ -28,7 +41,7 @@ fail() {
 while IFS= read -r script; do
   shebang="$(sed -n '1p' "${script}")"
 
-  mode="$(stat -c '%a' "${script}")"
+  mode="$(portable_stat_mode "${script}")"
   [[ "${mode}" =~ ^[0-9]+$ ]] || fail "unable to read mode for ${script}"
 
   [[ "${shebang}" == "#!/usr/bin/env bash" ]] || fail "bad shebang in ${script}"

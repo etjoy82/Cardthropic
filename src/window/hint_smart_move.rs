@@ -7,6 +7,9 @@ impl CardthropicWindow {
         if !self.guard_mode_engine("Smart Move") {
             return false;
         }
+        if self.active_game_mode() == GameMode::Freecell {
+            return self.try_smart_move_from_tableau_freecell(col, start);
+        }
         if !self.is_face_up_tableau_run(col, start) {
             self.flash_smart_move_fail_tableau_run(col, start);
             *self.imp().status_override.borrow_mut() =
@@ -155,5 +158,124 @@ impl CardthropicWindow {
             self.render();
         }
         changed
+    }
+
+    pub(super) fn try_smart_move_from_freecell(&self, cell: usize) -> bool {
+        if !self.guard_mode_engine("Smart Move") {
+            return false;
+        }
+        if self.active_game_mode() != GameMode::Freecell {
+            return false;
+        }
+        let allowed = [HintNode::Freecell(cell)];
+        let Some((message, _source, _target, action, score)) =
+            self.compute_best_freecell_action(Some(&allowed))
+        else {
+            *self.imp().status_override.borrow_mut() =
+                Some(format!("Smart Move: no legal move from F{}.", cell + 1));
+            self.render();
+            return false;
+        };
+        let changed = self.apply_freecell_hint_action(action);
+        if changed {
+            self.imp().selected_freecell.set(None);
+            let debug_suffix = if self.imp().robot_debug_enabled.get() {
+                format!(
+                    " | fc_score={} fc_action={}",
+                    score,
+                    Self::freecell_action_tag(action)
+                )
+            } else {
+                String::new()
+            };
+            *self.imp().status_override.borrow_mut() = Some(format!(
+                "Smart Move: {}{}",
+                message.strip_prefix("Hint: ").unwrap_or(message.as_str()),
+                debug_suffix
+            ));
+            self.render();
+            true
+        } else {
+            let detailed = self
+                .imp()
+                .status_override
+                .borrow()
+                .as_deref()
+                .map(str::to_string);
+            *self.imp().status_override.borrow_mut() = Some(if let Some(reason) = detailed {
+                format!("Smart Move: {reason}")
+            } else {
+                "Smart Move: move was not legal anymore.".to_string()
+            });
+            self.render();
+            false
+        }
+    }
+
+    fn try_smart_move_from_tableau_freecell(&self, col: usize, start: usize) -> bool {
+        if !self.is_face_up_tableau_run(col, start) {
+            self.flash_smart_move_fail_tableau_run(col, start);
+            *self.imp().status_override.borrow_mut() =
+                Some("Smart Move: no legal move from that card.".to_string());
+            self.render();
+            return false;
+        }
+        let is_top = boundary::tableau_len(&self.imp().game.borrow(), GameMode::Freecell, col)
+            .map(|len| start + 1 == len)
+            .unwrap_or(false);
+        let mut allowed = vec![HintNode::Tableau {
+            col,
+            index: Some(start),
+        }];
+        if is_top {
+            allowed.push(HintNode::Tableau {
+                col,
+                index: boundary::tableau_len(&self.imp().game.borrow(), GameMode::Freecell, col)
+                    .and_then(|len| len.checked_sub(1)),
+            });
+        }
+        let Some((message, _source, _target, action, score)) =
+            self.compute_best_freecell_action(Some(allowed.as_slice()))
+        else {
+            self.flash_smart_move_fail_tableau_run(col, start);
+            *self.imp().status_override.borrow_mut() =
+                Some("Smart Move: no legal move from that card.".to_string());
+            self.render();
+            return false;
+        };
+        let changed = self.apply_freecell_hint_action(action);
+        if changed {
+            *self.imp().selected_run.borrow_mut() = None;
+            let debug_suffix = if self.imp().robot_debug_enabled.get() {
+                format!(
+                    " | fc_score={} fc_action={}",
+                    score,
+                    Self::freecell_action_tag(action)
+                )
+            } else {
+                String::new()
+            };
+            *self.imp().status_override.borrow_mut() = Some(format!(
+                "Smart Move: {}{}",
+                message.strip_prefix("Hint: ").unwrap_or(message.as_str()),
+                debug_suffix
+            ));
+            self.render();
+            return true;
+        }
+        self.flash_smart_move_fail_tableau_run(col, start);
+        let detailed = self
+            .imp()
+            .status_override
+            .borrow()
+            .as_deref()
+            .map(str::to_string);
+        *self.imp().status_override.borrow_mut() = Some(if let Some(reason) = detailed {
+            format!("Smart Move: {reason}")
+        } else {
+            "Smart Move: move was not legal anymore.".to_string()
+        });
+        self.render();
+        false
     }
 }

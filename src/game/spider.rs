@@ -77,7 +77,7 @@ impl SpiderGame {
     }
 
     pub fn can_deal_from_stock(&self) -> bool {
-        self.stock.len() >= 10
+        self.stock.len() >= 10 && self.tableau.iter().all(|pile| !pile.is_empty())
     }
 
     pub fn deal_from_stock(&mut self) -> bool {
@@ -128,6 +128,12 @@ impl SpiderGame {
         self.flip_top_if_needed(src);
         self.remove_completed_runs();
         true
+    }
+
+    pub fn extract_completed_runs(&mut self) -> usize {
+        let before = self.completed_runs;
+        self.remove_completed_runs();
+        self.completed_runs.saturating_sub(before)
     }
 
     pub fn cyclone_shuffle_tableau(&mut self) -> bool {
@@ -395,7 +401,7 @@ fn is_descending_run(cards: &[Card]) -> bool {
     cards.windows(2).all(|pair| {
         let a = pair[0];
         let b = pair[1];
-        a.face_up && b.face_up && a.rank == b.rank + 1
+        a.face_up && b.face_up && a.suit == b.suit && a.rank == b.rank + 1
     })
 }
 

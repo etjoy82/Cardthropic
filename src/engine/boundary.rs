@@ -54,6 +54,15 @@ pub fn execute_command(
         EngineCommand::MoveTableauTopToFoundation { src } => {
             changed_or_unchanged(engine.move_tableau_top_to_foundation(state, src))
         }
+        EngineCommand::MoveTableauTopToFreecell { src, cell } => {
+            changed_or_unchanged(engine.move_tableau_top_to_freecell(state, src, cell))
+        }
+        EngineCommand::MoveFreecellToFoundation { cell } => {
+            changed_or_unchanged(engine.move_freecell_to_foundation(state, cell))
+        }
+        EngineCommand::MoveFreecellToTableau { cell, dst } => {
+            changed_or_unchanged(engine.move_freecell_to_tableau(state, cell, dst))
+        }
         EngineCommand::MoveFoundationTopToTableau {
             foundation_idx,
             dst,
@@ -107,6 +116,38 @@ pub fn can_move_tableau_top_to_foundation(
     })
 }
 
+pub fn can_move_tableau_top_to_freecell(
+    state: &VariantStateStore,
+    mode: GameMode,
+    src: usize,
+    cell: usize,
+) -> bool {
+    with_engine(mode, |engine| {
+        engine.can_move_tableau_top_to_freecell(state, src, cell)
+    })
+}
+
+pub fn can_move_freecell_to_foundation(
+    state: &VariantStateStore,
+    mode: GameMode,
+    cell: usize,
+) -> bool {
+    with_engine(mode, |engine| {
+        engine.can_move_freecell_to_foundation(state, cell)
+    })
+}
+
+pub fn can_move_freecell_to_tableau(
+    state: &VariantStateStore,
+    mode: GameMode,
+    cell: usize,
+    dst: usize,
+) -> bool {
+    with_engine(mode, |engine| {
+        engine.can_move_freecell_to_tableau(state, cell, dst)
+    })
+}
+
 pub fn can_move_tableau_run_to_tableau(
     state: &VariantStateStore,
     mode: GameMode,
@@ -150,27 +191,6 @@ pub fn foundation_top_exists(
     with_engine(mode, |engine| {
         engine.foundation_top_exists(state, foundation_idx)
     })
-}
-
-pub fn waste_top_matches_foundation(
-    state: &VariantStateStore,
-    mode: GameMode,
-    foundation_idx: usize,
-) -> bool {
-    waste_top(state, mode)
-        .map(|card| card.suit.foundation_index() == foundation_idx)
-        .unwrap_or(false)
-}
-
-pub fn tableau_top_matches_foundation(
-    state: &VariantStateStore,
-    mode: GameMode,
-    col: usize,
-    foundation_idx: usize,
-) -> bool {
-    tableau_top(state, mode, col)
-        .map(|card| card.suit.foundation_index() == foundation_idx)
-        .unwrap_or(false)
 }
 
 pub fn clone_klondike_for_automation(
