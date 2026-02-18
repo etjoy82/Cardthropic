@@ -40,7 +40,7 @@ Keep rule/config fixed during each run batch:
 
 ---
 
-## Telemetry Contract
+## Private Metrics Contract
 
 Use status lines as source of truth.
 

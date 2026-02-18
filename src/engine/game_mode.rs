@@ -2,7 +2,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use crate::game::{GameMode, KlondikeGame, SpiderGame};
+use crate::game::{FreecellGame, GameMode, KlondikeGame, SpiderGame};
 
 /// Runtime container for the active solitaire variant.
 /// Klondike is fully implemented; other variants are explicit placeholders.
@@ -10,7 +10,7 @@ use crate::game::{GameMode, KlondikeGame, SpiderGame};
 pub enum VariantRuntime {
     Klondike(KlondikeGame),
     Spider(SpiderGame),
-    Freecell,
+    Freecell(FreecellGame),
 }
 
 impl VariantRuntime {
@@ -18,7 +18,7 @@ impl VariantRuntime {
         match mode {
             GameMode::Klondike => Self::Klondike(KlondikeGame::new_with_seed(seed)),
             GameMode::Spider => Self::Spider(SpiderGame::new_with_seed(seed)),
-            GameMode::Freecell => Self::Freecell,
+            GameMode::Freecell => Self::Freecell(FreecellGame::new_with_seed(seed)),
         }
     }
 
@@ -26,7 +26,7 @@ impl VariantRuntime {
         match self {
             Self::Klondike(_) => GameMode::Klondike,
             Self::Spider(_) => GameMode::Spider,
-            Self::Freecell => GameMode::Freecell,
+            Self::Freecell(_) => GameMode::Freecell,
         }
     }
 
@@ -37,21 +37,21 @@ impl VariantRuntime {
     pub fn as_klondike(&self) -> Option<&KlondikeGame> {
         match self {
             Self::Klondike(game) => Some(game),
-            Self::Spider(_) | Self::Freecell => None,
+            Self::Spider(_) | Self::Freecell(_) => None,
         }
     }
 
     pub fn as_klondike_mut(&mut self) -> Option<&mut KlondikeGame> {
         match self {
             Self::Klondike(game) => Some(game),
-            Self::Spider(_) | Self::Freecell => None,
+            Self::Spider(_) | Self::Freecell(_) => None,
         }
     }
 
     pub fn into_klondike(self) -> Option<KlondikeGame> {
         match self {
             Self::Klondike(game) => Some(game),
-            Self::Spider(_) | Self::Freecell => None,
+            Self::Spider(_) | Self::Freecell(_) => None,
         }
     }
 }

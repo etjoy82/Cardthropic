@@ -70,19 +70,21 @@ const FREECELL_SPEC: VariantSpec = VariantSpec {
     id: "freecell",
     label: "FreeCell",
     emoji: "🗽",
-    engine_ready: false,
-    settings_placeholder: "FreeCell settings will appear once FreeCell is playable.",
+    engine_ready: true,
+    settings_placeholder: "FreeCell currently has no mode-specific settings.",
 };
 
 const KLONDIKE_VARIANT: KlondikeVariant = KlondikeVariant;
 const SPIDER_VARIANT: SpiderVariant = SpiderVariant;
 const FREECELL_VARIANT: FreecellVariant = FreecellVariant;
 
+#[allow(dead_code)]
 const VARIANTS: [&'static dyn SolitaireVariant; 3] =
     [&KLONDIKE_VARIANT, &SPIDER_VARIANT, &FREECELL_VARIANT];
 
 const VARIANT_SPECS: [VariantSpec; 3] = [KLONDIKE_SPEC, SPIDER_SPEC, FREECELL_SPEC];
 
+#[allow(dead_code)]
 pub fn all_variants() -> &'static [&'static dyn SolitaireVariant] {
     &VARIANTS
 }
@@ -100,6 +102,7 @@ pub fn all_variant_specs() -> &'static [VariantSpec] {
     &VARIANT_SPECS
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn spec_for_mode(mode: GameMode) -> &'static VariantSpec {
     VARIANT_SPECS
         .iter()

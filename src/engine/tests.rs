@@ -12,7 +12,10 @@ use crate::engine::{
     automation::KLONDIKE_AUTOMATION_PROFILE, automation::SPIDER_AUTOMATION_PROFILE,
 };
 use crate::engine::{boundary, commands::EngineCommand};
-use crate::game::{Card, DrawMode, GameMode, KlondikeGame, SpiderGame, SpiderSuitMode, Suit};
+use crate::game::{
+    Card, DrawMode, FreecellCardCountMode, FreecellGame, GameMode, KlondikeGame, SpiderGame,
+    SpiderSuitMode, Suit,
+};
 
 #[test]
 fn robot_playback_anchor_matching_and_mismatch() {
@@ -128,7 +131,7 @@ fn variant_engine_registry_matches_modes() {
     }
     assert!(engine_for_mode(GameMode::Klondike).engine_ready());
     assert!(engine_for_mode(GameMode::Spider).engine_ready());
-    assert!(!engine_for_mode(GameMode::Freecell).engine_ready());
+    assert!(engine_for_mode(GameMode::Freecell).engine_ready());
     assert_eq!(
         engine_for_mode(GameMode::Klondike).automation_profile(),
         KLONDIKE_AUTOMATION_PROFILE
@@ -160,8 +163,14 @@ fn variant_engine_registry_matches_modes() {
 
     let freecell_caps = engine_for_mode(GameMode::Freecell).capabilities();
     assert!(!freecell_caps.draw);
-    assert!(!freecell_caps.undo_redo);
-    assert!(!freecell_caps.winnability);
+    assert!(freecell_caps.undo_redo);
+    assert!(freecell_caps.seeded_deals);
+    assert!(freecell_caps.winnability);
+    assert!(freecell_caps.smart_move);
+    assert!(freecell_caps.autoplay);
+    assert!(freecell_caps.rapid_wand);
+    assert!(freecell_caps.robot_mode);
+    assert!(freecell_caps.cyclone_shuffle);
 }
 
 #[test]
@@ -207,6 +216,171 @@ fn boundary_is_won_is_mode_aware() {
     assert!(!boundary::is_won(&state, GameMode::Klondike));
     assert!(!boundary::is_won(&state, GameMode::Spider));
     assert!(!boundary::is_won(&state, GameMode::Freecell));
+}
+
+#[test]
+fn freecell_boundary_001_initialize_seeded_updates_freecell_only() {
+    let mut state = VariantStateStore::new(17);
+    let klondike_before = state.klondike().clone();
+    let spider_before = state.spider().clone();
+    let freecell_before = state.freecell().clone();
+
+    let ok = boundary::initialize_seeded_with_draw_mode(
+        &mut state,
+        GameMode::Freecell,
+        123_456_789,
+        DrawMode::One,
+    );
+    assert!(ok);
+    assert_eq!(state.klondike(), &klondike_before);
+    assert_eq!(state.spider(), &spider_before);
+    assert_ne!(state.freecell(), &freecell_before);
+}
+
+#[test]
+fn freecell_boundary_002_execute_command_routes_run_and_foundation_moves() {
+    let mut state = VariantStateStore::new(1);
+    let tableau: [Vec<Card>; 8] = [
+        vec![
+            Card {
+                suit: Suit::Spades,
+                rank: 9,
+                face_up: true,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: 8,
+                face_up: true,
+            },
+        ],
+        vec![Card {
+            suit: Suit::Clubs,
+            rank: 9,
+            face_up: true,
+        }],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    ];
+    state.set_freecell(FreecellGame::debug_new(
+        std::array::from_fn(|_| Vec::new()),
+        [None, None, None, None],
+        tableau,
+    ));
+
+    let run = boundary::execute_command(
+        &mut state,
+        GameMode::Freecell,
+        EngineCommand::MoveTableauRunToTableau {
+            src: 0,
+            start: 1,
+            dst: 1,
+        },
+    );
+    assert!(run.changed);
+
+    // Move Ace to foundation in FreeCell routing path.
+    let tableau: [Vec<Card>; 8] = [
+        vec![Card {
+            suit: Suit::Clubs,
+            rank: 1,
+            face_up: true,
+        }],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    ];
+    state.set_freecell(FreecellGame::debug_new(
+        std::array::from_fn(|_| Vec::new()),
+        [None, None, None, None],
+        tableau,
+    ));
+    let f_move = boundary::execute_command(
+        &mut state,
+        GameMode::Freecell,
+        EngineCommand::MoveTableauTopToFoundation { src: 0 },
+    );
+    assert!(f_move.changed);
+}
+
+#[test]
+fn freecell_boundary_003_execute_command_routes_freecell_slot_moves() {
+    let mut state = VariantStateStore::new(1);
+    let tableau: [Vec<Card>; 8] = [
+        vec![Card {
+            suit: Suit::Clubs,
+            rank: 1,
+            face_up: true,
+        }],
+        vec![Card {
+            suit: Suit::Spades,
+            rank: 2,
+            face_up: true,
+        }],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    ];
+    state.set_freecell(FreecellGame::debug_new(
+        std::array::from_fn(|_| Vec::new()),
+        [None, None, None, None],
+        tableau,
+    ));
+
+    let to_cell = boundary::execute_command(
+        &mut state,
+        GameMode::Freecell,
+        EngineCommand::MoveTableauTopToFreecell { src: 0, cell: 0 },
+    );
+    assert!(to_cell.changed);
+    assert!(boundary::can_move_freecell_to_foundation(
+        &state,
+        GameMode::Freecell,
+        0
+    ));
+
+    let from_cell_to_foundation = boundary::execute_command(
+        &mut state,
+        GameMode::Freecell,
+        EngineCommand::MoveFreecellToFoundation { cell: 0 },
+    );
+    assert!(from_cell_to_foundation.changed);
+
+    let move_spade_to_cell = boundary::execute_command(
+        &mut state,
+        GameMode::Freecell,
+        EngineCommand::MoveTableauTopToFreecell { src: 1, cell: 1 },
+    );
+    assert!(move_spade_to_cell.changed);
+    assert!(boundary::can_move_freecell_to_tableau(
+        &state,
+        GameMode::Freecell,
+        1,
+        2
+    ));
+
+    let from_cell_to_tableau = boundary::execute_command(
+        &mut state,
+        GameMode::Freecell,
+        EngineCommand::MoveFreecellToTableau { cell: 1, dst: 2 },
+    );
+    assert!(from_cell_to_tableau.changed);
+    assert!(boundary::can_move_tableau_top_to_freecell(
+        &state,
+        GameMode::Freecell,
+        2,
+        1
+    ));
 }
 
 #[test]
@@ -286,7 +460,7 @@ fn spider_boundary_003_spider_can_move_helpers_reject_out_of_range_indices() {
 }
 
 #[test]
-fn spider_boundary_004_draw_succeeds_with_empty_tableau_when_stock_available() {
+fn spider_boundary_004_draw_rejected_with_empty_tableau_when_stock_available() {
     let mut state = VariantStateStore::new(321);
     let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
     for pile in &mut tableau[0..9] {
@@ -314,14 +488,9 @@ fn spider_boundary_004_draw_succeeds_with_empty_tableau_when_stock_available() {
             draw_mode: DrawMode::One,
         },
     );
-    assert!(draw.changed);
-    assert_eq!(
-        draw.draw_result,
-        Some(crate::game::DrawResult::DrewFromStock)
-    );
-    assert_ne!(state.spider(), &spider);
-    assert_eq!(state.spider().stock_len(), 0);
-    assert_eq!(state.spider().tableau()[9].len(), 1);
+    assert!(!draw.changed);
+    assert_eq!(draw.draw_result, Some(crate::game::DrawResult::NoOp));
+    assert_eq!(state.spider(), &spider);
 }
 
 #[test]
@@ -514,6 +683,33 @@ fn persisted_session_v2_round_trip_for_spider_runtime() {
 }
 
 #[test]
+fn persisted_session_v2_round_trip_for_freecell_runtime_with_explicit_card_count() {
+    let mut state = VariantStateStore::new(42);
+    let mode = GameMode::Freecell;
+    let seed = 9_999_u64;
+    let freecell =
+        FreecellGame::new_with_seed_and_card_count(seed, FreecellCardCountMode::ThirtyNine);
+    state.set_freecell(freecell.clone());
+
+    let encoded = encode_persisted_session(&state, seed, mode, 4, 12, true, DrawMode::One);
+    assert!(encoded.contains("freecell-card-count=39"));
+
+    let decoded = decode_persisted_session(&encoded).expect("decode persisted freecell session");
+    assert_eq!(decoded.seed, seed);
+    assert_eq!(decoded.mode, GameMode::Freecell);
+    assert_eq!(
+        decoded.freecell_card_count_mode,
+        FreecellCardCountMode::ThirtyNine
+    );
+    match decoded.runtime {
+        crate::engine::game_mode::VariantRuntime::Freecell(decoded_freecell) => {
+            assert_eq!(decoded_freecell, freecell);
+        }
+        _ => panic!("expected freecell runtime"),
+    }
+}
+
+#[test]
 fn variant_state_set_runtime_spider_does_not_mutate_klondike() {
     let mut state = VariantStateStore::new(100);
     let klondike_before = state.klondike().clone();
@@ -608,6 +804,83 @@ fn keyboard_nav_normalizes_out_of_bounds_targets() {
 }
 
 #[test]
+fn keyboard_nav_vertical_from_top_row_enters_expected_tableau_column() {
+    let game = KlondikeGame::new_with_seed(17);
+    use crate::engine::keyboard_nav::{self, KeyboardTarget};
+
+    let cases = [
+        (KeyboardTarget::Stock, 0_usize),
+        (KeyboardTarget::Waste, 1_usize),
+        (KeyboardTarget::Foundation(0), 3_usize),
+        (KeyboardTarget::Foundation(1), 4_usize),
+        (KeyboardTarget::Foundation(2), 5_usize),
+        (KeyboardTarget::Foundation(3), 6_usize),
+    ];
+
+    for (start, expected_col) in cases {
+        let next = keyboard_nav::move_vertical(&game, start, 1);
+        match next {
+            KeyboardTarget::Tableau {
+                col,
+                start: Some(_),
+            } => assert_eq!(col, expected_col),
+            _ => panic!("expected tableau target when moving down from top row"),
+        }
+    }
+}
+
+#[test]
+fn keyboard_nav_vertical_up_from_tableau_returns_top_row_lane() {
+    let game = KlondikeGame::new_with_seed(17);
+    use crate::engine::keyboard_nav::{self, KeyboardTarget};
+
+    let lanes = [
+        KeyboardTarget::Stock,
+        KeyboardTarget::Waste,
+        KeyboardTarget::Foundation(0),
+        KeyboardTarget::Foundation(1),
+        KeyboardTarget::Foundation(2),
+        KeyboardTarget::Foundation(3),
+    ];
+
+    for lane in lanes {
+        let down = keyboard_nav::move_vertical(&game, lane, 1);
+        let up = keyboard_nav::move_vertical(&game, down, -1);
+        match (lane, up) {
+            (KeyboardTarget::Stock, KeyboardTarget::Stock) => {}
+            (KeyboardTarget::Waste, KeyboardTarget::Waste) => {}
+            (KeyboardTarget::Foundation(0), KeyboardTarget::Foundation(0)) => {}
+            (KeyboardTarget::Foundation(1), KeyboardTarget::Foundation(1)) => {}
+            (KeyboardTarget::Foundation(2), KeyboardTarget::Foundation(2)) => {}
+            (KeyboardTarget::Foundation(3), KeyboardTarget::Foundation(3)) => {}
+            _ => panic!("expected lane to round-trip with down/up navigation"),
+        }
+    }
+}
+
+#[test]
+fn keyboard_nav_horizontal_preserves_tableau_offset_from_top() {
+    let game = KlondikeGame::new_with_seed(17);
+    use crate::engine::keyboard_nav::{self, KeyboardTarget};
+
+    let start = keyboard_nav::tableau_target_for_column(&game, 0, Some(0));
+    let offset_before = match start {
+        KeyboardTarget::Tableau { col, start } => {
+            keyboard_nav::tableau_offset_from_top(&game, col, start)
+        }
+        _ => 0,
+    };
+    let moved = keyboard_nav::move_horizontal(&game, start, 1);
+    let offset_after = match moved {
+        KeyboardTarget::Tableau { col, start } => {
+            keyboard_nav::tableau_offset_from_top(&game, col, start)
+        }
+        _ => panic!("expected horizontal movement to stay in tableau"),
+    };
+    assert_eq!(offset_after, offset_before);
+}
+
+#[test]
 fn status_text_reports_win_and_selection_paths() {
     let game = KlondikeGame::new_with_seed(17);
     let selected_text = crate::engine::status_text::build_status_text(
@@ -673,7 +946,9 @@ fn seed_ops_parse_and_random_fallback_work() {
     );
     let hello_lower = crate::engine::seed_ops::parse_seed_input("hello").unwrap();
     let hello_upper = crate::engine::seed_ops::parse_seed_input("HELLO").unwrap();
+    let hello_with_underscore = crate::engine::seed_ops::parse_seed_input("he_llo").unwrap();
     assert_eq!(hello_lower, hello_upper);
+    assert_eq!(hello_lower, hello_with_underscore);
     assert!(hello_lower.unwrap() > 0);
     let too_long_word = "a".repeat(crate::engine::seed_ops::WORD_SEED_MAX_LEN + 1);
     assert!(crate::engine::seed_ops::parse_seed_input(&too_long_word).is_err());

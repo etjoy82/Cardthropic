@@ -8,8 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Documentation and maintainer release tooling continue to be refined for the alpha testbed workflow.
+- Documentation and maintainer release tooling continue to be refined for the beta testbed workflow.
 
+## [0.9.0-beta.1] - 2026-02-18
+
+### Added
+- Automation toggle `Auto start new game on loss` with GSettings backing, menu integration, and shortcut support.
+- Debug-only robot invariant checks with a strict runtime toggle to catch state-rule regressions earlier during automation.
+
+### Fixed
+- Spider rule enforcement for completed same-suit A-K run clearing.
+- Spider stock dealing rule: dealing is blocked unless every tableau column is occupied.
+- Spider `W?`/winnable-seed flow reliability and robot handoff behavior.
+- Seed input now accepts underscore-containing word seeds consistently and reflects them correctly in status text.
+- Return/Enter key behavior no longer steals seed-box input focus.
 
 
 ## [0.8.0] - 2026-02-15

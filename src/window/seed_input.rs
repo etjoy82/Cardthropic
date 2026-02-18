@@ -70,7 +70,11 @@ impl CardthropicWindow {
         };
 
         let status = if !original_seed_label.is_empty()
-            && original_seed_label.chars().all(|ch| ch.is_ascii_alphabetic())
+            && !original_seed_label.replace('_', "").is_empty()
+            && original_seed_label
+                .replace('_', "")
+                .chars()
+                .all(|ch| ch.is_ascii_alphabetic())
         {
             format!("Started a new game. Seed {seed}, [{original_seed_label}]")
         } else {
@@ -115,5 +119,122 @@ impl CardthropicWindow {
         let seed = self.imp().current_seed.get();
         self.set_seed_input_text(&seed.to_string());
         self.start_new_game_with_seed(seed, seed_ops::msg_repeated_seed(seed));
+    }
+
+    pub(super) fn show_seed_picker_dialog(&self) {
+        let dialog = gtk::Window::builder()
+            .title("Seed Picker")
+            .transient_for(self)
+            .modal(true)
+            .default_width(420)
+            .default_height(140)
+            .build();
+
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        root.set_margin_top(12);
+        root.set_margin_bottom(12);
+        root.set_margin_start(12);
+        root.set_margin_end(12);
+
+        let seed_entry = gtk::Entry::new();
+        let seed_text = self.seed_input_text();
+        if seed_text.trim().is_empty() {
+            seed_entry.set_text(&self.imp().current_seed.get().to_string());
+        } else {
+            seed_entry.set_text(&seed_text);
+        }
+        seed_entry.set_placeholder_text(Some("Seed number or word"));
+        root.append(&seed_entry);
+
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        actions.set_halign(gtk::Align::End);
+
+        let random_button = gtk::Button::with_label("Random");
+        random_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            dialog,
+            move |_| {
+                window.start_random_seed_game();
+                dialog.close();
+            }
+        ));
+        actions.append(&random_button);
+
+        let winnable_button = gtk::Button::with_label("Winnable");
+        winnable_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            dialog,
+            move |_| {
+                window.start_random_winnable_seed_game();
+                dialog.close();
+            }
+        ));
+        actions.append(&winnable_button);
+
+        let repeat_button = gtk::Button::with_label("Repeat");
+        repeat_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            dialog,
+            move |_| {
+                window.repeat_current_seed_game();
+                dialog.close();
+            }
+        ));
+        actions.append(&repeat_button);
+
+        let check_button = gtk::Button::with_label("Check W?");
+        check_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            seed_entry,
+            move |_| {
+                window.set_seed_input_text(seed_entry.text().as_str());
+                window.toggle_seed_winnable_check();
+            }
+        ));
+        actions.append(&check_button);
+
+        let start_button = gtk::Button::with_label("Start");
+        start_button.add_css_class("suggested-action");
+        start_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            seed_entry,
+            #[weak]
+            dialog,
+            move |_| {
+                window.set_seed_input_text(seed_entry.text().as_str());
+                window.start_new_game_from_seed_controls();
+                dialog.close();
+            }
+        ));
+        actions.append(&start_button);
+        root.append(&actions);
+
+        seed_entry.connect_activate(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            seed_entry,
+            #[weak]
+            dialog,
+            move |_| {
+                window.set_seed_input_text(seed_entry.text().as_str());
+                window.start_new_game_from_seed_controls();
+                dialog.close();
+            }
+        ));
+
+        dialog.set_child(Some(&root));
+        dialog.present();
+        seed_entry.grab_focus();
     }
 }

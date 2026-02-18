@@ -15,7 +15,9 @@ impl CardthropicWindow {
             move_count: imp.move_count.get(),
             elapsed_seconds: imp.elapsed_seconds.get(),
             timer_started: imp.timer_started.get(),
+            apm_elapsed_offset_seconds: imp.apm_elapsed_offset_seconds.get(),
             apm_samples: imp.apm_samples.borrow().clone(),
+            foundation_slot_suits: self.foundation_slot_suits_snapshot(),
         }
     }
 
@@ -24,6 +26,7 @@ impl CardthropicWindow {
             let imp = self.imp();
             self.clear_hint_effects();
             imp.waste_selected.set(false);
+            imp.selected_freecell.set(None);
             imp.history.borrow_mut().push(snapshot);
             imp.future.borrow_mut().clear();
             imp.move_count.set(imp.move_count.get() + 1);
@@ -140,10 +143,14 @@ impl CardthropicWindow {
             imp.spider_suit_mode.set(game.spider().suit_mode());
         }
         *imp.selected_run.borrow_mut() = snapshot.selected_run;
+        imp.selected_freecell.set(None);
         imp.waste_selected.set(snapshot.selected_waste);
+        self.set_foundation_slot_suits(snapshot.foundation_slot_suits);
         imp.move_count.set(snapshot.move_count);
         imp.elapsed_seconds.set(snapshot.elapsed_seconds);
         imp.timer_started.set(snapshot.timer_started);
+        imp.apm_elapsed_offset_seconds
+            .set(snapshot.apm_elapsed_offset_seconds);
         *imp.apm_samples.borrow_mut() = snapshot.apm_samples;
         self.update_game_mode_menu_selection();
         self.update_game_settings_menu();

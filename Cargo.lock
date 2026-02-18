@@ -96,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "cardthropic"
-version = "0.8.0"
+version = "0.9.0-beta.1"
 dependencies = [
  "gettext-rs",
  "gtk4",

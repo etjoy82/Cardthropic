@@ -55,3 +55,29 @@ EOF
   name_value="$(awk 'prev=="--name"{print; exit}{prev=$0}' "${CAPTURE_FILE}")"
   [ "${name_value}" = "manual-name" ]
 }
+
+@test "backupct installed outside repo resolves repo from current working directory" {
+  local repo_dir="${TEST_TMPDIR}/repo"
+  local release_dir="${repo_dir}/scripts/release"
+  local bin_dir="${TEST_TMPDIR}/bin"
+  mkdir -p "${release_dir}" "${bin_dir}"
+
+  cp "${REPO_ROOT}/scripts/release/backupct" "${bin_dir}/backupct"
+
+  cat > "${release_dir}/zip-working-tree.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$@" > "${CAPTURE_FILE}"
+EOF
+  chmod +x "${bin_dir}/backupct" "${release_dir}/zip-working-tree.sh"
+
+  export CAPTURE_FILE="${TEST_TMPDIR}/capture.txt"
+  pushd "${repo_dir}" >/dev/null
+  run "${bin_dir}/backupct"
+  popd >/dev/null
+  [ "${status}" -eq 0 ]
+
+  local repo_value
+  repo_value="$(awk 'prev=="--repo"{print; exit}{prev=$0}' "${CAPTURE_FILE}")"
+  [ "${repo_value}" = "${repo_dir}" ]
+}

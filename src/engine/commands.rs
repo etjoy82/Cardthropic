@@ -18,6 +18,17 @@ pub enum EngineCommand {
     MoveTableauTopToFoundation {
         src: usize,
     },
+    MoveTableauTopToFreecell {
+        src: usize,
+        cell: usize,
+    },
+    MoveFreecellToFoundation {
+        cell: usize,
+    },
+    MoveFreecellToTableau {
+        cell: usize,
+        dst: usize,
+    },
     MoveFoundationTopToTableau {
         foundation_idx: usize,
         dst: usize,

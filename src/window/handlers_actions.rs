@@ -2,23 +2,57 @@ use super::*;
 use crate::engine::boundary;
 
 impl CardthropicWindow {
+    pub(super) fn copy_game_state_to_clipboard(&self) {
+        let payload = self.build_saved_session();
+        self.clipboard().set_text(&payload);
+        *self.imp().status_override.borrow_mut() =
+            Some("Copied game state to clipboard.".to_string());
+        self.render();
+    }
+
+    pub(super) fn paste_game_state_from_clipboard(&self) {
+        let clipboard = self.clipboard();
+        clipboard.read_text_async(
+            None::<&gio::Cancellable>,
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |result| match result {
+                    Ok(Some(text)) => {
+                        let payload = text.to_string();
+                        match window.restore_session_from_payload(
+                            &payload,
+                            "Restored game from clipboard.",
+                            true,
+                        ) {
+                            Ok(()) => {
+                                window.render();
+                            }
+                            Err(err) => {
+                                *window.imp().status_override.borrow_mut() =
+                                    Some(format!("Paste failed: {err}."));
+                                window.render();
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        *window.imp().status_override.borrow_mut() =
+                            Some("Paste failed: clipboard is empty.".to_string());
+                        window.render();
+                    }
+                    Err(err) => {
+                        *window.imp().status_override.borrow_mut() =
+                            Some(format!("Paste failed: {err}."));
+                        window.render();
+                    }
+                }
+            ),
+        );
+    }
+
     pub(super) fn setup_primary_action_handlers(&self) {
         let imp = self.imp();
 
-        imp.help_button.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |_| {
-                window.show_help_dialog();
-            }
-        ));
-        imp.fullscreen_button.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |_| {
-                window.toggle_fullscreen_mode();
-            }
-        ));
         imp.undo_button.connect_clicked(glib::clone!(
             #[weak(rename_to = window)]
             self,
@@ -83,79 +117,6 @@ impl CardthropicWindow {
             }
         ));
         imp.robot_button.add_controller(robot_middle_click);
-        imp.copy_session_button.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |_| {
-                let payload = window.build_saved_session();
-                window.clipboard().set_text(&payload);
-                *window.imp().status_override.borrow_mut() =
-                    Some("Copied game state to clipboard.".to_string());
-                window.render();
-            }
-        ));
-        imp.paste_session_button.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |_| {
-                let clipboard = window.clipboard();
-                clipboard.read_text_async(
-                    None::<&gio::Cancellable>,
-                    glib::clone!(
-                        #[weak(rename_to = window)]
-                        window,
-                        move |result| match result {
-                            Ok(Some(text)) => {
-                                let payload = text.to_string();
-                                match window.restore_session_from_payload(
-                                    &payload,
-                                    "Restored game from clipboard.",
-                                    true,
-                                ) {
-                                    Ok(()) => {
-                                        window.render();
-                                    }
-                                    Err(err) => {
-                                        *window.imp().status_override.borrow_mut() =
-                                            Some(format!("Paste failed: {err}."));
-                                        window.render();
-                                    }
-                                }
-                            }
-                            Ok(None) => {
-                                *window.imp().status_override.borrow_mut() =
-                                    Some("Paste failed: clipboard is empty.".to_string());
-                                window.render();
-                            }
-                            Err(err) => {
-                                *window.imp().status_override.borrow_mut() =
-                                    Some(format!("Paste failed: {err}."));
-                                window.render();
-                            }
-                        }
-                    ),
-                );
-            }
-        ));
-        imp.robot_debug_toggle_button.connect_toggled(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |button| {
-                let enabled = button.is_active();
-                window.imp().robot_debug_enabled.set(enabled);
-                if enabled {
-                    button.add_css_class("suggested-action");
-                } else {
-                    button.remove_css_class("suggested-action");
-                }
-                *window.imp().status_override.borrow_mut() = Some(if enabled {
-                    "robot_debug=on".to_string()
-                } else {
-                    "robot_debug=off".to_string()
-                });
-                window.render();
-            }
-        ));
         imp.status_history_button.connect_clicked(glib::clone!(
             #[weak(rename_to = window)]
             self,
@@ -205,19 +166,30 @@ impl CardthropicWindow {
 
     pub(super) fn setup_keyboard_navigation_handler(&self) {
         let keyboard_nav = gtk::EventControllerKey::new();
-        keyboard_nav.set_propagation_phase(gtk::PropagationPhase::Bubble);
+        keyboard_nav.set_propagation_phase(gtk::PropagationPhase::Capture);
         keyboard_nav.connect_key_pressed(glib::clone!(
             #[weak(rename_to = window)]
             self,
             #[upgrade_or]
             glib::Propagation::Proceed,
             move |_, key, _, state| {
-                if matches!(key, gdk::Key::Return | gdk::Key::KP_Enter) {
+                if window.handle_variant_shortcut_key(key, state) {
+                    return glib::Propagation::Stop;
+                }
+                let arrow_key = matches!(
+                    key,
+                    gdk::Key::Left | gdk::Key::Right | gdk::Key::Up | gdk::Key::Down
+                );
+                if key == gdk::Key::space {
                     if let Some(entry) = window.seed_text_entry() {
                         if entry.has_focus() {
                             return glib::Propagation::Proceed;
                         }
                     }
+                }
+                if arrow_key {
+                    // Arrow navigation should move board focus, not stay trapped on a focused button.
+                    window.grab_focus();
                 }
                 if state.intersects(
                     gdk::ModifierType::ALT_MASK
@@ -328,21 +300,42 @@ impl CardthropicWindow {
         imp.stock_picture.add_controller(stock_click);
 
         let waste_click = gtk::GestureClick::new();
+        waste_click.set_button(0);
         waste_click.connect_released(glib::clone!(
             #[weak(rename_to = window)]
             self,
-            move |_, n_press, _, _| {
-                window.handle_waste_click(n_press);
+            move |gesture, n_press, x, _| {
+                let current_button = gesture.current_button();
+                if window.active_game_mode() == GameMode::Freecell {
+                    if window.smart_move_mode() == SmartMoveMode::RightClick
+                        && current_button == gdk::BUTTON_SECONDARY
+                    {
+                        let idx = window.freecell_slot_index_from_waste_x(x);
+                        let _ = window.try_smart_move_from_freecell(idx);
+                        return;
+                    }
+                    window.handle_freecell_click_x(n_press, Some(x));
+                } else {
+                    if window.smart_move_mode() == SmartMoveMode::RightClick
+                        && current_button == gdk::BUTTON_SECONDARY
+                    {
+                        let _ = window.try_smart_move_from_waste();
+                        return;
+                    }
+                    window.handle_waste_click(n_press);
+                }
             }
         ));
         imp.waste_overlay.add_controller(waste_click);
 
         for (index, stack) in self.tableau_stacks().into_iter().enumerate() {
             let click = gtk::GestureClick::new();
+            click.set_button(0);
             click.connect_released(glib::clone!(
                 #[weak(rename_to = window)]
                 self,
-                move |_, n_press, _, y| {
+                move |gesture, n_press, _, y| {
+                    let current_button = gesture.current_button();
                     if window.active_game_mode() == GameMode::Spider {
                         let game = window.imp().game.borrow().spider().clone();
                         let start = window.tableau_run_start_from_y_spider(&game, index, y);
@@ -359,9 +352,46 @@ impl CardthropicWindow {
                                     window.try_smart_move_from_tableau(index, start);
                                 }
                             }
+                            SmartMoveMode::RightClick
+                                if current_button == gdk::BUTTON_SECONDARY =>
+                            {
+                                if let Some(start) = start {
+                                    window.try_smart_move_from_tableau(index, start);
+                                }
+                            }
                             SmartMoveMode::Disabled | SmartMoveMode::DoubleClick
                                 if n_press == 1 =>
                             {
+                                window.select_or_move_tableau_with_start(index, start);
+                            }
+                            _ => {}
+                        }
+                        return;
+                    }
+                    if window.active_game_mode() == GameMode::Freecell {
+                        let game = window.imp().game.borrow().freecell().clone();
+                        let start = window.tableau_run_start_from_y_freecell(&game, index, y);
+                        match window.smart_move_mode() {
+                            SmartMoveMode::DoubleClick if n_press == 2 => {
+                                if let Some(start) = start {
+                                    window.try_smart_move_from_tableau(index, start);
+                                }
+                            }
+                            SmartMoveMode::SingleClick if n_press == 1 => {
+                                *window.imp().selected_run.borrow_mut() = None;
+                                window.imp().selected_freecell.set(None);
+                                if let Some(start) = start {
+                                    window.try_smart_move_from_tableau(index, start);
+                                }
+                            }
+                            SmartMoveMode::RightClick
+                                if current_button == gdk::BUTTON_SECONDARY =>
+                            {
+                                if let Some(start) = start {
+                                    window.try_smart_move_from_tableau(index, start);
+                                }
+                            }
+                            _ if n_press == 1 => {
                                 window.select_or_move_tableau_with_start(index, start);
                             }
                             _ => {}
@@ -384,6 +414,17 @@ impl CardthropicWindow {
                         SmartMoveMode::SingleClick if n_press == 1 => {
                             *window.imp().selected_run.borrow_mut() = None;
                             window.imp().waste_selected.set(false);
+                            let start = boundary::clone_klondike_for_automation(
+                                &window.imp().game.borrow(),
+                                window.active_game_mode(),
+                                window.current_klondike_draw_mode(),
+                            )
+                            .and_then(|game| window.tableau_run_start_from_y(&game, index, y));
+                            if let Some(start) = start {
+                                window.try_smart_move_from_tableau(index, start);
+                            }
+                        }
+                        SmartMoveMode::RightClick if current_button == gdk::BUTTON_SECONDARY => {
                             let start = boundary::clone_klondike_for_automation(
                                 &window.imp().game.borrow(),
                                 window.active_game_mode(),

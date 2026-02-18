@@ -1,0 +1,22 @@
+[bacon]
+summary = true
+
+[jobs.check]
+command = ["cargo", "check", "--all-targets"]
+need_stdout = false
+
+[jobs.clippy]
+command = ["cargo", "clippy", "--all-targets", "--all-features", "--", "-D", "warnings"]
+need_stdout = false
+
+[jobs.test]
+command = ["cargo", "nextest", "run", "--all-features"]
+need_stdout = true
+
+[jobs.freecell]
+command = ["cargo", "test", "-q", "freecell_"]
+need_stdout = true
+
+[jobs.cov]
+command = ["cargo", "llvm-cov", "--all-features", "--workspace", "--summary-only"]
+need_stdout = true

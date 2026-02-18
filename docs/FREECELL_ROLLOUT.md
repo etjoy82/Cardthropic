@@ -2,6 +2,7 @@
 
 Authoritative tracker for implementing full FreeCell without destabilizing Klondike/Spider.
 Use this as the execution order for the 0.9.0 feature pass.
+AI tuning companion: `FREECELL_AI_WORKPLAN.md`.
 
 ## Current Snapshot
 
@@ -125,7 +126,7 @@ Files (expected):
 Status:
 - [ ] Hint line generation for FreeCell
 - [ ] Magic Wand support for FreeCell
-- [ ] Robot mode support for FreeCell with status telemetry parity
+- [ ] Robot mode support for FreeCell with status private metrics parity
 - [ ] FreeCell W? support (seed winnability path) or explicit policy if deferred
 - [ ] Ensure debug vs non-debug verbosity behavior matches existing standards
 

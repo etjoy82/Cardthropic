@@ -56,10 +56,10 @@ pub fn build_status_text(
                 .to_string()
         }
         "single-click" => {
-            "Klondike controls: single-click cards/waste for Smart Move. Use drag-and-drop for manual runs."
+            "Klondike controls: single-click cards/waste for Smart Move. Use drag-and-drop for manual runs. Keyboard: arrows move focus, Enter activates."
                 .to_string()
         }
-        _ => "Klondike controls: click columns to move, click waste to select, double-click cards/waste for Smart Move."
+        _ => "Klondike controls: click columns to move, click waste to select, double-click cards/waste for Smart Move. Keyboard: arrows move focus, Enter activates."
             .to_string(),
     }
 }

@@ -35,7 +35,7 @@
   </description>
   <screenshots>
     <screenshot type="default">
-      <image type="source" width="691" height="787">https://codeberg.org/emviolet/Cardthropic/raw/branch/main/data/screenshots/cardthropic-0.8-screenshot.png</image>
+      <image type="source" width="691" height="787">https://codeberg.org/emviolet/Cardthropic/raw/branch/main/data/screenshots/cardthropic-0.9-screenshot.png</image>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1">
@@ -61,6 +61,15 @@
     <content_attribute id="social-location">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.9.0-beta.1" date="2026-02-18">
+      <description>
+        <p>Added an automation toggle to control auto-starting a new game after loss, with settings persistence and shortcut/menu wiring.</p>
+        <p>Added debug robot invariants with a strict runtime toggle to surface rule/state regressions during long automated runs.</p>
+        <p>Fixed Spider completed-run handling so valid same-suit A-K tableau stacks clear correctly.</p>
+        <p>Restored Spider stock deal rule enforcement: deal is allowed only when all tableau columns are occupied.</p>
+        <p>Improved Spider W? winnable-seed reliability, and fixed seed-word underscore handling and seed status label display.</p>
+      </description>
+    </release>
     <release version="0.8.0" date="2026-02-15">
       <description>
         <p>Major Spider expansion: suit selector (1/2/3/4), full engine parity work, and broad move/interaction reliability improvements.</p>

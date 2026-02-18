@@ -21,22 +21,21 @@ pub fn parse_seed_input(input: &str) -> Result<Option<u64>, String> {
     let normalized = trimmed.replace('_', "");
     if normalized.chars().all(|ch| ch.is_ascii_digit()) {
         return normalized.parse::<u64>().map(Some).map_err(|_| {
-            "Seed number must be an unsigned whole number (0 to 18446744073709551615)."
-                .to_string()
+            "Seed number must be an unsigned whole number (0 to 18446744073709551615).".to_string()
         });
     }
 
-    if trimmed.chars().all(|ch| ch.is_ascii_alphabetic()) {
-        if trimmed.len() > WORD_SEED_MAX_LEN {
+    if !normalized.is_empty() && normalized.chars().all(|ch| ch.is_ascii_alphabetic()) {
+        if normalized.len() > WORD_SEED_MAX_LEN {
             return Err(format!(
                 "Word seeds can be at most {WORD_SEED_MAX_LEN} letters."
             ));
         }
-        return Ok(Some(hash_word_seed(trimmed)));
+        return Ok(Some(hash_word_seed(&normalized)));
     }
 
     Err(format!(
-        "Seed must be either a number (u64, underscores allowed) or a word (A-Z letters only, max {WORD_SEED_MAX_LEN})."
+        "Seed must be either a number (u64, underscores allowed) or a word (A-Z letters only, underscores allowed, max {WORD_SEED_MAX_LEN})."
     ))
 }
 

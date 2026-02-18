@@ -1,11 +1,11 @@
 # Cardthropic Release Playbook
 
 This is the repeatable process for publishing a new Cardthropic release (source + Flatpak bundle).
-Current channel: alpha.
+Current channel: beta.
 
 Policy:
 
-- This Codeberg repository is an **alpha testbed**.
+- This Codeberg repository is a **beta testbed**.
 - Scripts under `scripts/` are **maintainer-only operational tooling** for this project and workflow.
 - CI must pass `scripts/release/maintainer-gate.sh --strict-tools` on push/PR before merge.
 - Release tags must be signed.
@@ -50,6 +50,12 @@ Shortcut:
 
 ```bash
 make gate
+```
+
+Expanded local quality gate (Rust + security/policy checks via `just`):
+
+```bash
+just ci-local
 ```
 
 This gate enforces:

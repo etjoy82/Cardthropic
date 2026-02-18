@@ -49,22 +49,40 @@ impl CardthropicWindow {
         }
     }
 
+    pub(super) fn current_apm_timeline_seconds(&self) -> u32 {
+        let imp = self.imp();
+        imp.apm_elapsed_offset_seconds
+            .get()
+            .saturating_add(imp.elapsed_seconds.get())
+    }
+
+    pub(super) fn roll_apm_timeline_forward(&self) {
+        let imp = self.imp();
+        let elapsed = imp.elapsed_seconds.get();
+        if elapsed == 0 {
+            return;
+        }
+        imp.apm_elapsed_offset_seconds
+            .set(imp.apm_elapsed_offset_seconds.get().saturating_add(elapsed));
+    }
+
     fn record_apm_sample_if_due(&self) {
         let imp = self.imp();
         let elapsed = imp.elapsed_seconds.get();
         if elapsed == 0 || elapsed % 5 != 0 {
             return;
         }
+        let elapsed_absolute = self.current_apm_timeline_seconds();
         let mut samples = imp.apm_samples.borrow_mut();
         if samples
             .last()
-            .map(|sample| sample.elapsed_seconds == elapsed)
+            .map(|sample| sample.elapsed_seconds == elapsed_absolute)
             .unwrap_or(false)
         {
             return;
         }
         samples.push(ApmSample {
-            elapsed_seconds: elapsed,
+            elapsed_seconds: elapsed_absolute,
             apm: self.current_apm(),
         });
     }
@@ -73,7 +91,7 @@ impl CardthropicWindow {
         match runtime {
             VariantRuntime::Klondike(game) => format!("k:{}", game.encode_for_session()),
             VariantRuntime::Spider(game) => format!("s:{}", game.encode_for_session()),
-            VariantRuntime::Freecell => "f:".to_string(),
+            VariantRuntime::Freecell(game) => format!("f:{}", game.encode_for_session()),
         }
     }
 
@@ -152,9 +170,20 @@ impl CardthropicWindow {
         let timer = if snapshot.timer_started { 1 } else { 0 };
         let runtime = Self::hex_encode(&Self::encode_snapshot_runtime(&snapshot.runtime));
         let apm = Self::encode_apm_samples(&snapshot.apm_samples);
+        let foundation_slots = snapshot
+            .foundation_slot_suits
+            .iter()
+            .map(|slot| match slot {
+                Some(Suit::Clubs) => 'C',
+                Some(Suit::Diamonds) => 'D',
+                Some(Suit::Hearts) => 'H',
+                Some(Suit::Spades) => 'S',
+                None => '-',
+            })
+            .collect::<String>();
         format!(
-            "mode={mode};draw={draw};selected={selected};waste={waste};moves={};elapsed={};timer={timer};runtime_hex={runtime};apm={apm}",
-            snapshot.move_count, snapshot.elapsed_seconds
+            "mode={mode};draw={draw};selected={selected};waste={waste};moves={};elapsed={};timer={timer};apm_offset={};runtime_hex={runtime};apm={apm};fslots={foundation_slots}",
+            snapshot.move_count, snapshot.elapsed_seconds, snapshot.apm_elapsed_offset_seconds
         )
     }
 
@@ -180,9 +209,33 @@ impl CardthropicWindow {
             "0" => false,
             _ => return None,
         };
+        let apm_elapsed_offset_seconds = fields
+            .get("apm_offset")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0);
         let runtime_encoded = Self::hex_decode(fields.get("runtime_hex")?)?;
         let runtime = VariantStateStore::decode_runtime_for_session(mode, &runtime_encoded)?;
         let apm_samples = Self::decode_apm_samples(fields.get("apm")?)?;
+        let foundation_slot_suits = fields
+            .get("fslots")
+            .and_then(|raw| {
+                if raw.len() != 4 {
+                    return None;
+                }
+                let mut out = [None, None, None, None];
+                for (idx, ch) in raw.chars().enumerate() {
+                    out[idx] = match ch {
+                        'C' => Some(Suit::Clubs),
+                        'D' => Some(Suit::Diamonds),
+                        'H' => Some(Suit::Hearts),
+                        'S' => Some(Suit::Spades),
+                        '-' => None,
+                        _ => return None,
+                    };
+                }
+                Some(out)
+            })
+            .unwrap_or([None, None, None, None]);
 
         Some(Snapshot {
             mode,
@@ -193,7 +246,9 @@ impl CardthropicWindow {
             move_count,
             elapsed_seconds,
             timer_started,
+            apm_elapsed_offset_seconds,
             apm_samples,
+            foundation_slot_suits,
         })
     }
 
@@ -345,16 +400,19 @@ impl CardthropicWindow {
         self.cancel_seed_winnable_check(None);
         imp.game.borrow_mut().set_runtime(session.runtime.clone());
         imp.current_seed.set(session.seed);
+        self.roll_apm_timeline_forward();
         imp.move_count.set(session.move_count);
         imp.elapsed_seconds.set(session.elapsed_seconds);
         imp.timer_started.set(session.timer_started);
         *imp.selected_run.borrow_mut() = None;
+        imp.selected_freecell.set(None);
         imp.waste_selected.set(false);
         imp.history.borrow_mut().clear();
         imp.future.borrow_mut().clear();
-        imp.apm_samples.borrow_mut().clear();
         imp.current_game_mode.set(session.mode);
         imp.klondike_draw_mode.set(session.klondike_draw_mode);
+        imp.freecell_card_count_mode
+            .set(session.freecell_card_count_mode);
         let _ = boundary::set_draw_mode(
             &mut imp.game.borrow_mut(),
             session.mode,

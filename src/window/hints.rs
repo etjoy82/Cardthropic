@@ -65,10 +65,20 @@ impl CardthropicWindow {
         match node {
             HintNode::Stock => Some(imp.stock_picture.get().upcast()),
             HintNode::Waste => Some(imp.waste_picture.get().upcast()),
-            HintNode::Foundation(index) => self
-                .foundation_pictures()
+            HintNode::Freecell(index) => self
+                .waste_fan_slots()
                 .get(index)
                 .map(|picture| picture.clone().upcast()),
+            HintNode::Foundation(index) => {
+                let slot = Suit::ALL
+                    .get(index)
+                    .copied()
+                    .and_then(|suit| self.foundation_slot_for_suit(suit))
+                    .unwrap_or(index);
+                self.foundation_pictures()
+                    .get(slot)
+                    .map(|picture| picture.clone().upcast())
+            }
             HintNode::Tableau { col, index } => {
                 if let Some(card_index) = index {
                     imp.tableau_card_pictures

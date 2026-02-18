@@ -177,6 +177,81 @@ Verification checklist:
 
 ---
 
+## Phase 2 Manual QA (Keyboard + Interaction Polish)
+
+Run this quick matrix after any FreeCell input/render change.
+
+Preconditions:
+- [ ] Launch app in FreeCell mode
+- [ ] Start seeded game (`Go`) to ensure deterministic repeat
+- [ ] Confirm no modal dialogs are open
+
+### 1) Top-row Focus Mapping
+
+- [ ] Use arrow keys until focus is on Free Cells row
+- [ ] Press `Down` from `F1`..`F4`
+- [ ] Expected: focus lands on the **top card** of tableau `T1`..`T4` (or empty target if column empty), never bottom card
+- [ ] Press `Down` from Foundations `H1`..`H4`
+- [ ] Expected: focus lands on the **top card** of tableau `T5`..`T8` (or empty target if column empty)
+
+### 2) Tableau Vertical Traversal
+
+- [ ] In a non-empty tableau, press `Up` repeatedly
+- [ ] Expected: focus climbs card-by-card toward the top of that same column
+- [ ] Expected: only after the top card, next `Up` exits to mapped top-row slot (Free Cell for `T1..T4`, Foundation for `T5..T8`)
+- [ ] Press `Down` from within the same column
+- [ ] Expected: focus descends toward lower cards; at bottom card, stays clamped
+
+### 3) Empty Column Behavior
+
+- [ ] Create at least one empty tableau column
+- [ ] Move focus to that empty column
+- [ ] Expected: empty-column focus style is visible (`keyboard-focus-empty`)
+- [ ] Press `Up`
+- [ ] Expected: exits to mapped top-row slot (no invalid focus target)
+- [ ] Press `Enter` on empty column
+- [ ] Expected: no crash, no illegal move, status remains valid
+
+### 4) Horizontal Traversal
+
+- [ ] On top row, press `Left/Right` across all 8 slots
+- [ ] Expected: traversal order is `F1..F4 -> H1..H4`, clamped at edges
+- [ ] On tableau row, press `Left/Right`
+- [ ] Expected: same run/top-card depth is preserved where possible when changing columns
+
+### 5) Enter Activation Contract
+
+- [ ] `Enter` on occupied Free Cell
+- [ ] Expected: selects card (or attempts legal move if selection active)
+- [ ] `Enter` on Foundation
+- [ ] Expected: routes to foundation click handler; illegal actions do not mutate state
+- [ ] `Enter` on tableau card
+- [ ] Expected: same behavior as mouse click (select/move), no bypass of legality checks
+
+### 6) Status and Signal Quality
+
+- [ ] Start new seeded FreeCell game
+- [ ] Expected: one compact ready line (`freecell_ready ...`) appears, not repeated every render frame
+- [ ] Perform legal and illegal actions
+- [ ] Expected: status lines are informative and append to history correctly
+- [ ] Open `History` dialog during play
+- [ ] Expected: new status entries stream in live; clear button works
+
+### 7) Regression Safety
+
+- [ ] Switch FreeCell -> Klondike -> FreeCell without closing app
+- [ ] Expected: keyboard navigation still maps correctly in FreeCell
+- [ ] Close and relaunch app with resumable FreeCell session
+- [ ] Expected: focus/activation logic works identically after resume
+
+Pass criteria:
+- [ ] No focus traps
+- [ ] No illegal state mutation from keyboard activation
+- [ ] No panic/crash under rapid arrow+enter input
+- [ ] Status remains compact and readable
+
+---
+
 ## Naming Convention (Keep)
 
 - `freecell_rule_*`
