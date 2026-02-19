@@ -12,10 +12,10 @@ This script runs local release sanity checks and prints the exact git/flatpak
 commands for a hotfix branch publish flow.
 
 Usage:
-  scripts/release/hotfix-flow.sh --version <x.y.z> [--skip-bundle]
+  scripts/release/hotfix-flow.sh --version <semver> [--skip-bundle]
 
 Options:
-  --version <x.y.z>  Required release version (example: 0.3.2)
+  --version <semver> Required release version (example: 0.3.2 or 0.3.2-beta.1)
   --skip-bundle      Skip scripts/flatpak/bundle.sh + appstream repo verification
   -h, --help         Show this help
 EOF
@@ -62,6 +62,11 @@ done
 if [[ -z "${VERSION}" ]]; then
   echo "--version is required." >&2
   usage
+  exit 1
+fi
+semver_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+if [[ ! "${VERSION}" =~ ${semver_re} ]]; then
+  echo "Version must be SemVer (example: 0.6.0 or 0.6.0-beta.1)." >&2
   exit 1
 fi
 

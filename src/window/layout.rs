@@ -118,13 +118,38 @@ impl CardthropicWindow {
         let used_tableau_width = card_width * columns + column_gap * (columns - 1);
         let overflow_delta = used_tableau_width - available_width;
 
+        let stock_live_w = imp.stock_picture.width();
+        let stock_live_h = imp.stock_picture.height();
+        let waste_live_w = imp.waste_picture.width();
+        let waste_live_h = imp.waste_picture.height();
+        let waste_overlay_live_w = imp.waste_overlay.width();
+        let waste_overlay_live_h = imp.waste_overlay.height();
+        let stock_req_w = imp.stock_picture.width_request();
+        let stock_req_h = imp.stock_picture.height_request();
+        let waste_req_w = imp.waste_picture.width_request();
+        let waste_req_h = imp.waste_picture.height_request();
+        let waste_overlay_req_w = imp.waste_overlay.width_request();
+        let waste_overlay_req_h = imp.waste_overlay.height_request();
+        let visible_foundation_slots = self
+            .foundation_pictures()
+            .iter()
+            .filter(|picture| picture.is_visible())
+            .count();
+        let expected_foundation_slots = match self.active_game_mode() {
+            GameMode::Spider => 8usize,
+            GameMode::Klondike | GameMode::Freecell => 4usize,
+        };
+        let foundation_slots_ok = visible_foundation_slots == expected_foundation_slots;
+        let mode_label = self.active_game_mode().label();
+
         imp.card_width.set(card_width);
         imp.card_height.set(card_height);
         imp.face_up_step.set(face_up_step);
         imp.face_down_step.set(face_down_step);
 
         self.append_layout_debug_history_line(&format!(
-            "mobile={} win={}x{} scroll_live={} scroll_obs={} avail_w={} used_w={} overflow_delta={} cols={} gap={} card={}x{} topcap={} colcap={} hcap={}",
+            "mode={} mobile={} win={}x{} scroll_live={} scroll_obs={} avail_w={} used_w={} overflow_delta={} cols={} gap={} card={}x{} topcap={} colcap={} hcap={} stock_live={}x{} stock_req={}x{} waste_live={}x{} waste_req={}x{} waste_overlay_live={}x{} waste_overlay_req={}x{} fslots_vis={} fslots_exp={} fslots_ok={}",
+            mode_label,
             mobile_phone_mode,
             window_width,
             window_height,
@@ -139,7 +164,22 @@ impl CardthropicWindow {
             card_height,
             width_limited_by_top_row,
             width_limited_by_columns,
-            width_limited_by_window_height
+            width_limited_by_window_height,
+            stock_live_w,
+            stock_live_h,
+            stock_req_w,
+            stock_req_h,
+            waste_live_w,
+            waste_live_h,
+            waste_req_w,
+            waste_req_h,
+            waste_overlay_live_w,
+            waste_overlay_live_h,
+            waste_overlay_req_w,
+            waste_overlay_req_h,
+            visible_foundation_slots,
+            expected_foundation_slots,
+            foundation_slots_ok
         ));
     }
 

@@ -4,9 +4,146 @@ use crate::engine::render_plan;
 use crate::engine::status_text;
 use crate::engine::variant_engine::engine_for_mode;
 use crate::game::{FreecellGame, SpiderGame};
+use crate::startup_trace;
 use std::time::Instant;
 
+const LAYOUT_DEBUG_HISTORY_ENABLED: bool = false;
+const SECONDARY_WINDOW_STATUS_HINT: &str =
+    "Secondary window: session and seed history are not auto-saved.";
+
 impl CardthropicWindow {
+    fn current_variant_name(&self) -> String {
+        match self.active_game_mode() {
+            GameMode::Klondike => {
+                format!(
+                    "Klondike Deal {}",
+                    self.current_klondike_draw_mode().count()
+                )
+            }
+            GameMode::Spider => {
+                format!(
+                    "Spider Suit {}",
+                    self.current_spider_suit_mode().suit_count()
+                )
+            }
+            GameMode::Freecell => format!(
+                "FreeCell Card Count {}",
+                self.current_freecell_card_count_mode().card_count()
+            ),
+        }
+    }
+
+    fn refresh_window_title(&self) {
+        let title = format!(
+            "Cardthropic \u{2014} {} ({})",
+            self.current_variant_name(),
+            self.imp().current_seed.get()
+        );
+        self.set_title(Some(&title));
+    }
+
+    fn decorate_status_for_window(&self, status: &str) -> String {
+        let trimmed = status.trim();
+        if self.should_persist_shared_state() {
+            return trimmed.to_string();
+        }
+        if trimmed.is_empty() {
+            return SECONDARY_WINDOW_STATUS_HINT.to_string();
+        }
+        format!("{trimmed} | {SECONDARY_WINDOW_STATUS_HINT}")
+    }
+
+    fn status_performance_mode_active(&self) -> bool {
+        let imp = self.imp();
+        imp.robot_mode_running.get()
+            && imp.robot_ludicrous_enabled.get()
+            && imp.robot_forever_enabled.get()
+            && imp.robot_auto_new_game_on_loss.get()
+            && !imp.robot_debug_enabled.get()
+    }
+
+    fn schedule_deck_load(&self) {
+        let imp = self.imp();
+        if imp.deck_load_in_progress.get() {
+            return;
+        }
+        imp.deck_load_in_progress.set(true);
+        startup_trace::mark_once("render:first-deck-load-scheduled");
+        startup_trace::mark_once("render:first-deck-load-enter");
+
+        let custom_svg = Self::load_app_settings()
+            .map(|settings| settings.string(SETTINGS_KEY_CUSTOM_CARD_SVG).to_string())
+            .unwrap_or_default();
+        let (sender, receiver) = mpsc::channel::<Result<crate::deck::DeckSheetRaster, String>>();
+        thread::spawn(move || {
+            startup_trace::mark_once("render:first-deck-worker-enter");
+            let rasterized = if custom_svg.trim().is_empty() {
+                AngloDeck::rasterize_default_svg()
+            } else {
+                AngloDeck::rasterize_custom_svg(&custom_svg)
+            };
+            startup_trace::mark_once("render:first-deck-worker-exit");
+            let _ = sender.send(rasterized);
+        });
+
+        glib::timeout_add_local(
+            Duration::from_millis(16),
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || match receiver.try_recv() {
+                    Ok(rasterized) => {
+                        let imp = window.imp();
+                        imp.deck_load_in_progress.set(false);
+                        startup_trace::mark_once("render:first-deck-main-build-enter");
+                        match rasterized.and_then(AngloDeck::from_raster) {
+                            Ok(deck) => {
+                                *imp.deck.borrow_mut() = Some(deck);
+                                *imp.deck_error.borrow_mut() = None;
+                                window.invalidate_card_render_cache();
+                            }
+                            Err(err) => {
+                                *imp.deck_error.borrow_mut() = Some(err);
+                            }
+                        }
+                        startup_trace::mark_once("render:first-deck-main-build-exit");
+                        startup_trace::mark_once("render:first-deck-load-exit");
+                        startup_trace::print_deck_summary_once();
+                        window.append_startup_deck_history_if_robot_debug();
+                        window.render();
+                        glib::ControlFlow::Break
+                    }
+                    Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        let imp = window.imp();
+                        imp.deck_load_in_progress.set(false);
+                        *imp.deck_error.borrow_mut() =
+                            Some("Card deck worker disconnected.".to_string());
+                        startup_trace::mark_once("render:first-deck-load-exit");
+                        startup_trace::print_deck_summary_once();
+                        window.append_startup_deck_history_if_robot_debug();
+                        window.render();
+                        glib::ControlFlow::Break
+                    }
+                }
+            ),
+        );
+    }
+
+    fn ensure_deck_ready(&self) -> bool {
+        let imp = self.imp();
+        if imp.deck.borrow().is_some() {
+            return true;
+        }
+        if !imp.deck_load_attempted.get() {
+            imp.deck_load_attempted.set(true);
+            self.schedule_deck_load();
+        }
+        false
+    }
+
     fn parse_robot_moves_from_status(status: &str) -> Option<u32> {
         let marker = " robot_moves=";
         let start = status.find(marker)? + marker.len();
@@ -30,12 +167,14 @@ impl CardthropicWindow {
             return false;
         }
 
+        if status.contains(" event=move_applied ") {
+            return false;
+        }
+
         let sample_mod = if status.contains(" event=planner_wait ") {
             16_u32
         } else if status.contains(" event=planner_ready ") {
             8_u32
-        } else if status.contains(" event=move_applied ") {
-            4_u32
         } else {
             0_u32
         };
@@ -116,6 +255,18 @@ impl CardthropicWindow {
         if self.should_throttle_robot_history_line(status) {
             return;
         }
+        if self.status_performance_mode_active()
+            && (status.starts_with("robot_v=")
+                || status.starts_with("bench_v=")
+                || status.starts_with("W/L ")
+                || status.starts_with("Robot "))
+        {
+            let is_move_line =
+                status.contains(" event=move_applied ") || status.contains("Event: move applied.");
+            if !is_move_line {
+                return;
+            }
+        }
 
         let imp = self.imp();
         let mut history = imp.status_history.borrow_mut();
@@ -143,6 +294,9 @@ impl CardthropicWindow {
     }
 
     pub(super) fn append_layout_debug_history_line(&self, status: &str) {
+        if !LAYOUT_DEBUG_HISTORY_ENABLED {
+            return;
+        }
         let imp = self.imp();
         if !imp.robot_debug_enabled.get() {
             return;
@@ -288,6 +442,7 @@ impl CardthropicWindow {
     pub(super) fn apply_mobile_phone_mode_overrides(&self) {
         let imp = self.imp();
         let mobile = imp.mobile_phone_mode.get();
+        let spider_mode = self.active_game_mode() == GameMode::Spider;
         let hud_visible = imp.hud_enabled.get() && !mobile;
 
         // HUD rows are always suppressed in mobile-phone mode.
@@ -309,7 +464,8 @@ impl CardthropicWindow {
             imp.waste_label.set_visible(false);
             imp.tableau_frame.set_label(None);
             imp.stock_waste_foundation_spacer_box.set_visible(false);
-            imp.foundations_area_box.set_spacing(2);
+            imp.foundations_area_box
+                .set_spacing(if spider_mode { 0 } else { 2 });
 
             // Bare-bones compact spacing at tiny sizes.
             imp.playfield_inner_box.set_spacing(2);
@@ -339,8 +495,10 @@ impl CardthropicWindow {
             imp.tableau_row.set_margin_start(0);
             imp.tableau_row.set_margin_end(0);
             imp.tableau_frame.set_label(Some("Tableau"));
-            imp.stock_waste_foundation_spacer_box.set_visible(true);
-            imp.foundations_area_box.set_spacing(8);
+            // Keep top-row groups left-flow aligned across modes.
+            imp.stock_waste_foundation_spacer_box.set_visible(false);
+            imp.foundations_area_box
+                .set_spacing(if spider_mode { 0 } else { 8 });
 
             imp.playfield_inner_box.set_spacing(2);
             imp.playfield_inner_box.set_margin_top(1);
@@ -354,16 +512,20 @@ impl CardthropicWindow {
     }
 
     pub(super) fn render(&self) {
+        startup_trace::mark_once("render:first-enter");
         let render_started = Instant::now();
+        self.refresh_window_title();
         match self.active_game_mode() {
             GameMode::Spider => {
                 self.render_spider();
                 self.record_render_timing(render_started.elapsed());
+                startup_trace::mark_once("render:first-exit");
                 return;
             }
             GameMode::Freecell => {
                 self.render_freecell();
                 self.record_render_timing(render_started.elapsed());
+                startup_trace::mark_once("render:first-exit");
                 return;
             }
             GameMode::Klondike => {}
@@ -371,18 +533,26 @@ impl CardthropicWindow {
 
         let imp = self.imp();
         imp.stock_picture.set_visible(true);
-        imp.stock_label.set_visible(true);
+        imp.stock_column_box.set_visible(true);
+        imp.stock_label.set_visible(false);
         imp.stock_heading_box.set_visible(true);
         imp.stock_heading_label.set_label("Stock");
         imp.waste_overlay.set_visible(true);
-        imp.waste_label.set_visible(true);
+        imp.waste_column_box.set_visible(true);
+        imp.waste_label.set_visible(false);
         imp.waste_heading_box.set_visible(true);
         imp.waste_heading_label.set_label("Waste");
-        imp.top_row_spacer_box.set_visible(true);
-        imp.stock_waste_foundation_spacer_box.set_visible(true);
+        imp.top_row_spacer_box.set_visible(false);
+        imp.stock_waste_foundation_spacer_box.set_visible(false);
         imp.selected_freecell.set(None);
         imp.foundations_heading_box.set_visible(true);
+        imp.foundations_heading_box.set_halign(gtk::Align::Start);
+        imp.foundations_heading_box.set_margin_start(0);
         imp.foundations_heading_label.set_label("Foundations");
+        imp.foundations_heading_label.set_xalign(0.0);
+        imp.foundations_heading_label.set_halign(gtk::Align::Start);
+        imp.foundations_area_box.set_halign(gtk::Align::Start);
+        imp.foundations_area_box.set_margin_start(0);
         imp.foundations_area_box.set_visible(true);
         let view = boundary::game_view_model(
             &imp.game.borrow(),
@@ -417,12 +587,15 @@ impl CardthropicWindow {
             label.set_label("");
         }
 
+        let selected_snapshot = imp.selected_run.try_borrow().ok().and_then(|run| *run);
         let selected_tuple = render_plan::sanitize_selected_run(
             game,
-            (*imp.selected_run.borrow()).map(|run| (run.col, run.start)),
+            selected_snapshot.map(|run| (run.col, run.start)),
         );
         let selected = selected_tuple.map(|(col, start)| SelectedRun { col, start });
-        *imp.selected_run.borrow_mut() = selected;
+        if let Ok(mut selected_run) = imp.selected_run.try_borrow_mut() {
+            *selected_run = selected;
+        }
         if imp.waste_selected.get() && game.waste_top().is_none() {
             imp.waste_selected.set(false);
         }
@@ -465,33 +638,40 @@ impl CardthropicWindow {
             imp.deck_error.borrow().as_deref(),
             imp.status_override.borrow().as_deref(),
         );
-        if !status.is_empty() {
-            self.append_status_line(&status);
-        }
+        self.append_status_line(&status);
 
         self.apply_mobile_phone_mode_overrides();
         self.update_tableau_overflow_hints();
         self.update_stats_label();
         self.mark_session_dirty();
         self.record_render_timing(render_started.elapsed());
+        startup_trace::mark_once("render:first-exit");
     }
 
     fn render_spider(&self) {
         let imp = self.imp();
         imp.stock_picture.set_visible(true);
-        imp.stock_label.set_visible(true);
+        imp.stock_column_box.set_visible(true);
+        imp.stock_label.set_visible(false);
         imp.stock_heading_box.set_visible(true);
         imp.stock_heading_label.set_label("Stock");
-        imp.waste_overlay.set_visible(true);
-        imp.waste_label.set_visible(true);
-        imp.waste_heading_box.set_visible(true);
+        imp.waste_overlay.set_visible(false);
+        imp.waste_column_box.set_visible(false);
+        imp.waste_label.set_visible(false);
+        imp.waste_heading_box.set_visible(false);
         imp.waste_heading_label.set_label("Waste");
-        imp.top_row_spacer_box.set_visible(true);
-        imp.stock_waste_foundation_spacer_box.set_visible(true);
+        imp.top_row_spacer_box.set_visible(false);
+        imp.stock_waste_foundation_spacer_box.set_visible(false);
         imp.selected_freecell.set(None);
-        imp.foundations_heading_box.set_visible(false);
-        imp.foundations_heading_label.set_label("Foundations");
-        imp.foundations_area_box.set_visible(false);
+        imp.foundations_heading_box.set_visible(true);
+        imp.foundations_heading_box.set_halign(gtk::Align::Start);
+        imp.foundations_heading_box.set_margin_start(0);
+        imp.foundations_heading_label.set_label("Completed Runs");
+        imp.foundations_heading_label.set_xalign(0.0);
+        imp.foundations_heading_label.set_halign(gtk::Align::Start);
+        imp.foundations_area_box.set_halign(gtk::Align::Start);
+        imp.foundations_area_box.set_margin_start(0);
+        imp.foundations_area_box.set_visible(true);
         let mode = self.active_game_mode();
         let caps = engine_for_mode(mode).capabilities();
         let spider = imp.game.borrow().spider().clone();
@@ -505,7 +685,8 @@ impl CardthropicWindow {
         imp.waste_label
             .set_label(&format!("{} runs", spider.completed_runs()));
 
-        let selected = (*imp.selected_run.borrow()).and_then(|run| {
+        let selected_snapshot = imp.selected_run.try_borrow().ok().and_then(|run| *run);
+        let selected = selected_snapshot.and_then(|run| {
             let len = spider.tableau().get(run.col).map(Vec::len)?;
             if run.start >= len {
                 return None;
@@ -515,7 +696,9 @@ impl CardthropicWindow {
                 .filter(|card| card.face_up)
                 .map(|_| run)
         });
-        *imp.selected_run.borrow_mut() = selected;
+        if let Ok(mut selected_run) = imp.selected_run.try_borrow_mut() {
+            *selected_run = selected;
+        }
         imp.waste_selected.set(false);
 
         self.render_card_images_spider(&spider);
@@ -573,9 +756,7 @@ impl CardthropicWindow {
         } else {
             String::new()
         };
-        if !status.is_empty() {
-            self.append_status_line(&status);
-        }
+        self.append_status_line(&status);
 
         self.apply_mobile_phone_mode_overrides();
         self.update_tableau_overflow_hints();
@@ -598,22 +779,33 @@ impl CardthropicWindow {
         self.note_current_seed_win_if_needed();
 
         imp.stock_picture.set_visible(false);
+        imp.stock_column_box.set_visible(false);
         imp.stock_label.set_visible(false);
         imp.stock_heading_box.set_visible(false);
         imp.waste_overlay.set_visible(true);
+        imp.waste_column_box.set_visible(true);
         imp.waste_label.set_visible(true);
         imp.waste_heading_box.set_visible(true);
         imp.waste_heading_label.set_label("Free Cells");
+        imp.foundations_heading_box.set_halign(gtk::Align::Start);
+        imp.foundations_heading_box.set_margin_start(8);
         imp.foundations_heading_label.set_label("Foundations");
+        imp.foundations_heading_label.set_xalign(0.0);
+        imp.foundations_heading_label.set_halign(gtk::Align::Start);
+        imp.foundations_area_box.set_halign(gtk::Align::Start);
+        imp.foundations_area_box.set_margin_start(8);
 
-        let selected = (*imp.selected_run.borrow()).and_then(|run| {
+        let selected_snapshot = imp.selected_run.try_borrow().ok().and_then(|run| *run);
+        let selected = selected_snapshot.and_then(|run| {
             let len = freecell.tableau().get(run.col).map(Vec::len)?;
             if run.start >= len {
                 return None;
             }
             Some(run)
         });
-        *imp.selected_run.borrow_mut() = selected;
+        if let Ok(mut selected_run) = imp.selected_run.try_borrow_mut() {
+            *selected_run = selected;
+        }
         imp.waste_selected.set(false);
 
         self.render_card_images_freecell(&freecell);
@@ -678,9 +870,7 @@ impl CardthropicWindow {
         } else {
             String::new()
         };
-        if !status.is_empty() {
-            self.append_status_line(&status);
-        }
+        self.append_status_line(&status);
 
         self.apply_mobile_phone_mode_overrides();
         self.update_tableau_overflow_hints();
@@ -749,48 +939,34 @@ impl CardthropicWindow {
     }
 
     pub(super) fn render_card_images(&self, game: &KlondikeGame) {
-        let imp = self.imp();
-
-        if !imp.deck_load_attempted.get() {
-            imp.deck_load_attempted.set(true);
-            let loaded = if let Some(settings) = Self::load_app_settings() {
-                let custom_svg = settings.string(SETTINGS_KEY_CUSTOM_CARD_SVG).to_string();
-                if custom_svg.trim().is_empty() {
-                    AngloDeck::load()
-                } else {
-                    AngloDeck::load_with_custom_normal_svg(&custom_svg)
-                }
-            } else {
-                AngloDeck::load()
-            };
-
-            match loaded {
-                Ok(deck) => {
-                    *imp.deck.borrow_mut() = Some(deck);
-                    *imp.deck_error.borrow_mut() = None;
-                }
-                Err(err) => {
-                    *imp.deck_error.borrow_mut() = Some(err);
-                }
-            }
+        startup_trace::mark_once("render:first-images-enter");
+        if !self.ensure_deck_ready() {
+            startup_trace::mark_once("render:first-images-exit");
+            return;
         }
-
+        let imp = self.imp();
         let deck_slot = imp.deck.borrow();
         let Some(deck) = deck_slot.as_ref() else {
+            startup_trace::mark_once("render:first-images-exit");
             return;
         };
 
+        startup_trace::mark_once("render:first-metrics-enter");
         self.update_tableau_metrics();
         let card_width = imp.card_width.get();
         let card_height = imp.card_height.get();
         let face_up_step = imp.face_up_step.get();
         let face_down_step = imp.face_down_step.get();
         let peek_active = imp.peek_active.get();
+        startup_trace::mark_once("render:first-metrics-exit");
 
+        startup_trace::mark_once("render:first-toprow-enter");
         self.configure_stock_waste_foundation_widgets(card_width, card_height);
         self.render_stock_picture(game, deck, card_width, card_height);
         self.render_waste_fan(game, deck, card_width, card_height);
         self.render_foundations_area(game, deck, card_width, card_height);
+        startup_trace::mark_once("render:first-toprow-exit");
+        startup_trace::mark_once("render:first-tableau-enter");
         self.render_tableau_columns(
             game,
             deck,
@@ -800,51 +976,39 @@ impl CardthropicWindow {
             face_down_step,
             peek_active,
         );
+        startup_trace::mark_once("render:first-tableau-exit");
+        startup_trace::mark_once("render:first-images-exit");
     }
 
     fn render_card_images_spider(&self, game: &SpiderGame) {
-        let imp = self.imp();
-
-        if !imp.deck_load_attempted.get() {
-            imp.deck_load_attempted.set(true);
-            let loaded = if let Some(settings) = Self::load_app_settings() {
-                let custom_svg = settings.string(SETTINGS_KEY_CUSTOM_CARD_SVG).to_string();
-                if custom_svg.trim().is_empty() {
-                    AngloDeck::load()
-                } else {
-                    AngloDeck::load_with_custom_normal_svg(&custom_svg)
-                }
-            } else {
-                AngloDeck::load()
-            };
-
-            match loaded {
-                Ok(deck) => {
-                    *imp.deck.borrow_mut() = Some(deck);
-                    *imp.deck_error.borrow_mut() = None;
-                }
-                Err(err) => {
-                    *imp.deck_error.borrow_mut() = Some(err);
-                }
-            }
+        startup_trace::mark_once("render:first-images-enter");
+        if !self.ensure_deck_ready() {
+            startup_trace::mark_once("render:first-images-exit");
+            return;
         }
-
+        let imp = self.imp();
         let deck_slot = imp.deck.borrow();
         let Some(deck) = deck_slot.as_ref() else {
+            startup_trace::mark_once("render:first-images-exit");
             return;
         };
 
+        startup_trace::mark_once("render:first-metrics-enter");
         self.update_tableau_metrics();
         let card_width = imp.card_width.get();
         let card_height = imp.card_height.get();
         let face_up_step = imp.face_up_step.get();
         let face_down_step = imp.face_down_step.get();
         let peek_active = imp.peek_active.get();
+        startup_trace::mark_once("render:first-metrics-exit");
 
+        startup_trace::mark_once("render:first-toprow-enter");
         self.configure_stock_waste_foundation_widgets(card_width, card_height);
         self.render_stock_picture_spider(game, deck, card_width, card_height);
-        self.render_waste_fan_spider();
+        self.render_waste_fan_spider(card_width, card_height);
         self.render_foundations_area_spider(game, deck, card_width, card_height);
+        startup_trace::mark_once("render:first-toprow-exit");
+        startup_trace::mark_once("render:first-tableau-enter");
         self.render_tableau_columns_spider(
             game,
             deck,
@@ -854,49 +1018,37 @@ impl CardthropicWindow {
             face_down_step,
             peek_active,
         );
+        startup_trace::mark_once("render:first-tableau-exit");
+        startup_trace::mark_once("render:first-images-exit");
     }
 
     fn render_card_images_freecell(&self, game: &FreecellGame) {
-        let imp = self.imp();
-
-        if !imp.deck_load_attempted.get() {
-            imp.deck_load_attempted.set(true);
-            let loaded = if let Some(settings) = Self::load_app_settings() {
-                let custom_svg = settings.string(SETTINGS_KEY_CUSTOM_CARD_SVG).to_string();
-                if custom_svg.trim().is_empty() {
-                    AngloDeck::load()
-                } else {
-                    AngloDeck::load_with_custom_normal_svg(&custom_svg)
-                }
-            } else {
-                AngloDeck::load()
-            };
-
-            match loaded {
-                Ok(deck) => {
-                    *imp.deck.borrow_mut() = Some(deck);
-                    *imp.deck_error.borrow_mut() = None;
-                }
-                Err(err) => {
-                    *imp.deck_error.borrow_mut() = Some(err);
-                }
-            }
+        startup_trace::mark_once("render:first-images-enter");
+        if !self.ensure_deck_ready() {
+            startup_trace::mark_once("render:first-images-exit");
+            return;
         }
-
+        let imp = self.imp();
         let deck_slot = imp.deck.borrow();
         let Some(deck) = deck_slot.as_ref() else {
+            startup_trace::mark_once("render:first-images-exit");
             return;
         };
 
+        startup_trace::mark_once("render:first-metrics-enter");
         self.update_tableau_metrics();
         let card_width = imp.card_width.get();
         let card_height = imp.card_height.get();
         let face_up_step = imp.face_up_step.get();
         let face_down_step = imp.face_down_step.get();
+        startup_trace::mark_once("render:first-metrics-exit");
 
+        startup_trace::mark_once("render:first-toprow-enter");
         self.configure_stock_waste_foundation_widgets(card_width, card_height);
         self.render_freecell_slots(game, deck, card_width, card_height);
         self.render_foundations_area_freecell(game, deck, card_width, card_height);
+        startup_trace::mark_once("render:first-toprow-exit");
+        startup_trace::mark_once("render:first-tableau-enter");
         self.render_tableau_columns_freecell(
             game,
             deck,
@@ -905,6 +1057,8 @@ impl CardthropicWindow {
             face_up_step,
             face_down_step,
         );
+        startup_trace::mark_once("render:first-tableau-exit");
+        startup_trace::mark_once("render:first-images-exit");
     }
 
     pub(super) fn set_picture_from_card(
@@ -937,23 +1091,31 @@ impl CardthropicWindow {
         gdk::Texture::for_pixbuf(&pixbuf)
     }
 
-    pub(super) fn foundation_pictures(&self) -> [gtk::Picture; 4] {
+    pub(super) fn foundation_pictures(&self) -> [gtk::Picture; 8] {
         let imp = self.imp();
         [
             imp.foundation_picture_1.get(),
             imp.foundation_picture_2.get(),
             imp.foundation_picture_3.get(),
             imp.foundation_picture_4.get(),
+            imp.foundation_picture_5.get(),
+            imp.foundation_picture_6.get(),
+            imp.foundation_picture_7.get(),
+            imp.foundation_picture_8.get(),
         ]
     }
 
-    pub(super) fn foundation_placeholders(&self) -> [gtk::Label; 4] {
+    pub(super) fn foundation_placeholders(&self) -> [gtk::Label; 8] {
         let imp = self.imp();
         [
             imp.foundation_placeholder_1.get(),
             imp.foundation_placeholder_2.get(),
             imp.foundation_placeholder_3.get(),
             imp.foundation_placeholder_4.get(),
+            imp.foundation_placeholder_5.get(),
+            imp.foundation_placeholder_6.get(),
+            imp.foundation_placeholder_7.get(),
+            imp.foundation_placeholder_8.get(),
         ]
     }
 
@@ -996,7 +1158,11 @@ impl CardthropicWindow {
     }
 
     fn append_status_line(&self, status: &str) {
-        let sanitized = self.sanitize_status_for_display(status);
+        let decorated = self.decorate_status_for_window(status);
+        if decorated.is_empty() {
+            return;
+        }
+        let sanitized = self.sanitize_status_for_display(&decorated);
         let imp = self.imp();
         if imp.status_last_appended.borrow().as_str() == sanitized {
             return;
@@ -1005,7 +1171,101 @@ impl CardthropicWindow {
         *imp.status_last_appended.borrow_mut() = sanitized.clone();
         self.append_status_history_only(&sanitized);
         imp.status_label.set_label(&sanitized);
-        imp.status_label.set_tooltip_text(Some(&sanitized));
+        if self.status_performance_mode_active() {
+            imp.status_label.set_tooltip_text(None);
+        } else {
+            imp.status_label.set_tooltip_text(Some(&sanitized));
+        }
+    }
+
+    fn status_history_window_size(&self) -> (i32, i32) {
+        const DEFAULT_WIDTH: i32 = 760;
+        const DEFAULT_HEIGHT: i32 = 420;
+        const MIN_WIDTH: i32 = 360;
+        const MIN_HEIGHT: i32 = 240;
+
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        };
+        if !schema.has_key(SETTINGS_KEY_STATUS_HISTORY_WIDTH)
+            || !schema.has_key(SETTINGS_KEY_STATUS_HISTORY_HEIGHT)
+        {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        }
+
+        (
+            settings
+                .int(SETTINGS_KEY_STATUS_HISTORY_WIDTH)
+                .max(MIN_WIDTH),
+            settings
+                .int(SETTINGS_KEY_STATUS_HISTORY_HEIGHT)
+                .max(MIN_HEIGHT),
+        )
+    }
+
+    fn status_history_maximized(&self) -> bool {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return false;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return false;
+        };
+        if !schema.has_key(SETTINGS_KEY_STATUS_HISTORY_MAXIMIZED) {
+            return false;
+        }
+        settings.boolean(SETTINGS_KEY_STATUS_HISTORY_MAXIMIZED)
+    }
+
+    fn persist_status_history_maximized(&self, maximized: bool) {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_STATUS_HISTORY_MAXIMIZED) {
+            return;
+        }
+        if settings.boolean(SETTINGS_KEY_STATUS_HISTORY_MAXIMIZED) != maximized {
+            let _ = settings.set_boolean(SETTINGS_KEY_STATUS_HISTORY_MAXIMIZED, maximized);
+        }
+    }
+
+    fn persist_status_history_window_size(&self, dialog: &gtk::Window) {
+        const MIN_WIDTH: i32 = 360;
+        const MIN_HEIGHT: i32 = 240;
+
+        if dialog.is_maximized() {
+            return;
+        }
+
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_STATUS_HISTORY_WIDTH)
+            || !schema.has_key(SETTINGS_KEY_STATUS_HISTORY_HEIGHT)
+        {
+            return;
+        }
+
+        let width = dialog.width().max(MIN_WIDTH);
+        let height = dialog.height().max(MIN_HEIGHT);
+        if settings.int(SETTINGS_KEY_STATUS_HISTORY_WIDTH) != width {
+            let _ = settings.set_int(SETTINGS_KEY_STATUS_HISTORY_WIDTH, width);
+        }
+        if settings.int(SETTINGS_KEY_STATUS_HISTORY_HEIGHT) != height {
+            let _ = settings.set_int(SETTINGS_KEY_STATUS_HISTORY_HEIGHT, height);
+        }
     }
 
     pub(super) fn show_status_history_dialog(&self) {
@@ -1022,20 +1282,53 @@ impl CardthropicWindow {
             .map(String::as_str)
             .collect::<Vec<_>>()
             .join("\n");
+        let (saved_width, saved_height) = self.status_history_window_size();
+        let saved_maximized = self.status_history_maximized();
 
         let dialog = gtk::Window::builder()
             .title("Status History")
             .modal(false)
-            .default_width(760)
-            .default_height(420)
+            .default_width(saved_width)
+            .default_height(saved_height)
+            .transient_for(self)
             .build();
-        if let Some(app) = self.application() {
-            dialog.set_application(Some(&app));
-        }
         dialog.set_resizable(true);
         dialog.set_deletable(true);
-        dialog.set_hide_on_close(true);
+        dialog.set_hide_on_close(false);
         dialog.set_destroy_with_parent(true);
+        dialog.connect_close_request(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |dialog| {
+                let maximized = dialog.is_maximized();
+                window.persist_status_history_maximized(maximized);
+                window.persist_status_history_window_size(dialog);
+                *window.imp().status_history_dialog.borrow_mut() = None;
+                *window.imp().status_history_buffer.borrow_mut() = None;
+                glib::Propagation::Proceed
+            }
+        ));
+        if saved_maximized {
+            dialog.maximize();
+        }
+        let dialog_keys = gtk::EventControllerKey::new();
+        dialog_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        dialog_keys.connect_key_pressed(glib::clone!(
+            #[weak]
+            dialog,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, _| {
+                if key == gdk::Key::Escape {
+                    dialog.close();
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            }
+        ));
+        dialog.add_controller(dialog_keys);
 
         let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
         root.set_margin_top(10);

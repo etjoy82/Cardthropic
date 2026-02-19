@@ -19,6 +19,7 @@ pub struct SpiderGame {
     stock: Vec<Card>,
     tableau: [Vec<Card>; 10],
     completed_runs: usize,
+    completed_run_suits: Vec<Suit>,
 }
 
 impl SpiderGame {
@@ -36,6 +37,7 @@ impl SpiderGame {
             stock: Vec::new(),
             tableau: std::array::from_fn(|_| Vec::new()),
             completed_runs: 0,
+            completed_run_suits: Vec::new(),
         };
 
         let mut draw = deck.into_iter();
@@ -70,6 +72,10 @@ impl SpiderGame {
 
     pub fn completed_runs(&self) -> usize {
         self.completed_runs
+    }
+
+    pub fn completed_run_suits(&self) -> &[Suit] {
+        &self.completed_run_suits
     }
 
     pub fn is_won(&self) -> bool {
@@ -193,6 +199,10 @@ impl SpiderGame {
         let parts = [
             format!("mode={}", self.suit_mode.session_tag()),
             format!("done={}", self.completed_runs),
+            format!(
+                "runs={}",
+                encode_spider_completed_run_suits(&self.completed_run_suits)
+            ),
             format!("stock={}", encode_spider_pile(&self.stock)),
             format!("t0={}", encode_spider_pile(&self.tableau[0])),
             format!("t1={}", encode_spider_pile(&self.tableau[1])),
@@ -220,6 +230,10 @@ impl SpiderGame {
         if completed_runs > 8 {
             return None;
         }
+        let completed_run_suits = match fields.get("runs") {
+            Some(encoded) => decode_spider_completed_run_suits(encoded, completed_runs)?,
+            None => vec![Suit::Spades; completed_runs],
+        };
 
         let stock = decode_spider_pile(fields.get("stock")?)?;
         let tableau = [
@@ -245,6 +259,7 @@ impl SpiderGame {
             stock,
             tableau,
             completed_runs,
+            completed_run_suits,
         })
     }
 
@@ -256,13 +271,14 @@ impl SpiderGame {
 
     fn remove_completed_runs(&mut self) {
         for col in 0..self.tableau.len() {
-            while has_complete_suited_run(&self.tableau[col]) {
+            while let Some(suit) = complete_suited_run_suit(&self.tableau[col]) {
                 let new_len = self.tableau[col]
                     .len()
                     .checked_sub(13)
                     .expect("complete run requires at least 13 cards");
                 self.tableau[col].truncate(new_len);
                 self.completed_runs += 1;
+                self.completed_run_suits.push(suit);
                 self.flip_top_if_needed(col);
             }
         }
@@ -322,6 +338,7 @@ impl SpiderGame {
             stock,
             tableau,
             completed_runs,
+            completed_run_suits: vec![Suit::Spades; completed_runs],
         }
     }
 }
@@ -405,24 +422,29 @@ fn is_descending_run(cards: &[Card]) -> bool {
     })
 }
 
-fn has_complete_suited_run(pile: &[Card]) -> bool {
+fn complete_suited_run_suit(pile: &[Card]) -> Option<Suit> {
     if pile.len() < 13 {
-        return false;
+        return None;
     }
 
     let run = &pile[pile.len() - 13..];
     let Some(first) = run.first().copied() else {
-        return false;
+        return None;
     };
     if first.rank != 13 || !first.face_up {
-        return false;
+        return None;
     }
 
-    run.windows(2).all(|pair| {
+    let valid = run.windows(2).all(|pair| {
         let a = pair[0];
         let b = pair[1];
         a.face_up && b.face_up && a.suit == b.suit && a.rank == b.rank + 1
-    }) && run.last().is_some_and(|card| card.rank == 1)
+    }) && run.last().is_some_and(|card| card.rank == 1);
+    if valid {
+        Some(first.suit)
+    } else {
+        None
+    }
 }
 
 fn encode_spider_pile(cards: &[Card]) -> String {
@@ -479,4 +501,48 @@ fn decode_spider_pile(encoded: &str) -> Option<Vec<Card>> {
         });
     }
     Some(cards)
+}
+
+fn encode_spider_completed_run_suits(suits: &[Suit]) -> String {
+    if suits.is_empty() {
+        return "-".to_string();
+    }
+
+    suits
+        .iter()
+        .map(|suit| match suit {
+            Suit::Clubs => 'C',
+            Suit::Diamonds => 'D',
+            Suit::Hearts => 'H',
+            Suit::Spades => 'S',
+        })
+        .collect()
+}
+
+fn decode_spider_completed_run_suits(encoded: &str, completed_runs: usize) -> Option<Vec<Suit>> {
+    if encoded == "-" {
+        return if completed_runs == 0 {
+            Some(Vec::new())
+        } else {
+            None
+        };
+    }
+
+    let mut suits = Vec::with_capacity(encoded.len());
+    for ch in encoded.chars() {
+        let suit = match ch {
+            'C' => Suit::Clubs,
+            'D' => Suit::Diamonds,
+            'H' => Suit::Hearts,
+            'S' => Suit::Spades,
+            _ => return None,
+        };
+        suits.push(suit);
+    }
+
+    if suits.len() != completed_runs {
+        return None;
+    }
+
+    Some(suits)
 }

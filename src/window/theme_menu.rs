@@ -10,6 +10,95 @@ impl CardthropicWindow {
         }
     }
 
+    fn theme_presets_window_size(&self, default_height: i32) -> (i32, i32) {
+        const DEFAULT_WIDTH: i32 = 620;
+        const MIN_WIDTH: i32 = 420;
+        const MIN_HEIGHT: i32 = 320;
+
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return (DEFAULT_WIDTH, default_height.max(MIN_HEIGHT));
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return (DEFAULT_WIDTH, default_height.max(MIN_HEIGHT));
+        };
+        if !schema.has_key(SETTINGS_KEY_THEME_PRESETS_WIDTH)
+            || !schema.has_key(SETTINGS_KEY_THEME_PRESETS_HEIGHT)
+        {
+            return (DEFAULT_WIDTH, default_height.max(MIN_HEIGHT));
+        }
+
+        (
+            settings
+                .int(SETTINGS_KEY_THEME_PRESETS_WIDTH)
+                .max(MIN_WIDTH),
+            settings
+                .int(SETTINGS_KEY_THEME_PRESETS_HEIGHT)
+                .max(MIN_HEIGHT),
+        )
+    }
+
+    fn theme_presets_maximized(&self) -> bool {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return false;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return false;
+        };
+        if !schema.has_key(SETTINGS_KEY_THEME_PRESETS_MAXIMIZED) {
+            return false;
+        }
+        settings.boolean(SETTINGS_KEY_THEME_PRESETS_MAXIMIZED)
+    }
+
+    fn persist_theme_presets_maximized(&self, maximized: bool) {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_THEME_PRESETS_MAXIMIZED) {
+            return;
+        }
+        if settings.boolean(SETTINGS_KEY_THEME_PRESETS_MAXIMIZED) != maximized {
+            let _ = settings.set_boolean(SETTINGS_KEY_THEME_PRESETS_MAXIMIZED, maximized);
+        }
+    }
+
+    fn persist_theme_presets_window_size(&self, dialog: &gtk::Window) {
+        const MIN_WIDTH: i32 = 420;
+        const MIN_HEIGHT: i32 = 320;
+
+        if dialog.is_maximized() {
+            return;
+        }
+
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_THEME_PRESETS_WIDTH)
+            || !schema.has_key(SETTINGS_KEY_THEME_PRESETS_HEIGHT)
+        {
+            return;
+        }
+
+        let width = dialog.width().max(MIN_WIDTH);
+        let height = dialog.height().max(MIN_HEIGHT);
+        if settings.int(SETTINGS_KEY_THEME_PRESETS_WIDTH) != width {
+            let _ = settings.set_int(SETTINGS_KEY_THEME_PRESETS_WIDTH, width);
+        }
+        if settings.int(SETTINGS_KEY_THEME_PRESETS_HEIGHT) != height {
+            let _ = settings.set_int(SETTINGS_KEY_THEME_PRESETS_HEIGHT, height);
+        }
+    }
+
     fn normalize_pasted_svg(input: &str) -> Result<String, String> {
         let trimmed = input.trim();
         if trimmed.is_empty() {
@@ -62,6 +151,7 @@ impl CardthropicWindow {
                                 settings.set_string(SETTINGS_KEY_CUSTOM_CARD_SVG, &normalized_svg);
                         }
                         window.imp().deck_load_attempted.set(false);
+                        window.imp().deck_load_in_progress.set(false);
                         *window.imp().deck.borrow_mut() = None;
                         *window.imp().deck_error.borrow_mut() = None;
                         window.invalidate_card_render_cache();
@@ -93,6 +183,7 @@ impl CardthropicWindow {
             let _ = settings.set_string(SETTINGS_KEY_CUSTOM_CARD_SVG, "");
         }
         self.imp().deck_load_attempted.set(false);
+        self.imp().deck_load_in_progress.set(false);
         *self.imp().deck.borrow_mut() = None;
         *self.imp().deck_error.borrow_mut() = None;
         self.invalidate_card_render_cache();
@@ -121,16 +212,18 @@ impl CardthropicWindow {
         let row_count = (Self::userstyle_preset_names().len().saturating_sub(1)) as i32;
         let estimated_height = 240 + (row_count * 26);
         let dialog_height = estimated_height.clamp(460, 820);
+        let (saved_width, saved_height) = self.theme_presets_window_size(dialog_height);
+        let saved_maximized = self.theme_presets_maximized();
 
         let palette_window = gtk::Window::builder()
             .title("Theme Presets")
             .resizable(true)
-            .default_width(620)
-            .default_height(dialog_height)
+            .default_width(saved_width)
+            .default_height(saved_height)
             .build();
         palette_window.set_transient_for(Some(self));
         palette_window.set_modal(false);
-        palette_window.set_hide_on_close(true);
+        palette_window.set_hide_on_close(false);
         palette_window.set_destroy_with_parent(true);
 
         let theme_label = gtk::Label::new(Some("Theme Presets"));
@@ -531,11 +624,33 @@ impl CardthropicWindow {
             self,
             #[upgrade_or]
             glib::Propagation::Proceed,
-            move |_| {
+            move |palette_window| {
+                let maximized = palette_window.is_maximized();
+                window.persist_theme_presets_maximized(maximized);
+                window.persist_theme_presets_window_size(palette_window);
                 *window.imp().theme_presets_window.borrow_mut() = None;
                 glib::Propagation::Proceed
             }
         ));
+        if saved_maximized {
+            palette_window.maximize();
+        }
+        let palette_keys = gtk::EventControllerKey::new();
+        palette_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        palette_keys.connect_key_pressed(glib::clone!(
+            #[weak]
+            palette_window,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, _| {
+                if key == gdk::Key::Escape {
+                    palette_window.close();
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            }
+        ));
+        palette_window.add_controller(palette_keys);
         *self.imp().theme_presets_window.borrow_mut() = Some(palette_window.clone());
 
         color_menu.connect_clicked(glib::clone!(

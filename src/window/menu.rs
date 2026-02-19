@@ -13,7 +13,6 @@ impl CardthropicWindow {
         let section = gio::Menu::new();
 
         let klondike = gio::Menu::new();
-        let current_draw = self.current_klondike_draw_mode();
         for (draw_mode, action) in [
             (DrawMode::One, "win.mode-klondike-deal-1"),
             (DrawMode::Two, "win.mode-klondike-deal-2"),
@@ -21,40 +20,25 @@ impl CardthropicWindow {
             (DrawMode::Four, "win.mode-klondike-deal-4"),
             (DrawMode::Five, "win.mode-klondike-deal-5"),
         ] {
-            let marker = if draw_mode == current_draw {
-                "● "
-            } else {
-                ""
-            };
-            klondike.append(
-                Some(&format!("{marker}Deal {}", draw_mode.count())),
-                Some(action),
-            );
+            klondike.append(Some(&format!("Deal {}", draw_mode.count())), Some(action));
         }
         section.append_submenu(Some("Klondike"), &klondike);
 
         let spider = gio::Menu::new();
-        let current_suit = self.current_spider_suit_mode();
         for (suit_mode, action) in [
             (SpiderSuitMode::One, "win.mode-spider-suit-1"),
             (SpiderSuitMode::Two, "win.mode-spider-suit-2"),
             (SpiderSuitMode::Three, "win.mode-spider-suit-3"),
             (SpiderSuitMode::Four, "win.mode-spider-suit-4"),
         ] {
-            let marker = if suit_mode == current_suit {
-                "● "
-            } else {
-                ""
-            };
             spider.append(
-                Some(&format!("{marker}Suit {}", suit_mode.suit_count())),
+                Some(&format!("Suit {}", suit_mode.suit_count())),
                 Some(action),
             );
         }
         section.append_submenu(Some("Spider"), &spider);
 
         let freecell = gio::Menu::new();
-        let current_card_count = self.current_freecell_card_count_mode();
         for (card_count_mode, action) in [
             (
                 FreecellCardCountMode::TwentySix,
@@ -66,16 +50,8 @@ impl CardthropicWindow {
             ),
             (FreecellCardCountMode::FiftyTwo, "win.mode-freecell-card-52"),
         ] {
-            let marker = if card_count_mode == current_card_count {
-                "● "
-            } else {
-                ""
-            };
             freecell.append(
-                Some(&format!(
-                    "{marker}Card Count {}",
-                    card_count_mode.card_count()
-                )),
+                Some(&format!("Card Count {}", card_count_mode.card_count())),
                 Some(action),
             );
         }
@@ -119,6 +95,10 @@ impl CardthropicWindow {
             Some("win.robot-auto-new-game-on-loss"),
         );
         automation.append(Some("Ludicrous Speed"), Some("win.ludicrous-speed"));
+        automation.append(
+            Some("Enable App Auto-Close on Runaway Memory State"),
+            Some("win.memory-guard-toggle"),
+        );
         automation.append(Some("Robot Debug Mode"), Some("win.robot-debug-toggle"));
         automation.append(
             Some("Strict Debug Invariants"),
@@ -131,6 +111,7 @@ impl CardthropicWindow {
         section.append_submenu(Some("Automation"), &automation);
 
         let view_help = gio::Menu::new();
+        view_help.append(Some("New Window"), Some("app.new-window"));
         view_help.append(Some("Enable HUD"), Some("win.enable-hud"));
         view_help.append(Some("Fullscreen"), Some("win.toggle-fullscreen"));
         view_help.append(Some("Theme Presets"), Some("win.open-theme-presets"));
@@ -138,6 +119,7 @@ impl CardthropicWindow {
         view_help.append(Some("APM Graph"), Some("win.apm-graph"));
         section.append_submenu(Some("View"), &view_help);
 
+        section.append(Some("Command Palette"), Some("win.command-search"));
         section.append(Some("Help"), Some("win.help"));
         section.append(Some("About Cardthropic"), Some("app.about"));
         section.append(Some("Quit"), Some("app.quit"));

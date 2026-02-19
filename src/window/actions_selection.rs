@@ -120,7 +120,8 @@ impl CardthropicWindow {
         let imp = self.imp();
         let idx = idx.clamp(0, 3);
 
-        if let Some(selected) = *imp.selected_run.borrow() {
+        let selected_run = { *imp.selected_run.borrow() };
+        if let Some(selected) = selected_run {
             let is_top =
                 boundary::tableau_len(&imp.game.borrow(), GameMode::Freecell, selected.col)
                     .map(|len| selected.start + 1 == len)

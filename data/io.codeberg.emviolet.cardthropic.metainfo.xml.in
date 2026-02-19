@@ -61,6 +61,12 @@
     <content_attribute id="social-location">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.9.5-beta" date="2026-02-18">
+      <description>
+        <p>Documentation and maintainer release tooling continue to be refined for the beta testbed workflow.</p>
+        <p>Release helper scripts now accept SemVer prerelease identifiers (for example, 0.9.5-beta).</p>
+      </description>
+    </release>
     <release version="0.9.0-beta.1" date="2026-02-18">
       <description>
         <p>Added an automation toggle to control auto-starting a new game after loss, with settings persistence and shortcut/menu wiring.</p>

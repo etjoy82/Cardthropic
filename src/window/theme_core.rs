@@ -232,6 +232,38 @@ impl CardthropicWindow {
             self.apply_interface_emoji_font(Some(interface_font.as_str()), false);
         }
 
+        let memory_guard_enabled = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| settings.boolean(SETTINGS_KEY_MEMORY_GUARD_ENABLED))
+                .unwrap_or(false)
+        };
+        let memory_guard_soft_limit_mib = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .and_then(|settings| {
+                    u64::try_from(settings.int(SETTINGS_KEY_MEMORY_GUARD_SOFT_LIMIT_MIB)).ok()
+                })
+                .unwrap_or(1536)
+        };
+        let memory_guard_hard_limit_mib = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .and_then(|settings| {
+                    u64::try_from(settings.int(SETTINGS_KEY_MEMORY_GUARD_HARD_LIMIT_MIB)).ok()
+                })
+                .unwrap_or(2048)
+        };
+        self.configure_memory_guard(
+            memory_guard_enabled,
+            memory_guard_soft_limit_mib,
+            memory_guard_hard_limit_mib,
+        );
+        self.set_memory_guard_enabled(memory_guard_enabled, false, false);
+
         let spider_suit_mode = {
             let settings = imp.settings.borrow().clone();
             settings

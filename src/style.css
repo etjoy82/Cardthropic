@@ -148,6 +148,14 @@
   opacity: 0.8;
 }
 
+.command-search-row {
+  font-size: 0.77em;
+}
+
+.command-search-action-suffix {
+  opacity: 0.62;
+}
+
 entry.seed-winnable {
   background-color: alpha(#2ecc71, 0.22);
   border-color: alpha(#2ecc71, 0.85);

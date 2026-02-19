@@ -68,10 +68,6 @@ pub fn waste_fan_step(card_width: i32) -> i32 {
     (card_width / 6).clamp(8, 22)
 }
 
-pub fn foundation_group_width(card_width: i32) -> i32 {
-    (card_width * 4) + (8 * 3)
-}
-
 pub fn waste_overlay_width(card_width: i32) -> i32 {
     card_width + (waste_fan_step(card_width) * 4)
 }

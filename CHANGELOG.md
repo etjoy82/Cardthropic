@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Documentation and maintainer release tooling continue to be refined for the beta testbed workflow.
 
+
+## [0.9.5-beta] - 2026-02-18
+
+### Changed
+- Documentation and maintainer release tooling continue to be refined for the beta testbed workflow.
+- Release helper scripts now accept SemVer prerelease identifiers (for example, 0.9.5-beta).
+
 ## [0.9.0-beta.1] - 2026-02-18
 
 ### Added

@@ -7,14 +7,14 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/release/finalize-release-notes.sh --version <x.y.z> --note "<text>" [--note "<text>" ...] [--dry-run]
+  scripts/release/finalize-release-notes.sh --version <semver> --note "<text>" [--note "<text>" ...] [--dry-run]
 
 Behavior:
   - Replaces the placeholder TODO bullet in CHANGELOG.md for the target version
   - Replaces the AppStream <description> block for the same version with <p> entries
 
 Options:
-  --version <x.y.z>  Required release version
+  --version <semver> Required release version (example: 0.9.5 or 0.9.5-beta)
   --note "<text>"    Release note text (repeat for multiple items)
   --dry-run          Print planned changes without writing files
   -h, --help         Show this help
@@ -75,6 +75,11 @@ done
 if [[ -z "${VERSION}" ]]; then
   echo "--version is required." >&2
   usage
+  exit 1
+fi
+semver_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+if [[ ! "${VERSION}" =~ ${semver_re} ]]; then
+  echo "Version must be SemVer (example: 0.6.0 or 0.6.0-beta.1)." >&2
   exit 1
 fi
 if [[ "${#NOTES[@]}" -eq 0 ]]; then

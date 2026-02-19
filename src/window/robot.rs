@@ -5,6 +5,7 @@ use crate::engine::freecell_planner::{
 };
 use crate::engine::seed_ops;
 use crate::window::hint_core::FreecellHintAction;
+use crate::winnability;
 
 impl CardthropicWindow {
     const ROBOT_STALL_LIMIT: u32 = 10;
@@ -614,6 +615,46 @@ impl CardthropicWindow {
         false
     }
 
+    fn robot_track_spider_action_cycle_and_mark_loss(
+        &self,
+        hint_move: HintMove,
+        solver_source: &str,
+    ) -> bool {
+        if self.active_game_mode() != GameMode::Spider {
+            return false;
+        }
+
+        let detected = {
+            let mut recent = self.imp().robot_recent_action_signatures.borrow_mut();
+            recent.push_back(winnability::spider_solver_move_signature(hint_move));
+            while recent.len() > 128 {
+                recent.pop_front();
+            }
+            let recent_slice = recent.make_contiguous();
+            winnability::spider_solver_detect_repeating_tail_cycle(recent_slice)
+        };
+
+        let repeats = detected.map(|(_period, blocks)| blocks as u32).unwrap_or(0);
+        self.imp().robot_action_cycle_streak.set(repeats);
+        if let Some((period, blocks)) = detected {
+            self.emit_robot_status(
+                "running",
+                "lost",
+                "spider repeated-move cycle threshold reached; treating state as lost",
+                Some(&format!(
+                    "same {period}-move tail repeated {blocks} times (limit > {})",
+                    winnability::SPIDER_SOLVER_REPEAT_SEQUENCE_LIMIT
+                )),
+                None,
+                Some(false),
+                solver_source,
+            );
+            self.render();
+            return true;
+        }
+        false
+    }
+
     pub(super) fn freecell_action_cycle_signature(action: FreecellHintAction) -> String {
         match action {
             FreecellHintAction::TableauToFoundation { src } => {
@@ -1021,6 +1062,24 @@ impl CardthropicWindow {
                 .get()
                 .saturating_add(1);
             imp.robot_moves_since_foundation_progress.set(drought);
+            if self.active_game_mode() == GameMode::Spider
+                && drought >= winnability::SPIDER_SOLVER_STAGNATION_MOVE_LIMIT as u32
+            {
+                self.emit_robot_status(
+                    "running",
+                    "lost",
+                    "spider stagnation threshold reached; treating state as lost",
+                    Some(&format!(
+                        "no completed Spider run in {} moves",
+                        winnability::SPIDER_SOLVER_STAGNATION_MOVE_LIMIT
+                    )),
+                    None,
+                    Some(false),
+                    "search",
+                );
+                self.render();
+                return true;
+            }
             if self.active_game_mode() == GameMode::Freecell
                 && drought >= Self::ROBOT_FOUNDATION_DROUGHT_LIMIT
             {
@@ -1047,6 +1106,11 @@ impl CardthropicWindow {
         }
         if progressed {
             imp.robot_stall_streak.set(0);
+            return false;
+        }
+        if self.active_game_mode() == GameMode::Spider {
+            // Spider uses shared solver stagnation (completed-run drought) as
+            // the authoritative anti-loop loss rule.
             return false;
         }
 
@@ -1189,6 +1253,53 @@ impl CardthropicWindow {
             .saturating_add(self.imp().robot_losses.get())
     }
 
+    fn robot_high_throughput_mode_active(&self) -> bool {
+        let imp = self.imp();
+        imp.robot_mode_running.get()
+            && imp.robot_ludicrous_enabled.get()
+            && imp.robot_forever_enabled.get()
+            && imp.robot_auto_new_game_on_loss.get()
+    }
+
+    fn robot_benchmark_dump_interval_current(&self) -> u32 {
+        if self.robot_high_throughput_mode_active() {
+            250
+        } else {
+            ROBOT_BENCHMARK_DUMP_INTERVAL
+        }
+    }
+
+    fn should_render_after_robot_move(&self) -> bool {
+        if self.active_game_mode() == GameMode::Klondike
+            && self.robot_high_throughput_mode_active()
+            && !self.imp().robot_debug_enabled.get()
+        {
+            return self.imp().robot_moves_applied.get() % 2 == 0;
+        }
+        true
+    }
+
+    fn should_publish_robot_status(
+        &self,
+        state: &str,
+        event: &str,
+        move_changed: Option<bool>,
+    ) -> bool {
+        if !self.robot_high_throughput_mode_active() || self.imp().robot_debug_enabled.get() {
+            return true;
+        }
+        if state != "running" {
+            return true;
+        }
+        if event == "move_applied" {
+            return true;
+        }
+        if move_changed == Some(true) || event == "move_applied" {
+            return self.imp().robot_moves_applied.get() % 12 == 0;
+        }
+        matches!(event, "reseed" | "won" | "lost")
+    }
+
     fn robot_benchmark_summary_line(&self, trigger: &str) -> String {
         let wins = self.imp().robot_wins.get();
         let losses = self.imp().robot_losses.get();
@@ -1220,7 +1331,8 @@ impl CardthropicWindow {
 
     fn maybe_emit_periodic_benchmark_dump(&self, trigger: &str) {
         let total = self.robot_total_runs();
-        if total == 0 || total % ROBOT_BENCHMARK_DUMP_INTERVAL != 0 {
+        let interval = self.robot_benchmark_dump_interval_current();
+        if total == 0 || total % interval != 0 {
             return;
         }
         if self.imp().robot_last_benchmark_dump_total.get() == total {
@@ -1242,7 +1354,9 @@ impl CardthropicWindow {
             )
         };
         *self.imp().status_override.borrow_mut() = Some(status);
-        self.render();
+        if !(self.robot_high_throughput_mode_active() && !self.imp().robot_debug_enabled.get()) {
+            self.render();
+        }
     }
 
     pub(super) fn copy_benchmark_snapshot(&self) {
@@ -1333,6 +1447,52 @@ impl CardthropicWindow {
             .replace('\n', "\\n")
     }
 
+    fn spider_suited_edge_count(spider: &crate::game::SpiderGame) -> usize {
+        spider
+            .tableau()
+            .iter()
+            .map(|col| {
+                col.windows(2)
+                    .filter(|pair| {
+                        let a = pair[0];
+                        let b = pair[1];
+                        a.face_up && b.face_up && a.suit == b.suit && a.rank == b.rank + 1
+                    })
+                    .count()
+            })
+            .sum()
+    }
+
+    fn spider_max_face_up_tail_run(spider: &crate::game::SpiderGame) -> usize {
+        spider
+            .tableau()
+            .iter()
+            .map(|col| col.iter().rev().take_while(|card| card.face_up).count())
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn spider_tail_cycle_hint_fields(&self) -> String {
+        let recent = self.imp().robot_recent_action_signatures.borrow();
+        if recent.is_empty() {
+            return " spider_tail_cycle_period=na spider_tail_cycle_blocks=na spider_last_sig=na"
+                .to_string();
+        }
+        let snapshot: Vec<String> = recent.iter().cloned().collect();
+        let cycle = winnability::spider_solver_detect_repeating_tail_cycle(&snapshot);
+        let last_sig = snapshot
+            .last()
+            .map(|s| Self::robot_quote(s))
+            .unwrap_or_else(|| "na".to_string());
+        let (period, blocks) = cycle.map_or(("na".to_string(), "na".to_string()), |(p, b)| {
+            (p.to_string(), b.to_string())
+        });
+        format!(
+            " spider_tail_cycle_period={} spider_tail_cycle_blocks={} spider_last_sig={}",
+            period, blocks, last_sig
+        )
+    }
+
     fn robot_debug_tail(&self) -> String {
         if !self.imp().robot_debug_enabled.get() {
             return String::new();
@@ -1356,10 +1516,36 @@ impl CardthropicWindow {
             )
         };
         let cpu_pct = self.robot_cpu_pct_sample().unwrap_or(0.0);
-        format!(
+        let mut tail = format!(
             " state_hash={} scripted_enabled={} scripted_ready={} scripted_remaining={} cpu_pct={:.1}",
             state_hash, scripted_enabled, scripted_ready, scripted_remaining, cpu_pct
-        )
+        );
+        if mode == GameMode::Spider {
+            let game = self.imp().game.borrow();
+            let spider = game.spider();
+            let stock_cards = spider.stock_len();
+            let stock_deals_left = stock_cards / 10;
+            let suited_edges = Self::spider_suited_edge_count(spider);
+            let max_tail_run = Self::spider_max_face_up_tail_run(spider);
+            let drought = self.imp().robot_moves_since_foundation_progress.get();
+            let stall_streak = self.imp().robot_stall_streak.get();
+            let action_cycle_streak = self.imp().robot_action_cycle_streak.get();
+            let hash_cycle_period = self.imp().robot_hash_oscillation_period.get();
+            let hash_cycle_streak = self.imp().robot_hash_oscillation_streak.get();
+            tail.push_str(&format!(
+                " spider_stock_deals_left={} spider_suited_edges={} spider_max_tail_run={} spider_drought_moves={} spider_stall_streak={} spider_action_cycle_streak={} spider_hash_cycle_period={} spider_hash_cycle_streak={}",
+                stock_deals_left,
+                suited_edges,
+                max_tail_run,
+                drought,
+                stall_streak,
+                action_cycle_streak,
+                hash_cycle_period,
+                hash_cycle_streak
+            ));
+            tail.push_str(&self.spider_tail_cycle_hint_fields());
+        }
+        tail
     }
 
     fn robot_progress_fields(&self) -> String {
@@ -1623,6 +1809,9 @@ impl CardthropicWindow {
         move_changed: Option<bool>,
         solver_source: &str,
     ) {
+        if !self.should_publish_robot_status(state, event, move_changed) {
+            return;
+        }
         let deals_tried = self.imp().robot_deals_tried.get();
         let moves_applied = self.imp().robot_moves_applied.get();
         let outcome = self.robot_outcome_fields();
@@ -1901,8 +2090,16 @@ impl CardthropicWindow {
                         &format!("solver {desc}"),
                         "scripted",
                     );
-                    self.render();
-                    true
+                    if mode == GameMode::Spider
+                        && self.robot_track_spider_action_cycle_and_mark_loss(hint_move, "scripted")
+                    {
+                        false
+                    } else {
+                        if self.should_render_after_robot_move() {
+                            self.render();
+                        }
+                        true
+                    }
                 } else {
                     self.imp().robot_playback.borrow_mut().clear_scripted_line();
                     self.stop_robot_mode_with_message(
@@ -2383,8 +2580,17 @@ impl CardthropicWindow {
                     if changed {
                         *self.imp().selected_run.borrow_mut() = None;
                         self.record_robot_move_and_maybe_pulse(&move_fields, &desc, "search");
-                        self.render();
-                        true
+                        if mode == GameMode::Spider
+                            && self
+                                .robot_track_spider_action_cycle_and_mark_loss(hint_move, "search")
+                        {
+                            false
+                        } else {
+                            if self.should_render_after_robot_move() {
+                                self.render();
+                            }
+                            true
+                        }
                     } else {
                         self.emit_robot_status(
                             "running",
@@ -2456,17 +2662,19 @@ impl CardthropicWindow {
             let _ = self.handle_robot_win();
             return;
         }
-        if moved && mode == GameMode::Freecell {
+        if moved {
             let cooldown = self.imp().robot_freecell_planner_cooldown_ticks.get();
-            if cooldown > 0 {
+            if mode == GameMode::Freecell && cooldown > 0 {
                 self.imp()
                     .robot_freecell_planner_cooldown_ticks
                     .set(cooldown.saturating_sub(1));
             }
-            self.note_current_state_for_hint_cycle();
-            self.robot_mark_seen_state(self.current_game_hash());
-            if self.robot_track_hash_oscillation_and_mark_loss("search") {
-                moved = false;
+            if mode == GameMode::Freecell {
+                self.note_current_state_for_hint_cycle();
+                self.robot_mark_seen_state(self.current_game_hash());
+                if self.robot_track_hash_oscillation_and_mark_loss("search") {
+                    moved = false;
+                }
             }
             if self.robot_update_stall_after_move_and_mark_loss() {
                 moved = false;
@@ -2726,6 +2934,7 @@ impl CardthropicWindow {
         if let Some(source_id) = self.imp().robot_mode_timer.borrow_mut().take() {
             Self::remove_source_if_present(source_id);
         }
+        self.flush_seed_history_now();
         self.trim_process_memory_if_supported();
         self.emit_robot_status(
             "stopped",
@@ -2754,6 +2963,7 @@ impl CardthropicWindow {
         if let Some(source_id) = self.imp().robot_mode_timer.borrow_mut().take() {
             Self::remove_source_if_present(source_id);
         }
+        self.flush_seed_history_now();
         self.trim_process_memory_if_supported();
         self.emit_robot_status("stopped", "stop", message, Some(message), None, None, "na");
         self.render();

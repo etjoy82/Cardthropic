@@ -1968,9 +1968,9 @@ impl CardthropicWindow {
         let committed_css = Rc::new(RefCell::new(
             self.imp().saved_custom_userstyle_css.borrow().clone(),
         ));
-        dialog.set_transient_for(None::<&gtk::Window>);
-        dialog.set_hide_on_close(true);
-        dialog.set_destroy_with_parent(false);
+        dialog.set_transient_for(Some(self));
+        dialog.set_hide_on_close(false);
+        dialog.set_destroy_with_parent(true);
 
         let key_controller = gtk::EventControllerKey::new();
         key_controller.connect_key_pressed(glib::clone!(

@@ -86,5 +86,105 @@
 				<summary>Seed history store</summary>
 				<description>Serialized per-seed play and win history used by the seed dropdown.</description>
 			</key>
+			<key name="close-palette-on-command" type="b">
+				<default>true</default>
+				<summary>Close command palette after executing a command</summary>
+				<description>When enabled, command palette closes after a command is invoked.</description>
+			</key>
+			<key name="command-palette-width" type="i">
+				<default>400</default>
+				<summary>Command palette window width</summary>
+				<description>Last remembered width for the command palette window.</description>
+			</key>
+			<key name="command-palette-height" type="i">
+				<default>600</default>
+				<summary>Command palette window height</summary>
+				<description>Last remembered height for the command palette window.</description>
+			</key>
+			<key name="command-palette-maximized" type="b">
+				<default>false</default>
+				<summary>Command palette maximized</summary>
+				<description>Whether the command palette window was maximized when last closed.</description>
+			</key>
+			<key name="command-palette-query" type="s">
+				<default>''</default>
+				<summary>Command palette query text</summary>
+				<description>Last query text entered in the command palette search box.</description>
+			</key>
+			<key name="status-history-width" type="i">
+				<default>760</default>
+				<summary>Status history window width</summary>
+				<description>Last remembered width for the status history window.</description>
+			</key>
+			<key name="status-history-height" type="i">
+				<default>420</default>
+				<summary>Status history window height</summary>
+				<description>Last remembered height for the status history window.</description>
+			</key>
+			<key name="status-history-maximized" type="b">
+				<default>false</default>
+				<summary>Status history maximized</summary>
+				<description>Whether the status history window was maximized when last closed.</description>
+			</key>
+			<key name="theme-presets-width" type="i">
+				<default>620</default>
+				<summary>Theme presets window width</summary>
+				<description>Last remembered width for the theme presets window.</description>
+			</key>
+			<key name="theme-presets-height" type="i">
+				<default>640</default>
+				<summary>Theme presets window height</summary>
+				<description>Last remembered height for the theme presets window.</description>
+			</key>
+			<key name="theme-presets-maximized" type="b">
+				<default>false</default>
+				<summary>Theme presets maximized</summary>
+				<description>Whether the theme presets window was maximized when last closed.</description>
+			</key>
+			<key name="apm-graph-width" type="i">
+				<default>640</default>
+				<summary>APM graph window width</summary>
+				<description>Last remembered width for the APM graph window.</description>
+			</key>
+			<key name="apm-graph-height" type="i">
+				<default>360</default>
+				<summary>APM graph window height</summary>
+				<description>Last remembered height for the APM graph window.</description>
+			</key>
+			<key name="apm-graph-maximized" type="b">
+				<default>false</default>
+				<summary>APM graph maximized</summary>
+				<description>Whether the APM graph window was maximized when last closed.</description>
+			</key>
+			<key name="help-width" type="i">
+				<default>760</default>
+				<summary>Help window width</summary>
+				<description>Last remembered width for the help window.</description>
+			</key>
+			<key name="help-height" type="i">
+				<default>640</default>
+				<summary>Help window height</summary>
+				<description>Last remembered height for the help window.</description>
+			</key>
+			<key name="help-maximized" type="b">
+				<default>false</default>
+				<summary>Help maximized</summary>
+				<description>Whether the help window was maximized when last closed.</description>
+			</key>
+			<key name="memory-guard-enabled" type="b">
+				<default>false</default>
+				<summary>Enable memory guard</summary>
+				<description>When enabled, Cardthropic monitors process memory and applies soft/hard guard actions.</description>
+			</key>
+			<key name="memory-guard-soft-limit-mib" type="i">
+				<default>1536</default>
+				<summary>Memory guard soft limit (MiB)</summary>
+				<description>Soft memory threshold in MiB. Crossing it stops automation and attempts memory trim.</description>
+			</key>
+			<key name="memory-guard-hard-limit-mib" type="i">
+				<default>2048</default>
+				<summary>Memory guard hard limit (MiB)</summary>
+				<description>Hard memory threshold in MiB. Crossing it saves session and exits gracefully.</description>
+			</key>
 		</schema>
 	</schemalist>

@@ -170,21 +170,145 @@ impl CardthropicWindow {
         }
     }
 
+    fn apm_graph_window_size(&self) -> (i32, i32) {
+        const DEFAULT_WIDTH: i32 = 640;
+        const DEFAULT_HEIGHT: i32 = 360;
+        const MIN_WIDTH: i32 = 360;
+        const MIN_HEIGHT: i32 = 220;
+
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        };
+        if !schema.has_key(SETTINGS_KEY_APM_GRAPH_WIDTH)
+            || !schema.has_key(SETTINGS_KEY_APM_GRAPH_HEIGHT)
+        {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        }
+
+        (
+            settings.int(SETTINGS_KEY_APM_GRAPH_WIDTH).max(MIN_WIDTH),
+            settings.int(SETTINGS_KEY_APM_GRAPH_HEIGHT).max(MIN_HEIGHT),
+        )
+    }
+
+    fn apm_graph_maximized(&self) -> bool {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return false;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return false;
+        };
+        if !schema.has_key(SETTINGS_KEY_APM_GRAPH_MAXIMIZED) {
+            return false;
+        }
+        settings.boolean(SETTINGS_KEY_APM_GRAPH_MAXIMIZED)
+    }
+
+    fn persist_apm_graph_maximized(&self, maximized: bool) {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_APM_GRAPH_MAXIMIZED) {
+            return;
+        }
+        if settings.boolean(SETTINGS_KEY_APM_GRAPH_MAXIMIZED) != maximized {
+            let _ = settings.set_boolean(SETTINGS_KEY_APM_GRAPH_MAXIMIZED, maximized);
+        }
+    }
+
+    fn persist_apm_graph_window_size(&self, dialog: &gtk::Window) {
+        const MIN_WIDTH: i32 = 360;
+        const MIN_HEIGHT: i32 = 220;
+
+        if dialog.is_maximized() {
+            return;
+        }
+
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_APM_GRAPH_WIDTH)
+            || !schema.has_key(SETTINGS_KEY_APM_GRAPH_HEIGHT)
+        {
+            return;
+        }
+
+        let width = dialog.width().max(MIN_WIDTH);
+        let height = dialog.height().max(MIN_HEIGHT);
+        if settings.int(SETTINGS_KEY_APM_GRAPH_WIDTH) != width {
+            let _ = settings.set_int(SETTINGS_KEY_APM_GRAPH_WIDTH, width);
+        }
+        if settings.int(SETTINGS_KEY_APM_GRAPH_HEIGHT) != height {
+            let _ = settings.set_int(SETTINGS_KEY_APM_GRAPH_HEIGHT, height);
+        }
+    }
+
     pub(super) fn show_apm_graph_dialog(&self) {
         if let Some(existing) = self.imp().apm_graph_dialog.borrow().as_ref() {
             existing.present();
             return;
         }
 
+        let (saved_width, saved_height) = self.apm_graph_window_size();
+        let saved_maximized = self.apm_graph_maximized();
         let dialog = gtk::Window::builder()
             .title("APM Graph")
             .transient_for(self)
             .modal(false)
-            .default_width(640)
-            .default_height(360)
+            .default_width(saved_width)
+            .default_height(saved_height)
             .build();
         dialog.set_destroy_with_parent(true);
-        dialog.set_hide_on_close(true);
+        dialog.set_hide_on_close(false);
+        dialog.connect_close_request(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |dialog| {
+                let maximized = dialog.is_maximized();
+                window.persist_apm_graph_maximized(maximized);
+                window.persist_apm_graph_window_size(dialog);
+                *window.imp().apm_graph_dialog.borrow_mut() = None;
+                *window.imp().apm_graph_area.borrow_mut() = None;
+                *window.imp().apm_peak_label.borrow_mut() = None;
+                *window.imp().apm_avg_label.borrow_mut() = None;
+                *window.imp().apm_tilt_label.borrow_mut() = None;
+                glib::Propagation::Proceed
+            }
+        ));
+        if saved_maximized {
+            dialog.maximize();
+        }
+        let dialog_keys = gtk::EventControllerKey::new();
+        dialog_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        dialog_keys.connect_key_pressed(glib::clone!(
+            #[weak]
+            dialog,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, _| {
+                if key == gdk::Key::Escape {
+                    dialog.close();
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            }
+        ));
+        dialog.add_controller(dialog_keys);
 
         let stats_row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         let peak_label = gtk::Label::new(None);

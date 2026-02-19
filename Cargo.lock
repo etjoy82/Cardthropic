@@ -96,11 +96,12 @@ dependencies = [
 
 [[package]]
 name = "cardthropic"
-version = "0.9.0-beta.1"
+version = "0.9.5-beta"
 dependencies = [
  "gettext-rs",
  "gtk4",
  "libadwaita",
+ "png",
  "rand",
  "resvg",
  "sourceview5",

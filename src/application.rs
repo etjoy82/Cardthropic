@@ -24,6 +24,7 @@ use gettextrs::gettext;
 use gtk::{gio, glib};
 
 use crate::config::VERSION;
+use crate::startup_trace;
 use crate::CardthropicWindow;
 
 mod imp {
@@ -44,7 +45,9 @@ mod imp {
             self.parent_constructed();
             let obj = self.obj();
             obj.setup_gactions();
+            obj.set_accels_for_action("app.new-window", &["<primary>n"]);
             obj.set_accels_for_action("app.quit", &["<primary>q"]);
+            obj.set_accels_for_action("win.command-search", &["slash"]);
             obj.set_accels_for_action("win.help", &["F1"]);
             obj.set_accels_for_action("win.random-seed", &["<primary>r"]);
             obj.set_accels_for_action("win.winnable-seed", &["<primary><shift>r"]);
@@ -97,12 +100,30 @@ mod imp {
 
     impl ApplicationImpl for CardthropicApplication {
         fn activate(&self) {
+            startup_trace::mark("app:activate-enter");
             let application = self.obj();
-            let window = application.active_window().unwrap_or_else(|| {
+            let windows = application.windows();
+            let game_window = windows
+                .iter()
+                .find_map(|w| w.clone().downcast::<CardthropicWindow>().ok());
+
+            for window in windows {
+                if window.is::<CardthropicWindow>() {
+                    continue;
+                }
+                // Guard startup against stray top-level helper windows taking focus.
+                window.close();
+            }
+
+            if let Some(window) = game_window {
+                startup_trace::mark("app:activate-present-existing");
+                window.present();
+            } else {
+                startup_trace::mark("app:activate-create-window");
                 let window = CardthropicWindow::new(&*application);
-                window.upcast()
-            });
-            window.present();
+                window.present();
+            }
+            startup_trace::mark("app:activate-exit");
         }
     }
 
@@ -126,13 +147,21 @@ impl CardthropicApplication {
     }
 
     fn setup_gactions(&self) {
+        let new_window_action = gio::ActionEntry::builder("new-window")
+            .activate(move |app: &Self, _, _| app.open_new_window())
+            .build();
         let quit_action = gio::ActionEntry::builder("quit")
             .activate(move |app: &Self, _, _| app.quit())
             .build();
         let about_action = gio::ActionEntry::builder("about")
             .activate(move |app: &Self, _, _| app.show_about())
             .build();
-        self.add_action_entries([quit_action, about_action]);
+        self.add_action_entries([new_window_action, quit_action, about_action]);
+    }
+
+    fn open_new_window(&self) {
+        let window = CardthropicWindow::new(self);
+        window.present();
     }
 
     fn show_about(&self) {

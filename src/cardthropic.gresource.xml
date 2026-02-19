@@ -2,7 +2,6 @@
 <gresources>
   <gresource prefix="/io/codeberg/emviolet/cardthropic">
     <file preprocess="xml-stripblanks">window.ui</file>
-    <file preprocess="xml-stripblanks">gtk/help-overlay.ui</file>
     <file>style.css</file>
     <file alias="cards/anglo.svg">../data/cards/anglo.svg</file>
   </gresource>
