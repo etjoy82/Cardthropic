@@ -3,10 +3,24 @@ use crate::engine::boundary;
 use crate::engine::game_mode::VariantRuntime;
 use crate::engine::session::{decode_persisted_session, encode_persisted_session};
 use crate::engine::variant_state::VariantStateStore;
+use crate::startup_trace;
 
 impl CardthropicWindow {
     const SESSION_FLUSH_INTERVAL_SECS: u32 = 3;
+    const SESSION_FLUSH_INTERVAL_AUTOMATION_SECS: u32 = 30;
     const MAX_PERSISTED_SNAPSHOTS: usize = 200;
+
+    fn session_flush_interval_secs(&self) -> u32 {
+        let imp = self.imp();
+        if imp.robot_mode_running.get()
+            && imp.robot_ludicrous_enabled.get()
+            && imp.robot_forever_enabled.get()
+            && imp.robot_auto_new_game_on_loss.get()
+        {
+            return Self::SESSION_FLUSH_INTERVAL_AUTOMATION_SECS;
+        }
+        Self::SESSION_FLUSH_INTERVAL_SECS
+    }
 
     pub(super) fn setup_timer(&self) {
         glib::timeout_add_seconds_local(
@@ -37,6 +51,7 @@ impl CardthropicWindow {
         }
         // Keep Mem in the stats row live even when gameplay timer is stopped.
         self.update_stats_label();
+        self.enforce_memory_guard_if_needed();
     }
 
     pub(super) fn current_apm(&self) -> f64 {
@@ -312,6 +327,9 @@ impl CardthropicWindow {
     }
 
     fn persist_session_if_changed(&self) {
+        if !self.should_persist_shared_state() {
+            return;
+        }
         let settings = self.imp().settings.borrow().clone();
         let Some(settings) = settings else {
             return;
@@ -332,7 +350,7 @@ impl CardthropicWindow {
         }
 
         let timer = glib::timeout_add_seconds_local(
-            Self::SESSION_FLUSH_INTERVAL_SECS,
+            self.session_flush_interval_secs(),
             glib::clone!(
                 #[weak(rename_to = window)]
                 self,
@@ -365,15 +383,21 @@ impl CardthropicWindow {
     }
 
     pub(super) fn try_restore_saved_session(&self) -> bool {
+        if !self.should_persist_shared_state() {
+            return false;
+        }
+        startup_trace::mark("session:restore-start");
         let settings = self.imp().settings.borrow().clone();
         let Some(settings) = settings else {
+            startup_trace::mark("session:restore-end");
             return false;
         };
         let raw = settings.string(SETTINGS_KEY_SAVED_SESSION).to_string();
         if raw.trim().is_empty() {
+            startup_trace::mark("session:restore-end");
             return false;
         }
-        if self
+        let restored = if self
             .restore_session_from_payload(&raw, "Resumed previous game.", false)
             .is_ok()
         {
@@ -381,7 +405,9 @@ impl CardthropicWindow {
         } else {
             let _ = settings.set_string(SETTINGS_KEY_SAVED_SESSION, "");
             false
-        }
+        };
+        startup_trace::mark("session:restore-end");
+        restored
     }
 
     pub(super) fn restore_session_from_payload(
@@ -436,7 +462,7 @@ impl CardthropicWindow {
         *imp.history.borrow_mut() = history;
         *imp.future.borrow_mut() = future;
         *imp.last_saved_session.borrow_mut() = raw.to_string();
-        if persist_payload {
+        if persist_payload && self.should_persist_shared_state() {
             if let Some(settings) = imp.settings.borrow().as_ref() {
                 let _ = settings.set_string(SETTINGS_KEY_SAVED_SESSION, raw);
             }

@@ -152,6 +152,14 @@
                       <object class="GtkBox" id="seed_controls_row">
                         <property name="spacing">8</property>
                         <child>
+                          <object class="GtkButton" id="command_search_button">
+                            <property name="label" translatable="yes">CMD</property>
+                            <property name="tooltip-text" translatable="yes">Open Command Palette</property>
+                            <property name="has-frame">False</property>
+                            <property name="action-name">win.command-search</property>
+                          </object>
+                        </child>
+                        <child>
                           <object class="GtkButton" id="seed_random_button">
                             <property name="label">🎲</property>
                             <property name="tooltip-text" translatable="yes">Start Random Deal</property>
@@ -305,7 +313,7 @@
                           <object class="GtkBox" id="stock_waste_foundations_row_box">
                             <property name="spacing">16</property>
                             <child>
-                              <object class="GtkBox">
+                              <object class="GtkBox" id="stock_column_box">
                                 <property name="orientation">vertical</property>
                                 <property name="spacing">4</property>
                                 <property name="valign">start</property>
@@ -332,7 +340,7 @@
                               </object>
                             </child>
                             <child>
-                              <object class="GtkBox">
+                              <object class="GtkBox" id="waste_column_box">
                                 <property name="orientation">vertical</property>
                                 <property name="spacing">4</property>
                                 <property name="valign">start</property>
@@ -609,6 +617,150 @@
                                         <style>
                                           <class name="dim-label"/>
                                         </style>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">4</property>
+                                    <child>
+                                      <object class="GtkOverlay">
+                                        <child>
+                                          <object class="GtkPicture" id="foundation_picture_5">
+                                            <property name="width-request">70</property>
+                                            <property name="height-request">108</property>
+                                            <property name="can-shrink">True</property>
+                                            <property name="content-fit">contain</property>
+                                            <style>
+                                              <class name="card-slot"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child type="overlay">
+                                          <object class="GtkLabel" id="foundation_placeholder_5">
+                                            <property name="label"></property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">False</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">4</property>
+                                    <child>
+                                      <object class="GtkOverlay">
+                                        <child>
+                                          <object class="GtkPicture" id="foundation_picture_6">
+                                            <property name="width-request">70</property>
+                                            <property name="height-request">108</property>
+                                            <property name="can-shrink">True</property>
+                                            <property name="content-fit">contain</property>
+                                            <style>
+                                              <class name="card-slot"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child type="overlay">
+                                          <object class="GtkLabel" id="foundation_placeholder_6">
+                                            <property name="label"></property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">False</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">4</property>
+                                    <child>
+                                      <object class="GtkOverlay">
+                                        <child>
+                                          <object class="GtkPicture" id="foundation_picture_7">
+                                            <property name="width-request">70</property>
+                                            <property name="height-request">108</property>
+                                            <property name="can-shrink">True</property>
+                                            <property name="content-fit">contain</property>
+                                            <style>
+                                              <class name="card-slot"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child type="overlay">
+                                          <object class="GtkLabel" id="foundation_placeholder_7">
+                                            <property name="label"></property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">False</property>
+                                      </object>
+                                    </child>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkBox">
+                                    <property name="orientation">vertical</property>
+                                    <property name="spacing">4</property>
+                                    <child>
+                                      <object class="GtkOverlay">
+                                        <child>
+                                          <object class="GtkPicture" id="foundation_picture_8">
+                                            <property name="width-request">70</property>
+                                            <property name="height-request">108</property>
+                                            <property name="can-shrink">True</property>
+                                            <property name="content-fit">contain</property>
+                                            <style>
+                                              <class name="card-slot"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                        <child type="overlay">
+                                          <object class="GtkLabel" id="foundation_placeholder_8">
+                                            <property name="label"></property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <style>
+                                              <class name="slot-emoji"/>
+                                            </style>
+                                          </object>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">False</property>
                                       </object>
                                     </child>
                                   </object>

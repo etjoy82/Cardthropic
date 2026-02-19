@@ -3,7 +3,7 @@
 Cardthropic: Solitaire with a Real Heart.
 Cardthropic is a GNOME solitaire app built with Rust, GTK4, and Libadwaita.
 
-Current version: `0.9.0-beta.1` (beta channel)
+Current version: `0.9.5-beta` (beta channel)
 License: `GPL-3.0-or-later`
 App ID: `io.codeberg.emviolet.cardthropic`
 
@@ -132,7 +132,7 @@ scripts/flatpak/release.sh
 Manual version bump helper:
 
 ```bash
-scripts/release/bump-version.sh --version X.Y.Z
+scripts/release/bump-version.sh --version X.Y.Z[-PRERELEASE]
 ```
 
 Full process details: `RELEASE.md`

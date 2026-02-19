@@ -444,6 +444,72 @@ fn spider_removes_completed_suited_king_to_ace_run() {
 }
 
 #[test]
+fn spider_completed_run_suits_are_tracked_and_restored() {
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    tableau[0] = vec![
+        card(Suit::Hearts, 13, true),
+        card(Suit::Hearts, 12, true),
+        card(Suit::Hearts, 11, true),
+        card(Suit::Hearts, 10, true),
+        card(Suit::Hearts, 9, true),
+        card(Suit::Hearts, 8, true),
+        card(Suit::Hearts, 7, true),
+        card(Suit::Hearts, 6, true),
+        card(Suit::Hearts, 5, true),
+        card(Suit::Hearts, 4, true),
+        card(Suit::Hearts, 3, true),
+        card(Suit::Hearts, 2, true),
+        card(Suit::Hearts, 1, true),
+    ];
+
+    let stock = vec![card(Suit::Clubs, 1, false); 91];
+    let mut game = SpiderGame::debug_new(SpiderSuitMode::Four, stock, tableau, 0);
+    assert_eq!(game.extract_completed_runs(), 1);
+    assert_eq!(game.completed_run_suits(), &[Suit::Hearts]);
+
+    let encoded = game.encode_for_session();
+    let decoded = SpiderGame::decode_from_session(&encoded).expect("decode spider session");
+    assert_eq!(decoded.completed_run_suits(), &[Suit::Hearts]);
+    assert_eq!(decoded, game);
+}
+
+#[test]
+fn spider_session_codec_accepts_legacy_payload_without_run_suits() {
+    let mut tableau: [Vec<Card>; 10] = std::array::from_fn(|_| Vec::new());
+    tableau[0] = vec![
+        card(Suit::Hearts, 13, true),
+        card(Suit::Hearts, 12, true),
+        card(Suit::Hearts, 11, true),
+        card(Suit::Hearts, 10, true),
+        card(Suit::Hearts, 9, true),
+        card(Suit::Hearts, 8, true),
+        card(Suit::Hearts, 7, true),
+        card(Suit::Hearts, 6, true),
+        card(Suit::Hearts, 5, true),
+        card(Suit::Hearts, 4, true),
+        card(Suit::Hearts, 3, true),
+        card(Suit::Hearts, 2, true),
+        card(Suit::Hearts, 1, true),
+    ];
+
+    let stock = vec![card(Suit::Clubs, 1, false); 91];
+    let mut game = SpiderGame::debug_new(SpiderSuitMode::Four, stock, tableau, 0);
+    assert_eq!(game.extract_completed_runs(), 1);
+
+    let encoded = game.encode_for_session();
+    let legacy_payload = encoded
+        .split(';')
+        .filter(|part| !part.starts_with("runs="))
+        .collect::<Vec<_>>()
+        .join(";");
+
+    let decoded =
+        SpiderGame::decode_from_session(&legacy_payload).expect("decode legacy spider session");
+    assert_eq!(decoded.completed_runs(), 1);
+    assert_eq!(decoded.completed_run_suits(), &[Suit::Spades]);
+}
+
+#[test]
 fn spider_session_codec_round_trip_preserves_state() {
     let mut game = SpiderGame::new_with_seed_and_mode(777, SpiderSuitMode::Two);
     let _ = game.deal_from_stock();

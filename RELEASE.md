@@ -15,8 +15,9 @@ Policy:
 Update version strings:
 
 - `Cargo.toml` (`[package].version`)
-- `meson.build` (`project(... version: 'x.y.z' ...)`)
+- `meson.build` (`project(... version: 'x.y.z[-prerelease]' ...)`)
 - `README.md` current version
+- `src/config.rs` (`VERSION` constant for app About/version display)
 - `CHANGELOG.md` latest release entry
 - `data/io.codeberg.emviolet.cardthropic.metainfo.xml.in` release entry
 
@@ -29,13 +30,13 @@ scripts/release/check-release-consistency.sh
 Or perform the version bump skeleton automatically:
 
 ```bash
-scripts/release/bump-version.sh --version X.Y.Z
+scripts/release/bump-version.sh --version X.Y.Z[-PRERELEASE]
 ```
 
 After writing final release notes, replace placeholders in changelog + AppStream:
 
 ```bash
-scripts/release/finalize-release-notes.sh --version X.Y.Z \
+scripts/release/finalize-release-notes.sh --version X.Y.Z[-PRERELEASE] \
   --note "First release note" \
   --note "Second release note"
 ```
@@ -117,8 +118,8 @@ flatpak run io.codeberg.emviolet.cardthropic
 
 ```bash
 git add -A
-git commit -S -m "release: vX.Y.Z"
-git tag -s vX.Y.Z -m "Cardthropic vX.Y.Z"
+git commit -S -m "release: vX.Y.Z[-PRERELEASE]"
+git tag -s vX.Y.Z[-PRERELEASE] -m "Cardthropic vX.Y.Z[-PRERELEASE]"
 git push origin main --tags
 ```
 
@@ -176,7 +177,7 @@ This performs:
 For hotfix releases, use:
 
 ```bash
-scripts/release/hotfix-flow.sh --version X.Y.Z
+scripts/release/hotfix-flow.sh --version X.Y.Z[-PRERELEASE]
 ```
 
 Behavior:
@@ -189,5 +190,5 @@ Behavior:
 If you need to skip bundle + repo verification:
 
 ```bash
-scripts/release/hotfix-flow.sh --version X.Y.Z --skip-bundle
+scripts/release/hotfix-flow.sh --version X.Y.Z[-PRERELEASE] --skip-bundle
 ```

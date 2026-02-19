@@ -36,7 +36,7 @@ impl CardthropicWindow {
         } else {
             imp.board_box.remove_css_class("mobile-phone-mode");
             imp.tableau_row.set_homogeneous(true);
-            imp.foundations_area_box.set_halign(gtk::Align::End);
+            imp.foundations_area_box.set_halign(gtk::Align::Start);
         }
         self.apply_mobile_phone_mode_overrides();
     }
@@ -190,6 +190,22 @@ impl CardthropicWindow {
         self.add_action(&action);
     }
 
+    pub(super) fn setup_memory_guard_action(&self) {
+        let action =
+            gio::SimpleAction::new_stateful("memory-guard-toggle", None, &false.to_variant());
+        action.connect_change_state(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_, value| {
+                let enabled = value
+                    .and_then(|variant| variant.get::<bool>())
+                    .unwrap_or(false);
+                window.set_memory_guard_enabled(enabled, true, true);
+            }
+        ));
+        self.add_action(&action);
+    }
+
     pub(super) fn set_robot_forever_enabled(&self, enabled: bool, persist: bool, announce: bool) {
         let imp = self.imp();
         imp.robot_forever_enabled.set(enabled);
@@ -334,6 +350,40 @@ impl CardthropicWindow {
                 "robot_debug=on".to_string()
             } else {
                 "robot_debug=off".to_string()
+            });
+            self.render();
+        } else if persist {
+            self.render();
+        }
+    }
+
+    pub(super) fn set_memory_guard_enabled(&self, enabled: bool, persist: bool, announce: bool) {
+        let imp = self.imp();
+        imp.memory_guard_enabled.set(enabled);
+
+        if persist {
+            if let Some(settings) = imp.settings.borrow().clone() {
+                let _ = settings.set_boolean(SETTINGS_KEY_MEMORY_GUARD_ENABLED, enabled);
+            }
+        }
+
+        if let Some(action) = self.lookup_action("memory-guard-toggle") {
+            if let Ok(action) = action.downcast::<gio::SimpleAction>() {
+                let current = action
+                    .state()
+                    .and_then(|variant| variant.get::<bool>())
+                    .unwrap_or(false);
+                if current != enabled {
+                    action.set_state(&enabled.to_variant());
+                }
+            }
+        }
+
+        if announce {
+            *imp.status_override.borrow_mut() = Some(if enabled {
+                "App auto-close on runaway memory state enabled.".to_string()
+            } else {
+                "App auto-close on runaway memory state disabled.".to_string()
             });
             self.render();
         } else if persist {

@@ -65,6 +65,13 @@ impl CardthropicWindow {
         let (hint_move, used_fallback) = if let Some(hint_move) = suggestion.hint_move {
             (hint_move, false)
         } else {
+            if mode == GameMode::Spider {
+                self.flash_smart_move_fail_tableau_run(col, start);
+                *self.imp().status_override.borrow_mut() =
+                    Some("Smart Move: no legal move from that card.".to_string());
+                self.render();
+                return false;
+            }
             let fallback =
                 smart_move::fallback_tableau_run_move(&self.imp().game.borrow(), mode, col, start);
             let Some(fallback_move) = fallback else {
@@ -129,6 +136,13 @@ impl CardthropicWindow {
         let (hint_move, used_fallback) = if let Some(hint_move) = suggestion.hint_move {
             (hint_move, false)
         } else {
+            if mode == GameMode::Spider {
+                self.flash_smart_move_fail_waste_top();
+                *self.imp().status_override.borrow_mut() =
+                    Some("Smart Move: no legal move from waste.".to_string());
+                self.render();
+                return false;
+            }
             let fallback =
                 smart_move::fallback_waste_to_tableau_move(&self.imp().game.borrow(), mode);
             let Some(fallback_move) = fallback else {

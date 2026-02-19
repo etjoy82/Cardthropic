@@ -7,18 +7,19 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/release/bump-version.sh --version <x.y.z> [--date YYYY-MM-DD] [--dry-run]
+  scripts/release/bump-version.sh --version <semver> [--date YYYY-MM-DD] [--dry-run]
 
 Behavior:
   - Updates version references in:
     - Cargo.toml
     - meson.build
     - README.md (Current version line)
+    - src/config.rs (VERSION constant)
   - Adds a new release section to CHANGELOG.md after [Unreleased]
   - Prepends a new <release> entry in AppStream metadata
 
 Options:
-  --version <x.y.z>   Required semver (major.minor.patch)
+  --version <semver>  Required SemVer (example: 0.9.5 or 0.9.5-beta)
   --date <YYYY-MM-DD> Release date for changelog/metainfo (default: today)
   --dry-run           Print planned changes without writing files
   -h, --help          Show this help
@@ -78,8 +79,9 @@ if [[ -z "${VERSION}" ]]; then
   exit 1
 fi
 
-if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "Version must be semver like x.y.z (example: 0.6.0)." >&2
+semver_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+if [[ ! "${VERSION}" =~ ${semver_re} ]]; then
+  echo "Version must be SemVer (example: 0.6.0 or 0.6.0-beta.1)." >&2
   exit 1
 fi
 
@@ -177,6 +179,25 @@ awk -v version="${VERSION}" '
   }
 ' README.md >"${tmp}"
 apply_or_preview "README.md" "${tmp}"
+
+# src/config.rs: VERSION constant
+tmp="$(mktemp -p . .tmp.config-rs.XXXXXX)"
+awk -v version="${VERSION}" '
+  BEGIN { done=0 }
+  /^pub static VERSION: &str = "/ {
+    print "pub static VERSION: &str = \"" version "\";"
+    done=1
+    next
+  }
+  { print }
+  END {
+    if (!done) {
+      print "ERROR: did not find VERSION constant in src/config.rs" > "/dev/stderr"
+      exit 1
+    }
+  }
+' src/config.rs >"${tmp}"
+apply_or_preview "src/config.rs" "${tmp}"
 
 # CHANGELOG.md: insert section after Unreleased block
 tmp="$(mktemp -p . .tmp.changelog.XXXXXX)"

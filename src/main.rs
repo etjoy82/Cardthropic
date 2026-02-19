@@ -23,6 +23,7 @@ mod config;
 mod deck;
 mod engine;
 mod game;
+mod startup_trace;
 mod window;
 mod winnability;
 
@@ -323,6 +324,8 @@ fn run_freecell_benchmark(options: &FreecellBenchmarkOptions) -> Result<(), Stri
 }
 
 fn main() -> glib::ExitCode {
+    startup_trace::init();
+    startup_trace::mark("main:start");
     let args: Vec<String> = std::env::args().collect();
     match parse_benchmark_args(&args) {
         Ok(Some(options)) => match run_freecell_benchmark(&options) {
@@ -350,10 +353,13 @@ fn main() -> glib::ExitCode {
     let resources = gio::Resource::load(PKGDATADIR.to_owned() + "/cardthropic.gresource")
         .expect("Could not load resources");
     gio::resources_register(&resources);
+    startup_trace::mark("main:resources-registered");
 
     let app = CardthropicApplication::new(
         "io.codeberg.emviolet.cardthropic",
         &gio::ApplicationFlags::empty(),
     );
+    startup_trace::mark("main:app-created");
+    startup_trace::mark("main:app-run-enter");
     app.run()
 }

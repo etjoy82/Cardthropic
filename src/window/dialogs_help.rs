@@ -245,27 +245,126 @@ This hybrid style typically outperforms either side used alone.
         scroller
     }
 
+    fn help_window_size(&self) -> (i32, i32) {
+        const DEFAULT_WIDTH: i32 = 760;
+        const DEFAULT_HEIGHT: i32 = 640;
+        const MIN_WIDTH: i32 = 360;
+        const MIN_HEIGHT: i32 = 280;
+
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        };
+        if !schema.has_key(SETTINGS_KEY_HELP_WIDTH) || !schema.has_key(SETTINGS_KEY_HELP_HEIGHT) {
+            return (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        }
+
+        (
+            settings.int(SETTINGS_KEY_HELP_WIDTH).max(MIN_WIDTH),
+            settings.int(SETTINGS_KEY_HELP_HEIGHT).max(MIN_HEIGHT),
+        )
+    }
+
+    fn help_window_maximized(&self) -> bool {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return false;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return false;
+        };
+        if !schema.has_key(SETTINGS_KEY_HELP_MAXIMIZED) {
+            return false;
+        }
+        settings.boolean(SETTINGS_KEY_HELP_MAXIMIZED)
+    }
+
+    fn persist_help_window_maximized(&self, maximized: bool) {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_HELP_MAXIMIZED) {
+            return;
+        }
+        if settings.boolean(SETTINGS_KEY_HELP_MAXIMIZED) != maximized {
+            let _ = settings.set_boolean(SETTINGS_KEY_HELP_MAXIMIZED, maximized);
+        }
+    }
+
+    fn persist_help_window_size(&self, dialog: &gtk::Window) {
+        const MIN_WIDTH: i32 = 360;
+        const MIN_HEIGHT: i32 = 280;
+
+        if dialog.is_maximized() {
+            return;
+        }
+
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_HELP_WIDTH) || !schema.has_key(SETTINGS_KEY_HELP_HEIGHT) {
+            return;
+        }
+
+        let width = dialog.width().max(MIN_WIDTH);
+        let height = dialog.height().max(MIN_HEIGHT);
+        if settings.int(SETTINGS_KEY_HELP_WIDTH) != width {
+            let _ = settings.set_int(SETTINGS_KEY_HELP_WIDTH, width);
+        }
+        if settings.int(SETTINGS_KEY_HELP_HEIGHT) != height {
+            let _ = settings.set_int(SETTINGS_KEY_HELP_HEIGHT, height);
+        }
+    }
+
     pub(super) fn show_help_dialog(&self) {
         if let Some(existing) = self.imp().help_dialog.borrow().as_ref() {
             existing.present();
             return;
         }
 
+        let (saved_width, saved_height) = self.help_window_size();
+        let saved_maximized = self.help_window_maximized();
         let dialog = gtk::Window::builder()
             .title("Cardthropic Manual")
             .modal(false)
-            .default_width(760)
-            .default_height(640)
+            .default_width(saved_width)
+            .default_height(saved_height)
             .build();
-        if let Some(app) = self.application() {
-            dialog.set_application(Some(&app));
-        }
+        dialog.set_transient_for(Some(self));
         dialog.set_resizable(true);
         dialog.set_deletable(true);
-        dialog.set_hide_on_close(true);
+        dialog.set_hide_on_close(false);
         dialog.set_destroy_with_parent(true);
+        dialog.connect_close_request(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |dialog| {
+                let maximized = dialog.is_maximized();
+                window.persist_help_window_maximized(maximized);
+                window.persist_help_window_size(dialog);
+                *window.imp().help_dialog.borrow_mut() = None;
+                glib::Propagation::Proceed
+            }
+        ));
+        if saved_maximized {
+            dialog.maximize();
+        }
 
         let key_controller = gtk::EventControllerKey::new();
+        key_controller.set_propagation_phase(gtk::PropagationPhase::Capture);
         key_controller.connect_key_pressed(glib::clone!(
             #[weak]
             dialog,

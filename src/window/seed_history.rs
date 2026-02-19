@@ -19,10 +19,58 @@ impl CardthropicWindow {
         *self.imp().seed_history.borrow_mut() = data;
     }
 
-    pub(super) fn save_seed_history(&self) {
-        if let Some(settings) = self.imp().settings.borrow().as_ref() {
-            let payload = self.imp().seed_history.borrow().serialize();
-            let _ = settings.set_string(SETTINGS_KEY_SEED_HISTORY, &payload);
+    fn should_defer_seed_history_dropdown_refresh(&self) -> bool {
+        let imp = self.imp();
+        imp.robot_mode_running.get()
+            && imp.robot_ludicrous_enabled.get()
+            && imp.robot_forever_enabled.get()
+            && imp.robot_auto_new_game_on_loss.get()
+    }
+
+    fn mark_seed_history_dirty(&self) {
+        if !self.should_persist_shared_state() {
+            return;
+        }
+        let imp = self.imp();
+        imp.seed_history_dirty.set(true);
+        if imp.seed_history_flush_timer.borrow().is_some() {
+            return;
+        }
+
+        let timer = glib::timeout_add_seconds_local(
+            SEED_HISTORY_FLUSH_INTERVAL_SECS,
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || {
+                    window.flush_seed_history_now();
+                    glib::ControlFlow::Break
+                }
+            ),
+        );
+        *imp.seed_history_flush_timer.borrow_mut() = Some(timer);
+    }
+
+    pub(super) fn flush_seed_history_now(&self) {
+        let imp = self.imp();
+        if let Some(source_id) = imp.seed_history_flush_timer.borrow_mut().take() {
+            Self::remove_source_if_present(source_id);
+        }
+
+        if imp.seed_history_dirty.replace(false) {
+            if let Some(settings) = imp.settings.borrow().as_ref() {
+                let payload = imp.seed_history.borrow().serialize();
+                let _ = settings.set_string(SETTINGS_KEY_SEED_HISTORY, &payload);
+            }
+        }
+
+        if imp.seed_history_dropdown_dirty.get()
+            && !self.should_defer_seed_history_dropdown_refresh()
+        {
+            self.refresh_seed_history_dropdown_immediate();
+            imp.seed_history_dropdown_dirty.set(false);
         }
     }
 
@@ -32,7 +80,7 @@ impl CardthropicWindow {
             .borrow_mut()
             .note_play_started(seed, MAX_SEED_HISTORY_ENTRIES);
         self.imp().current_seed_win_recorded.set(false);
-        self.save_seed_history();
+        self.mark_seed_history_dirty();
         self.refresh_seed_history_dropdown();
     }
 
@@ -48,12 +96,25 @@ impl CardthropicWindow {
         self.imp().seed_history.borrow_mut().note_win(seed);
 
         self.imp().current_seed_win_recorded.set(true);
-        self.save_seed_history();
-        self.refresh_seed_history_dropdown();
+        self.mark_seed_history_dirty();
+        if self.should_defer_seed_history_dropdown_refresh() {
+            self.imp().seed_history_dropdown_dirty.set(true);
+            return;
+        }
+        self.refresh_seed_history_dropdown_immediate();
     }
 
     #[allow(deprecated)]
     pub(super) fn refresh_seed_history_dropdown(&self) {
+        if self.should_defer_seed_history_dropdown_refresh() {
+            self.imp().seed_history_dropdown_dirty.set(true);
+            return;
+        }
+        self.refresh_seed_history_dropdown_immediate();
+    }
+
+    #[allow(deprecated)]
+    fn refresh_seed_history_dropdown_immediate(&self) {
         let imp = self.imp();
         let current_text = self.seed_input_text();
 
@@ -79,5 +140,6 @@ impl CardthropicWindow {
 
         imp.seed_combo_updating.set(false);
         self.set_seed_input_text(&current_text);
+        imp.seed_history_dropdown_dirty.set(false);
     }
 }

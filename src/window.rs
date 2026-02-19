@@ -45,6 +45,7 @@ use crate::engine::variant_state::VariantStateStore;
 use crate::game::{
     Card, DrawMode, FreecellCardCountMode, GameMode, KlondikeGame, SolverMove, SpiderSuitMode, Suit,
 };
+use crate::startup_trace;
 use crate::winnability;
 
 #[path = "window/actions_history.rs"]
@@ -59,6 +60,8 @@ mod ai;
 mod ai_winnability_check;
 #[path = "window/dialogs_apm.rs"]
 mod dialogs_apm;
+#[path = "window/dialogs_command_search.rs"]
+mod dialogs_command_search;
 #[path = "window/dialogs_help.rs"]
 mod dialogs_help;
 #[path = "window/drag.rs"]
@@ -159,7 +162,11 @@ mod imp {
         #[template_child]
         pub stock_picture: TemplateChild<gtk::Picture>,
         #[template_child]
+        pub stock_column_box: TemplateChild<gtk::Box>,
+        #[template_child]
         pub waste_overlay: TemplateChild<gtk::Overlay>,
+        #[template_child]
+        pub waste_column_box: TemplateChild<gtk::Box>,
         #[template_child]
         pub waste_picture: TemplateChild<gtk::Picture>,
         #[template_child]
@@ -214,6 +221,22 @@ mod imp {
         pub foundation_picture_4: TemplateChild<gtk::Picture>,
         #[template_child]
         pub foundation_placeholder_4: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub foundation_picture_5: TemplateChild<gtk::Picture>,
+        #[template_child]
+        pub foundation_placeholder_5: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub foundation_picture_6: TemplateChild<gtk::Picture>,
+        #[template_child]
+        pub foundation_placeholder_6: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub foundation_picture_7: TemplateChild<gtk::Picture>,
+        #[template_child]
+        pub foundation_placeholder_7: TemplateChild<gtk::Label>,
+        #[template_child]
+        pub foundation_picture_8: TemplateChild<gtk::Picture>,
+        #[template_child]
+        pub foundation_placeholder_8: TemplateChild<gtk::Label>,
         #[template_child]
         pub foundation_label_1: TemplateChild<gtk::Label>,
         #[template_child]
@@ -301,10 +324,14 @@ mod imp {
         pub current_seed: Cell<u64>,
         pub current_seed_win_recorded: Cell<bool>,
         pub(super) seed_history: RefCell<SeedHistoryStore>,
+        pub seed_history_dirty: Cell<bool>,
+        pub seed_history_dropdown_dirty: Cell<bool>,
+        pub seed_history_flush_timer: RefCell<Option<glib::SourceId>>,
         pub(super) selected_run: RefCell<Option<SelectedRun>>,
         pub(super) selected_freecell: Cell<Option<usize>>,
         pub waste_selected: Cell<bool>,
         pub settings: RefCell<Option<gio::Settings>>,
+        pub shared_state_persistence_owner: Cell<bool>,
         pub last_saved_session: RefCell<String>,
         pub session_dirty: Cell<bool>,
         pub session_flush_timer: RefCell<Option<glib::SourceId>>,
@@ -325,6 +352,7 @@ mod imp {
         pub status_history_buffer: RefCell<Option<gtk::TextBuffer>>,
         pub deck: RefCell<Option<AngloDeck>>,
         pub deck_load_attempted: Cell<bool>,
+        pub deck_load_in_progress: Cell<bool>,
         pub deck_error: RefCell<Option<String>>,
         pub status_override: RefCell<Option<String>>,
         pub status_ephemeral_timer: RefCell<Option<glib::SourceId>>,
@@ -387,6 +415,12 @@ mod imp {
         pub seed_check_seconds: Cell<u32>,
         pub seed_check_memory_guard_triggered: Cell<bool>,
         pub seed_check_memory_limit_mib: Cell<u64>,
+        pub memory_guard_enabled: Cell<bool>,
+        pub memory_guard_soft_limit_mib: Cell<u64>,
+        pub memory_guard_hard_limit_mib: Cell<u64>,
+        pub memory_guard_soft_triggered: Cell<bool>,
+        pub memory_guard_hard_triggered: Cell<bool>,
+        pub memory_guard_last_dialog_mono_us: Cell<i64>,
         pub auto_play_seen_states: RefCell<HashSet<u64>>,
         pub auto_playing_move: Cell<bool>,
         pub(super) hint_loss_cache: RefCell<HashMap<u64, LossVerdict>>,
@@ -469,12 +503,17 @@ mod imp {
         pub freecell_card_count_mode: Cell<FreecellCardCountMode>,
         pub game_mode_buttons: RefCell<HashMap<GameMode, gtk::Button>>,
         pub help_dialog: RefCell<Option<gtk::Window>>,
+        pub command_search_dialog: RefCell<Option<gtk::Window>>,
+        pub command_search_filter_entry: RefCell<Option<gtk::SearchEntry>>,
+        pub memory_guard_dialog: RefCell<Option<gtk::Window>>,
         pub apm_graph_dialog: RefCell<Option<gtk::Window>>,
         pub apm_graph_area: RefCell<Option<gtk::DrawingArea>>,
         pub apm_peak_label: RefCell<Option<gtk::Label>>,
         pub apm_avg_label: RefCell<Option<gtk::Label>>,
         pub apm_tilt_label: RefCell<Option<gtk::Label>>,
         pub keyboard_target: Cell<KeyboardTarget>,
+        pub startup_first_map_logged: Cell<bool>,
+        pub startup_deck_logged: Cell<bool>,
     }
 
     impl Default for CardthropicWindow {
@@ -489,7 +528,9 @@ mod imp {
                 peek_button: TemplateChild::default(),
                 robot_button: TemplateChild::default(),
                 stock_picture: TemplateChild::default(),
+                stock_column_box: TemplateChild::default(),
                 waste_overlay: TemplateChild::default(),
+                waste_column_box: TemplateChild::default(),
                 waste_picture: TemplateChild::default(),
                 waste_picture_1: TemplateChild::default(),
                 waste_picture_2: TemplateChild::default(),
@@ -517,6 +558,14 @@ mod imp {
                 foundation_placeholder_3: TemplateChild::default(),
                 foundation_picture_4: TemplateChild::default(),
                 foundation_placeholder_4: TemplateChild::default(),
+                foundation_picture_5: TemplateChild::default(),
+                foundation_placeholder_5: TemplateChild::default(),
+                foundation_picture_6: TemplateChild::default(),
+                foundation_placeholder_6: TemplateChild::default(),
+                foundation_picture_7: TemplateChild::default(),
+                foundation_placeholder_7: TemplateChild::default(),
+                foundation_picture_8: TemplateChild::default(),
+                foundation_placeholder_8: TemplateChild::default(),
                 foundation_label_1: TemplateChild::default(),
                 foundation_label_2: TemplateChild::default(),
                 foundation_label_3: TemplateChild::default(),
@@ -562,10 +611,14 @@ mod imp {
                 current_seed: Cell::new(seed),
                 current_seed_win_recorded: Cell::new(false),
                 seed_history: RefCell::new(SeedHistoryStore::default()),
+                seed_history_dirty: Cell::new(false),
+                seed_history_dropdown_dirty: Cell::new(false),
+                seed_history_flush_timer: RefCell::new(None),
                 selected_run: RefCell::new(None),
                 selected_freecell: Cell::new(None),
                 waste_selected: Cell::new(false),
                 settings: RefCell::new(None),
+                shared_state_persistence_owner: Cell::new(false),
                 last_saved_session: RefCell::new(String::new()),
                 session_dirty: Cell::new(false),
                 session_flush_timer: RefCell::new(None),
@@ -586,6 +639,7 @@ mod imp {
                 status_history_buffer: RefCell::new(None),
                 deck: RefCell::new(None),
                 deck_load_attempted: Cell::new(false),
+                deck_load_in_progress: Cell::new(false),
                 deck_error: RefCell::new(None),
                 status_override: RefCell::new(None),
                 status_ephemeral_timer: RefCell::new(None),
@@ -647,6 +701,12 @@ mod imp {
                 seed_check_seconds: Cell::new(0),
                 seed_check_memory_guard_triggered: Cell::new(false),
                 seed_check_memory_limit_mib: Cell::new(0),
+                memory_guard_enabled: Cell::new(false),
+                memory_guard_soft_limit_mib: Cell::new(1536),
+                memory_guard_hard_limit_mib: Cell::new(2048),
+                memory_guard_soft_triggered: Cell::new(false),
+                memory_guard_hard_triggered: Cell::new(false),
+                memory_guard_last_dialog_mono_us: Cell::new(0),
                 auto_play_seen_states: RefCell::new(HashSet::new()),
                 auto_playing_move: Cell::new(false),
                 hint_loss_cache: RefCell::new(HashMap::new()),
@@ -728,12 +788,17 @@ mod imp {
                 freecell_card_count_mode: Cell::new(FreecellCardCountMode::FiftyTwo),
                 game_mode_buttons: RefCell::new(HashMap::new()),
                 help_dialog: RefCell::new(None),
+                command_search_dialog: RefCell::new(None),
+                command_search_filter_entry: RefCell::new(None),
+                memory_guard_dialog: RefCell::new(None),
                 apm_graph_dialog: RefCell::new(None),
                 apm_graph_area: RefCell::new(None),
                 apm_peak_label: RefCell::new(None),
                 apm_avg_label: RefCell::new(None),
                 apm_tilt_label: RefCell::new(None),
                 keyboard_target: Cell::new(KeyboardTarget::Stock),
+                startup_first_map_logged: Cell::new(false),
+                startup_deck_logged: Cell::new(false),
             }
         }
     }
@@ -796,6 +861,9 @@ mod imp {
             });
             klass.install_action("win.copy-benchmark-snapshot", None, |window, _, _| {
                 window.copy_benchmark_snapshot();
+            });
+            klass.install_action("win.command-search", None, |window, _, _| {
+                window.show_command_search_dialog();
             });
             klass.install_action("win.help", None, |window, _, _| {
                 window.show_help_dialog();
@@ -894,7 +962,21 @@ mod imp {
     impl ObjectImpl for CardthropicWindow {
         fn constructed(&self) {
             self.parent_constructed();
+            startup_trace::mark("window:constructed-enter");
             let obj = self.obj();
+            obj.initialize_shared_state_persistence_owner();
+            obj.connect_map(glib::clone!(
+                #[weak(rename_to = window)]
+                obj,
+                move |_| {
+                    if window.imp().startup_first_map_logged.replace(true) {
+                        return;
+                    }
+                    startup_trace::mark("window:first-map");
+                    startup_trace::print_summary_once();
+                    window.append_startup_trace_history_if_robot_debug();
+                }
+            ));
             let icon_name = gdk::Display::default()
                 .map(|display| {
                     let theme = gtk::IconTheme::for_display(&display);
@@ -920,21 +1002,29 @@ mod imp {
             obj.setup_forever_mode_action();
             obj.setup_robot_auto_new_game_on_loss_action();
             obj.setup_ludicrous_speed_action();
+            obj.setup_memory_guard_action();
             obj.setup_robot_debug_action();
             obj.setup_robot_strict_debug_invariants_action();
             obj.setup_board_color_preferences();
-            if !obj.try_restore_saved_session() {
+            startup_trace::mark("window:before-restore-session");
+            let restored = obj.should_persist_shared_state() && obj.try_restore_saved_session();
+            if !restored {
                 obj.note_seed_play_started(self.current_seed.get());
                 obj.set_seed_input_text(&self.current_seed.get().to_string());
             }
+            startup_trace::mark("window:after-restore-session");
             obj.setup_handlers();
+            startup_trace::mark("window:handlers-ready");
             obj.connect_close_request(glib::clone!(
                 #[weak(rename_to = window)]
                 obj,
                 #[upgrade_or]
                 glib::Propagation::Proceed,
                 move |_| {
+                    window.close_auxiliary_windows();
                     window.flush_session_now();
+                    window.flush_seed_history_now();
+                    window.handoff_shared_state_persistence_owner_if_needed();
                     glib::Propagation::Proceed
                 }
             ));
@@ -946,6 +1036,7 @@ mod imp {
             obj.reset_auto_play_memory();
             let state_hash = obj.current_game_hash();
             obj.start_hint_loss_analysis_if_needed(state_hash);
+            startup_trace::mark("window:constructed-exit");
         }
     }
 
@@ -981,8 +1072,29 @@ const SETTINGS_KEY_ROBOT_DEBUG_ENABLED: &str = "robot-debug-enabled";
 const SETTINGS_KEY_ROBOT_STRICT_DEBUG_INVARIANTS: &str = "robot-strict-debug-invariants";
 const SETTINGS_KEY_INTERFACE_EMOJI_FONT: &str = "interface-emoji-font";
 const SETTINGS_KEY_SEED_HISTORY: &str = "seed-history";
+const SETTINGS_KEY_CLOSE_PALETTE_ON_COMMAND: &str = "close-palette-on-command";
+const SETTINGS_KEY_COMMAND_PALETTE_WIDTH: &str = "command-palette-width";
+const SETTINGS_KEY_COMMAND_PALETTE_HEIGHT: &str = "command-palette-height";
+const SETTINGS_KEY_COMMAND_PALETTE_MAXIMIZED: &str = "command-palette-maximized";
+const SETTINGS_KEY_COMMAND_PALETTE_QUERY: &str = "command-palette-query";
+const SETTINGS_KEY_STATUS_HISTORY_WIDTH: &str = "status-history-width";
+const SETTINGS_KEY_STATUS_HISTORY_HEIGHT: &str = "status-history-height";
+const SETTINGS_KEY_STATUS_HISTORY_MAXIMIZED: &str = "status-history-maximized";
+const SETTINGS_KEY_THEME_PRESETS_WIDTH: &str = "theme-presets-width";
+const SETTINGS_KEY_THEME_PRESETS_HEIGHT: &str = "theme-presets-height";
+const SETTINGS_KEY_THEME_PRESETS_MAXIMIZED: &str = "theme-presets-maximized";
+const SETTINGS_KEY_APM_GRAPH_WIDTH: &str = "apm-graph-width";
+const SETTINGS_KEY_APM_GRAPH_HEIGHT: &str = "apm-graph-height";
+const SETTINGS_KEY_APM_GRAPH_MAXIMIZED: &str = "apm-graph-maximized";
+const SETTINGS_KEY_HELP_WIDTH: &str = "help-width";
+const SETTINGS_KEY_HELP_HEIGHT: &str = "help-height";
+const SETTINGS_KEY_HELP_MAXIMIZED: &str = "help-maximized";
+const SETTINGS_KEY_MEMORY_GUARD_ENABLED: &str = "memory-guard-enabled";
+const SETTINGS_KEY_MEMORY_GUARD_SOFT_LIMIT_MIB: &str = "memory-guard-soft-limit-mib";
+const SETTINGS_KEY_MEMORY_GUARD_HARD_LIMIT_MIB: &str = "memory-guard-hard-limit-mib";
 const MAX_SEED_HISTORY_ENTRIES: usize = 10_000;
 const MAX_SEED_DROPDOWN_ENTRIES: usize = 250;
+const SEED_HISTORY_FLUSH_INTERVAL_SECS: u32 = 15;
 const SEED_WINNABLE_BUTTON_LABEL: &str = "W?";
 const MIN_WINDOW_WIDTH: i32 = 250;
 const MIN_WINDOW_HEIGHT: i32 = 250;
@@ -994,10 +1106,120 @@ const DEFAULT_BOARD_COLOR: &str = "#1f232b";
 const ROBOT_BENCHMARK_DUMP_INTERVAL: u32 = 25;
 
 impl CardthropicWindow {
+    fn initialize_shared_state_persistence_owner(&self) {
+        let owner = self
+            .application()
+            .map(|app| {
+                !app.windows()
+                    .iter()
+                    .filter_map(|window| window.clone().downcast::<CardthropicWindow>().ok())
+                    .any(|window| {
+                        window.as_ptr() != self.as_ptr() && window.should_persist_shared_state()
+                    })
+            })
+            .unwrap_or(true);
+        self.set_shared_state_persistence_owner(owner);
+    }
+
+    pub(super) fn should_persist_shared_state(&self) -> bool {
+        self.imp().shared_state_persistence_owner.get()
+    }
+
+    pub(super) fn set_shared_state_persistence_owner(&self, owner: bool) {
+        self.imp().shared_state_persistence_owner.set(owner);
+    }
+
+    fn handoff_shared_state_persistence_owner_if_needed(&self) {
+        if !self.should_persist_shared_state() {
+            return;
+        }
+        self.set_shared_state_persistence_owner(false);
+
+        let Some(app) = self.application() else {
+            return;
+        };
+        if let Some(next_owner) = app
+            .windows()
+            .iter()
+            .filter_map(|window| window.clone().downcast::<CardthropicWindow>().ok())
+            .find(|window| window.as_ptr() != self.as_ptr())
+        {
+            next_owner.set_shared_state_persistence_owner(true);
+        }
+    }
+
+    pub(super) fn append_startup_trace_history_if_robot_debug(&self) {
+        if !self.imp().robot_debug_enabled.get() {
+            return;
+        }
+        self.append_status_history_only("startup_trace_begin");
+        for line in startup_trace::history_lines() {
+            self.append_status_history_only(&line);
+        }
+    }
+
+    pub(super) fn append_startup_deck_history_if_robot_debug(&self) {
+        if self.imp().startup_deck_logged.replace(true) || !self.imp().robot_debug_enabled.get() {
+            return;
+        }
+        self.append_status_history_only("startup_trace_deck_ready");
+        for line in startup_trace::deck_history_lines() {
+            self.append_status_history_only(&line);
+        }
+    }
+
     pub fn new<P: IsA<gtk::Application>>(application: &P) -> Self {
-        glib::Object::builder()
+        startup_trace::mark("window:new-enter");
+        let window = glib::Object::builder()
             .property("application", application)
-            .build()
+            .build();
+        startup_trace::mark("window:new-exit");
+        window
+    }
+
+    pub(super) fn close_auxiliary_windows(&self) {
+        let imp = self.imp();
+        let mut to_close: Vec<gtk::Window> = Vec::new();
+
+        if let Some(w) = imp.custom_userstyle_dialog.borrow().as_ref() {
+            to_close.push(w.clone());
+        }
+        if let Some(w) = imp.theme_presets_window.borrow().as_ref() {
+            to_close.push(w.clone());
+        }
+        if let Some(w) = imp.status_history_dialog.borrow().as_ref() {
+            to_close.push(w.clone());
+        }
+        if let Some(w) = imp.help_dialog.borrow().as_ref() {
+            to_close.push(w.clone());
+        }
+        if let Some(w) = imp.command_search_dialog.borrow().as_ref() {
+            to_close.push(w.clone());
+        }
+        if let Some(w) = imp.memory_guard_dialog.borrow().as_ref() {
+            to_close.push(w.clone());
+        }
+        if let Some(w) = imp.apm_graph_dialog.borrow().as_ref() {
+            to_close.push(w.clone());
+        }
+
+        *imp.custom_userstyle_dialog.borrow_mut() = None;
+        *imp.theme_presets_window.borrow_mut() = None;
+        *imp.status_history_dialog.borrow_mut() = None;
+        *imp.help_dialog.borrow_mut() = None;
+        *imp.command_search_dialog.borrow_mut() = None;
+        *imp.command_search_filter_entry.borrow_mut() = None;
+        *imp.memory_guard_dialog.borrow_mut() = None;
+        *imp.apm_graph_dialog.borrow_mut() = None;
+        *imp.status_history_buffer.borrow_mut() = None;
+        *imp.apm_graph_area.borrow_mut() = None;
+        *imp.apm_peak_label.borrow_mut() = None;
+        *imp.apm_avg_label.borrow_mut() = None;
+        *imp.apm_tilt_label.borrow_mut() = None;
+
+        for window in to_close {
+            window.close();
+        }
     }
 
     pub(super) fn automation_profile(&self) -> AutomationProfile {
