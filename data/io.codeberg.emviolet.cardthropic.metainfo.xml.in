@@ -35,7 +35,8 @@
   </description>
   <screenshots>
     <screenshot type="default">
-      <image type="source" width="691" height="787">https://codeberg.org/emviolet/Cardthropic/raw/branch/main/data/screenshots/cardthropic-0.9-screenshot.png</image>
+      <caption>Cardthropic 0.10.0-beta main window</caption>
+      <image type="source" width="603" height="799">https://codeberg.org/emviolet/Cardthropic/raw/branch/main/data/screenshots/cardthropic-0.10.0-screenshot.png</image>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1">
@@ -63,9 +64,9 @@
   <releases>
     <release version="0.10.0-beta" date="2026-02-20">
       <description>
-        <p>Added Atomic Chess (preview) variant wiring and ruleset scaffolding.</p>
-        <p>Migrated card rendering from SVG/PNG assets to CSS + Unicode symbols for lower memory and smoother ludicrous robot pacing.</p>
-        <p>Hardened Flatpak/AppStream release metadata flow and bundle metadata wiring.</p>
+        <p>Added preview chess variants: Standard, Chess960, and Atomic.</p>
+        <p>Switched card rendering from SVG/PNG assets to a CSS + Unicode pipeline.</p>
+        <p>Improved release and Flatpak/AppStream verification tooling.</p>
       </description>
     </release>
     <release version="0.9.5-beta" date="2026-02-18">

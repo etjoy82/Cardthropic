@@ -1,64 +1,89 @@
 # Cardthropic
 
-Cardthropic: Solitaire with a Real Heart.
-Cardthropic is a GNOME solitaire app built with Rust, GTK4, and Libadwaita.
+Cardthropic is a GNOME card game app built with Rust, GTK4, and Libadwaita.
 
 Current version: `0.10.0-beta` (beta channel)
 License: `GPL-3.0-or-later`
 App ID: `io.codeberg.emviolet.cardthropic`
 
-![Cardthropic screenshot](data/screenshots/cardthropic-0.9-screenshot.png)
+![Cardthropic screenshot](data/screenshots/cardthropic-0.10.0-screenshot.png)
 
 ## What Cardthropic Includes
 
-### Gameplay
+### Game Modes
 
-- Klondike, Spider, and FreeCell in one app
-- Spider suit modes: 1, 2, 3, or 4 suits
-- Smart Move with click-mode control (single, double, disabled)
-- Undo/redo, move counting, timers, and run progress tracking
+- Klondike with deal modes: 1, 2, 3, 4, or 5
+- Spider with suit modes: 1, 2, 3, or 4
+- FreeCell with card-count modes: 26, 39, or 52
+- Configurable FreeCell free-cell count (`1..6`)
+- Chess modes in preview:
+  - Standard Chess
+  - Chess960
+  - Atomic Chess
 
-### Automation
+### Core Play Tools
 
-- Magic Wand and Rapid Wand hint actions
-- Robot mode for continuous auto-play
+- Smart Move with click behavior control (single, double, right click, disabled)
+- Undo/redo and mode-aware move handling
+- Mouse, keyboard, and drag-and-drop interaction
+- Command palette and visible shortcut hints on key controls
+
+### Automation and Analysis
+
+- Wave Magic Wand and Rapid Wand actions
+- Robot mode, Forever mode, and optional auto-new-game on loss
+- `W?` analysis with cancel-on-repeat behavior
 - Cyclone Shuffle and Peek utilities
-- Automation settings, including auto-start-new-game on loss toggle
+- Chess auto-response controls (including side selection)
+- Independent chess AI strength channels:
+  - auto-response
+  - Wand
+  - `W?`
+  - robot white
+  - robot black
 
-### Seeds and Reproducibility
+### Seeds, Reproducibility, and Game State
 
-- Deterministic seed-first workflow for replayable deals
+- Deterministic seed workflow for replayable games
 - Numeric (`u64`) and word seeds (letters + underscores)
 - Random seed and random winnable-seed actions
-- Seed history with fast back/forward navigation
-- `W?` winnability analysis and mode-specific solver routing
+- Seed history with back/forward navigation
+- Copy/load game-state actions
+- Session restore across relaunch, including chess state
 
-### UX and Controls
+### UI, Status, and Notes
 
-- Native GTK4/Libadwaita desktop experience
-- Mouse, keyboard, and drag-and-drop interaction
-- Focus-safe seed input behavior for uninterrupted seed entry
-- In-app history/status reporting for solver and robot activity
+- Status history window with non-modal workflow
+- Insert note support in status history and game-state menu
+- `Copy All` for status history content
+- Chess board coordinate overlays (`A-H`, `1-8`) with toggle
+- Flip-board-aware chess keyboard navigation
+- Optional chess system move sounds (rate-limited)
 
 ### Visuals and Customization
 
-- Built-in themes for quick style switching
-- Custom CSS userstyle support
-- Responsive layout behavior across compact and desktop windows
+- CSS + Unicode card rendering pipeline (replacing SVG/PNG card-sheet runtime rendering)
+- Built-in theme presets
+- Custom CSS userstyle editor and saved userstyle support
+- Responsive layout behavior for compact and desktop windows
 
-### Persistence and Runtime
+### Settings and Runtime
 
-- Session persistence and resume on relaunch
-- Runtime metrics in HUD (APM/memory/status)
+- Runtime HUD metrics (APM/memory/status)
+- Copy all Cardthropic GSettings values to clipboard
+- Strict validation path to load full Cardthropic GSettings payload
 - Flatpak-first distribution and GNOME runtime integration
 
-## Variant Status
+## Mode Status
 
 | Variant | Status | Notes |
 |---|---|---|
-| Klondike | Playable | Core gameplay, draw modes, automation, and seed tooling |
-| Spider | Playable | 1/2/3/4 suit modes, automation, Smart Move, and winnability tooling |
-| FreeCell | Playable | Full gameplay loop with Free Cells, Foundations, Smart Move, and automation tooling |
+| Klondike | Playable | Deal modes, automation, seeds, and Smart Move controls |
+| Spider | Playable | 1/2/3/4 suit modes, automation, Smart Move, and `W?` support |
+| FreeCell | Playable | Card-count modes, configurable free-cell count, automation, and `W?` support |
+| Standard Chess | Preview | Board controls, auto-response, `W?` analysis, and robot support |
+| Chess960 | Preview | Variant setup and shared chess tooling |
+| Atomic Chess | Preview | Atomic ruleset integration with shared chess tooling |
 
 ## Installation
 
@@ -116,6 +141,7 @@ Robot mode is practical but intentionally non-perfect.
 
 - Seed box input is preserved; Enter is intentionally not globally bound
 - Core gameplay shortcuts remain available through the app shortcut layer
+- Chess board coordinate visibility toggle: `<Ctrl><Alt>C`
 
 ## Maintainer and Release Workflow
 
@@ -142,7 +168,7 @@ Full process details: `RELEASE.md`
 
 - `CHANGELOG.md`
 - `RELEASE.md`
-- `TOOLING_WORKFLOW.md`
+- `docs/TOOLING_WORKFLOW.md`
 - `data/io.codeberg.emviolet.cardthropic.metainfo.xml.in`
 
 ## Notes
