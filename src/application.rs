@@ -47,7 +47,7 @@ mod imp {
             obj.setup_gactions();
             obj.set_accels_for_action("app.new-window", &["<primary>n"]);
             obj.set_accels_for_action("app.quit", &["<primary>q"]);
-            obj.set_accels_for_action("win.command-search", &["slash"]);
+            obj.set_accels_for_action("win.command-search", &["slash", "KP_Divide"]);
             obj.set_accels_for_action("win.help", &["F1"]);
             obj.set_accels_for_action("win.random-seed", &["<primary>r"]);
             obj.set_accels_for_action("win.winnable-seed", &["<primary><shift>r"]);
@@ -71,6 +71,7 @@ mod imp {
             obj.set_accels_for_action("win.enable-hud", &["grave"]);
             obj.set_accels_for_action("win.copy-game-state", &["<primary><shift>c"]);
             obj.set_accels_for_action("win.paste-game-state", &["<primary><shift>v"]);
+            obj.set_accels_for_action("win.insert-note", &["<primary><shift>n"]);
             obj.set_accels_for_action("win.mode-klondike-deal-1", &["<shift>1"]);
             obj.set_accels_for_action("win.mode-klondike-deal-2", &["<shift>2"]);
             obj.set_accels_for_action("win.mode-klondike-deal-3", &["<shift>3"]);
@@ -86,12 +87,40 @@ mod imp {
                 "win.mode-freecell-card-52",
                 &["<primary><shift>3", "<primary><shift>4"],
             );
+            obj.set_accels_for_action("win.mode-chess-standard", &["<primary><alt>1"]);
+            obj.set_accels_for_action("win.mode-chess-960", &["<primary><alt>2"]);
+            obj.set_accels_for_action("win.mode-chess-atomic", &["<primary><alt>3"]);
+            obj.set_accels_for_action("win.chess-flip-board", &["<primary><alt>f"]);
+            obj.set_accels_for_action("win.chess-auto-flip-board-each-move", &["<primary><alt>a"]);
+            obj.set_accels_for_action("win.chess-show-board-coordinates", &["<primary><alt>c"]);
+            obj.set_accels_for_action("win.chess-system-sounds-enabled", &["<primary><alt>m"]);
+            obj.set_accels_for_action("win.chess-rotate-board-dialog", &["<primary><alt>o"]);
+            obj.set_accels_for_action("win.chess-ai-strength-dialog", &["<primary><alt>e"]);
+            obj.set_accels_for_action(
+                "win.chess-w-question-ai-strength-dialog",
+                &["<primary><alt>q"],
+            );
+            obj.set_accels_for_action("win.chess-wand-ai-strength-dialog", &["<primary><alt>w"]);
+            obj.set_accels_for_action(
+                "win.chess-robot-white-ai-strength-dialog",
+                &["<primary><alt>i"],
+            );
+            obj.set_accels_for_action(
+                "win.chess-robot-black-ai-strength-dialog",
+                &["<primary><alt>b"],
+            );
+            obj.set_accels_for_action(
+                "win.chess-wand-ai-opponent-auto-response",
+                &["<primary><alt>p"],
+            );
+            obj.set_accels_for_action("win.chess-auto-response-plays-white", &["<primary><alt>l"]);
             obj.set_accels_for_action("win.smart-move-double-click", &["<primary><alt>d"]);
             obj.set_accels_for_action("win.smart-move-single-click", &["<primary><alt>s"]);
             obj.set_accels_for_action("win.smart-move-right-click", &["<primary><alt>r"]);
             obj.set_accels_for_action("win.smart-move-disabled", &["<primary><alt>0"]);
             obj.set_accels_for_action("win.robot-debug-toggle", &["F8"]);
             obj.set_accels_for_action("win.open-theme-presets", &["<primary><shift>t"]);
+            obj.set_accels_for_action("win.open-custom-css", &["<primary><alt>u"]);
             obj.set_accels_for_action("win.status-history", &["<primary><shift>h"]);
             obj.set_accels_for_action("win.apm-graph", &["<primary><shift>a"]);
             obj.set_accels_for_action("app.about", &["<primary>i"]);

@@ -43,7 +43,7 @@ impl CardthropicWindow {
         {
             return HintSuggestion {
                 message: format!(
-                    "Hint: no winning path found from this position (explored {explored_states} states)."
+                    "Hint: solver did not find a winning line from this position (explored {explored_states} states)."
                 ),
                 source: None,
                 target: None,
@@ -57,7 +57,7 @@ impl CardthropicWindow {
             return match self.cached_loss_verdict_for_hash(state_hash) {
                 Some(LossVerdict::Lost { explored_states }) => HintSuggestion {
                     message: format!(
-                        "Hint: no legal moves and no winning path found (explored {explored_states} states)."
+                        "Hint: no legal moves. Solver did not find a winning line in this search (explored {explored_states} states)."
                     ),
                     source: None,
                     target: None,
@@ -139,9 +139,7 @@ impl CardthropicWindow {
         } else {
             self.start_hint_loss_analysis_if_needed(state_hash);
             HintSuggestion {
-                message:
-                    "Hint: no productive move found from this position. The line appears lost."
-                        .to_string(),
+                message: "Hint: no productive move found from this position.".to_string(),
                 source: None,
                 target: None,
                 hint_move: None,

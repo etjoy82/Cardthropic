@@ -59,24 +59,99 @@ impl CardthropicWindow {
 
     pub(super) fn handle_keyboard_navigation_key(&self, key: gdk::Key) -> bool {
         match key {
-            gdk::Key::Left => {
+            gdk::Key::Left
+            | gdk::Key::KP_Left
+            | gdk::Key::a
+            | gdk::Key::A
+            | gdk::Key::h
+            | gdk::Key::H => {
                 self.move_keyboard_focus_horizontal(-1);
                 true
             }
-            gdk::Key::Right => {
+            gdk::Key::Right
+            | gdk::Key::KP_Right
+            | gdk::Key::d
+            | gdk::Key::D
+            | gdk::Key::l
+            | gdk::Key::L => {
                 self.move_keyboard_focus_horizontal(1);
                 true
             }
-            gdk::Key::Up => {
+            gdk::Key::Up
+            | gdk::Key::KP_Up
+            | gdk::Key::w
+            | gdk::Key::W
+            | gdk::Key::k
+            | gdk::Key::K => {
                 self.move_keyboard_focus_vertical(-1);
                 true
             }
-            gdk::Key::Down => {
+            gdk::Key::Down
+            | gdk::Key::KP_Down
+            | gdk::Key::s
+            | gdk::Key::S
+            | gdk::Key::j
+            | gdk::Key::J => {
                 self.move_keyboard_focus_vertical(1);
                 true
             }
-            gdk::Key::space => {
+            gdk::Key::space | gdk::Key::Return | gdk::Key::KP_Enter => {
                 self.activate_keyboard_target();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub(super) fn handle_numpad_solitaire_shortcut_key(
+        &self,
+        key: gdk::Key,
+        state: gdk::ModifierType,
+    ) -> bool {
+        if state.intersects(
+            gdk::ModifierType::ALT_MASK
+                | gdk::ModifierType::CONTROL_MASK
+                | gdk::ModifierType::SUPER_MASK
+                | gdk::ModifierType::META_MASK
+                | gdk::ModifierType::SHIFT_MASK,
+        ) {
+            return false;
+        }
+        if self.imp().chess_mode_active.get() {
+            return false;
+        }
+
+        match key {
+            gdk::Key::KP_7 => {
+                self.undo();
+                true
+            }
+            gdk::Key::KP_9 => {
+                self.redo();
+                true
+            }
+            gdk::Key::KP_1 => {
+                self.toggle_robot_mode();
+                true
+            }
+            gdk::Key::KP_3 => {
+                self.trigger_peek();
+                true
+            }
+            gdk::Key::KP_5 => {
+                self.activate_keyboard_target();
+                true
+            }
+            gdk::Key::KP_Decimal | gdk::Key::KP_Delete => {
+                self.draw_card();
+                true
+            }
+            gdk::Key::KP_Multiply => {
+                let _ = self.play_hint_for_player();
+                true
+            }
+            gdk::Key::KP_Subtract => {
+                self.undo();
                 true
             }
             _ => false,
@@ -215,7 +290,7 @@ impl CardthropicWindow {
             imp.keyboard_target.set(target);
             match target {
                 KeyboardTarget::Freecell(idx) => {
-                    if let Some(slot) = self.waste_fan_slots().get(idx) {
+                    if let Some(slot) = self.freecell_slot_pictures().get(idx) {
                         slot.add_css_class("keyboard-focus-card");
                     }
                 }
@@ -289,8 +364,10 @@ impl CardthropicWindow {
     fn normalize_freecell_keyboard_target(&self, target: KeyboardTarget) -> KeyboardTarget {
         let game = self.imp().game.borrow();
         let freecell = game.freecell();
+        let freecell_slots = self.current_freecell_cell_count() as usize;
+        let max_freecell_idx = freecell_slots.saturating_sub(1);
         match target {
-            KeyboardTarget::Freecell(idx) => KeyboardTarget::Freecell(idx.min(3)),
+            KeyboardTarget::Freecell(idx) => KeyboardTarget::Freecell(idx.min(max_freecell_idx)),
             KeyboardTarget::Foundation(idx) => KeyboardTarget::Foundation(idx.min(3)),
             KeyboardTarget::Tableau { col, start } => {
                 let col = col.min(7);
@@ -315,21 +392,23 @@ impl CardthropicWindow {
 
     fn move_keyboard_focus_horizontal_freecell(&self, delta: i32) {
         let current = self.normalize_freecell_keyboard_target(self.imp().keyboard_target.get());
+        let freecell_slots = self.current_freecell_cell_count() as i32;
+        let top_slots = (freecell_slots + 4).max(1);
         let next = match current {
             KeyboardTarget::Freecell(idx) => {
-                let idx = (idx as i32 + delta).clamp(0, 7) as usize;
-                if idx < 4 {
-                    KeyboardTarget::Freecell(idx)
+                let idx = (idx as i32 + delta).clamp(0, top_slots - 1);
+                if idx < freecell_slots {
+                    KeyboardTarget::Freecell(idx as usize)
                 } else {
-                    KeyboardTarget::Foundation(idx - 4)
+                    KeyboardTarget::Foundation((idx - freecell_slots) as usize)
                 }
             }
             KeyboardTarget::Foundation(idx) => {
-                let idx = ((idx + 4) as i32 + delta).clamp(0, 7) as usize;
-                if idx < 4 {
-                    KeyboardTarget::Freecell(idx)
+                let idx = ((idx as i32 + freecell_slots) + delta).clamp(0, top_slots - 1);
+                if idx < freecell_slots {
+                    KeyboardTarget::Freecell(idx as usize)
                 } else {
-                    KeyboardTarget::Foundation(idx - 4)
+                    KeyboardTarget::Foundation((idx - freecell_slots) as usize)
                 }
             }
             KeyboardTarget::Tableau { col, start } => {
@@ -347,6 +426,7 @@ impl CardthropicWindow {
 
     fn move_keyboard_focus_vertical_freecell(&self, delta: i32) {
         let current = self.normalize_freecell_keyboard_target(self.imp().keyboard_target.get());
+        let freecell_slots = self.current_freecell_cell_count() as usize;
         let next = match current {
             KeyboardTarget::Freecell(idx) => {
                 if delta > 0 {
@@ -367,7 +447,7 @@ impl CardthropicWindow {
             }
             KeyboardTarget::Foundation(idx) => {
                 if delta > 0 {
-                    let col = idx + 4;
+                    let col = (idx + freecell_slots).min(7);
                     let game = self.imp().game.borrow();
                     let len = game
                         .freecell()
@@ -393,10 +473,10 @@ impl CardthropicWindow {
                     .unwrap_or(0);
                 if delta < 0 {
                     if len == 0 {
-                        if col < 4 {
+                        if col < freecell_slots {
                             KeyboardTarget::Freecell(col)
                         } else {
-                            KeyboardTarget::Foundation(col - 4)
+                            KeyboardTarget::Foundation((col - freecell_slots).min(3))
                         }
                     } else if let Some(curr) = start {
                         if curr + 1 < len {
@@ -404,15 +484,15 @@ impl CardthropicWindow {
                                 col,
                                 start: Some(curr + 1),
                             }
-                        } else if col < 4 {
+                        } else if col < freecell_slots {
                             KeyboardTarget::Freecell(col)
                         } else {
-                            KeyboardTarget::Foundation(col - 4)
+                            KeyboardTarget::Foundation((col - freecell_slots).min(3))
                         }
-                    } else if col < 4 {
+                    } else if col < freecell_slots {
                         KeyboardTarget::Freecell(col)
                     } else {
-                        KeyboardTarget::Foundation(col - 4)
+                        KeyboardTarget::Foundation((col - freecell_slots).min(3))
                     }
                 } else if len == 0 {
                     KeyboardTarget::Tableau { col, start: None }

@@ -5,10 +5,14 @@ impl CardthropicWindow {
     pub(super) fn snapshot(&self) -> Snapshot {
         let imp = self.imp();
         let mode = self.active_game_mode();
-        let game = imp.game.borrow();
+        let runtime = {
+            let game = imp.game.borrow();
+            game.runtime_for_mode(mode)
+        };
+        let chess_mode_active = imp.chess_mode_active.get();
         Snapshot {
             mode,
-            runtime: game.runtime_for_mode(mode),
+            runtime,
             draw_mode: imp.klondike_draw_mode.get(),
             selected_run: *imp.selected_run.borrow(),
             selected_waste: imp.waste_selected.get(),
@@ -18,6 +22,38 @@ impl CardthropicWindow {
             apm_elapsed_offset_seconds: imp.apm_elapsed_offset_seconds.get(),
             apm_samples: imp.apm_samples.borrow().clone(),
             foundation_slot_suits: self.foundation_slot_suits_snapshot(),
+            chess_mode_active,
+            chess_variant: imp.chess_variant.get(),
+            chess_position: if chess_mode_active {
+                Some(imp.chess_position.borrow().clone())
+            } else {
+                None
+            },
+            chess_selected_square: if chess_mode_active {
+                imp.chess_selected_square.get()
+            } else {
+                None
+            },
+            chess_last_move_from: if chess_mode_active {
+                imp.chess_last_move_from.get()
+            } else {
+                None
+            },
+            chess_last_move_to: if chess_mode_active {
+                imp.chess_last_move_to.get()
+            } else {
+                None
+            },
+            chess_history: if chess_mode_active {
+                imp.chess_history.borrow().clone()
+            } else {
+                Vec::new()
+            },
+            chess_future: if chess_mode_active {
+                imp.chess_future.borrow().clone()
+            } else {
+                Vec::new()
+            },
         }
     }
 
@@ -51,6 +87,13 @@ impl CardthropicWindow {
     }
 
     pub(super) fn undo(&self) {
+        if self.imp().history.borrow().is_empty()
+            && self.imp().chess_mode_active.get()
+            && !self.imp().chess_history.borrow().is_empty()
+        {
+            let _ = self.chess_undo();
+            return;
+        }
         if !self.guard_mode_engine("Undo") {
             return;
         }
@@ -92,6 +135,13 @@ impl CardthropicWindow {
     }
 
     pub(super) fn redo(&self) {
+        if self.imp().future.borrow().is_empty()
+            && self.imp().chess_mode_active.get()
+            && !self.imp().chess_future.borrow().is_empty()
+        {
+            let _ = self.chess_redo();
+            return;
+        }
         if !self.guard_mode_engine("Redo") {
             return;
         }
@@ -146,6 +196,35 @@ impl CardthropicWindow {
         imp.selected_freecell.set(None);
         imp.waste_selected.set(snapshot.selected_waste);
         self.set_foundation_slot_suits(snapshot.foundation_slot_suits);
+        imp.chess_mode_active.set(snapshot.chess_mode_active);
+        imp.chess_variant.set(snapshot.chess_variant);
+        *imp.chess_position.borrow_mut() = snapshot
+            .chess_position
+            .unwrap_or_else(|| crate::game::standard_position());
+        imp.chess_selected_square
+            .set(if snapshot.chess_mode_active {
+                snapshot.chess_selected_square
+            } else {
+                None
+            });
+        imp.chess_last_move_from.set(if snapshot.chess_mode_active {
+            snapshot.chess_last_move_from
+        } else {
+            None
+        });
+        imp.chess_last_move_to.set(if snapshot.chess_mode_active {
+            snapshot.chess_last_move_to
+        } else {
+            None
+        });
+        imp.chess_keyboard_square
+            .set(if snapshot.chess_mode_active {
+                snapshot.chess_selected_square
+            } else {
+                None
+            });
+        *imp.chess_history.borrow_mut() = snapshot.chess_history;
+        *imp.chess_future.borrow_mut() = snapshot.chess_future;
         imp.move_count.set(snapshot.move_count);
         imp.elapsed_seconds.set(snapshot.elapsed_seconds);
         imp.timer_started.set(snapshot.timer_started);
@@ -154,9 +233,14 @@ impl CardthropicWindow {
         *imp.apm_samples.borrow_mut() = snapshot.apm_samples;
         self.update_game_mode_menu_selection();
         self.update_game_settings_menu();
-        self.reset_hint_cycle_memory();
-        self.reset_auto_play_memory();
-        let state_hash = self.current_game_hash();
-        self.start_hint_loss_analysis_if_needed(state_hash);
+        if snapshot.chess_mode_active {
+            self.cancel_hint_loss_analysis();
+        } else {
+            self.reset_hint_cycle_memory();
+            self.reset_auto_play_memory();
+            let state_hash = self.current_game_hash();
+            self.start_hint_loss_analysis_if_needed(state_hash);
+        }
+        let _ = self.maybe_auto_flip_chess_board_to_side_to_move(false);
     }
 }

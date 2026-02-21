@@ -15,6 +15,14 @@
               <object class="GtkBox">
                 <property name="spacing">6</property>
                 <child>
+                  <object class="GtkButton" id="command_search_button">
+                    <property name="label" translatable="yes">/</property>
+                    <property name="tooltip-text" translatable="yes">Open Command Palette</property>
+                    <property name="has-frame">False</property>
+                    <property name="action-name">win.command-search</property>
+                  </object>
+                </child>
+                <child>
                   <object class="GtkMenuButton" id="game_settings_menu_button">
                     <property name="label">🥇</property>
                     <property name="tooltip-text" translatable="yes">Game Settings</property>
@@ -88,12 +96,6 @@
                         <property name="spacing">6</property>
                         <property name="halign">start</property>
                         <child>
-                          <object class="GtkButton" id="board_color_menu_button">
-                            <property name="tooltip-text" translatable="yes">Board color</property>
-                            <property name="has-frame">True</property>
-                          </object>
-                        </child>
-                        <child>
                           <object class="GtkToggleButton" id="hud_button">
                             <property name="label" translatable="yes">HUD</property>
                             <property name="tooltip-text" translatable="yes">Toggle HUD</property>
@@ -101,6 +103,15 @@
                             <property name="action-name">win.enable-hud</property>
                             <style>
                               <class name="hud-toggle"/>
+                            </style>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="board_color_menu_button">
+                            <property name="tooltip-text" translatable="yes">Board color</property>
+                            <property name="has-frame">True</property>
+                            <style>
+                              <class name="toolbar-emoji-button"/>
                             </style>
                           </object>
                         </child>
@@ -123,6 +134,9 @@
                             <property name="label">🪄</property>
                             <property name="tooltip-text" translatable="yes">Wave Magic Wand</property>
                             <property name="has-frame">False</property>
+                            <style>
+                              <class name="toolbar-emoji-button"/>
+                            </style>
                           </object>
                         </child>
                         <child>
@@ -130,6 +144,9 @@
                             <property name="label">🌀</property>
                             <property name="tooltip-text" translatable="yes">Cyclone Shuffle Tableau</property>
                             <property name="has-frame">False</property>
+                            <style>
+                              <class name="toolbar-emoji-button"/>
+                            </style>
                           </object>
                         </child>
                         <child>
@@ -137,6 +154,9 @@
                             <property name="label">🫣</property>
                             <property name="tooltip-text" translatable="yes">Peek</property>
                             <property name="has-frame">False</property>
+                            <style>
+                              <class name="toolbar-emoji-button"/>
+                            </style>
                           </object>
                         </child>
                         <child>
@@ -144,6 +164,9 @@
                             <property name="label">🤖</property>
                             <property name="tooltip-text" translatable="yes">Robot Mode</property>
                             <property name="has-frame">False</property>
+                            <style>
+                              <class name="toolbar-emoji-button"/>
+                            </style>
                           </object>
                         </child>
                       </object>
@@ -152,25 +175,23 @@
                       <object class="GtkBox" id="seed_controls_row">
                         <property name="spacing">8</property>
                         <child>
-                          <object class="GtkButton" id="command_search_button">
-                            <property name="label" translatable="yes">CMD</property>
-                            <property name="tooltip-text" translatable="yes">Open Command Palette</property>
-                            <property name="has-frame">False</property>
-                            <property name="action-name">win.command-search</property>
-                          </object>
-                        </child>
-                        <child>
                           <object class="GtkButton" id="seed_random_button">
                             <property name="label">🎲</property>
-                            <property name="tooltip-text" translatable="yes">Start Random Deal</property>
+                            <property name="tooltip-text" translatable="yes">Start Random Game</property>
                             <property name="has-frame">False</property>
+                            <style>
+                              <class name="toolbar-emoji-button"/>
+                            </style>
                           </object>
                         </child>
                         <child>
                           <object class="GtkButton" id="seed_rescue_button">
                             <property name="label">🛟</property>
-                            <property name="tooltip-text" translatable="yes">Find and Start Winnable Deal</property>
+                            <property name="tooltip-text" translatable="yes">Find and Start Winnable Game</property>
                             <property name="has-frame">False</property>
+                            <style>
+                              <class name="toolbar-emoji-button"/>
+                            </style>
                           </object>
                         </child>
                         <child>
@@ -183,8 +204,11 @@
                         <child>
                           <object class="GtkButton" id="seed_repeat_button">
                             <property name="label">🔁</property>
-                            <property name="tooltip-text" translatable="yes">Deal Again from Current Seed</property>
+                            <property name="tooltip-text" translatable="yes">Start Game Again from Current Seed</property>
                             <property name="has-frame">False</property>
+                            <style>
+                              <class name="toolbar-emoji-button"/>
+                            </style>
                           </object>
                         </child>
                         <child>
@@ -192,13 +216,13 @@
                             <property name="has-entry">True</property>
                             <property name="width-request">1</property>
                             <property name="hexpand">True</property>
-                            <property name="tooltip-text" translatable="yes">Deal seed</property>
+                            <property name="tooltip-text" translatable="yes">Game seed</property>
                           </object>
                         </child>
                         <child>
                           <object class="GtkButton" id="seed_go_button">
                             <property name="label" translatable="yes">Go</property>
-                            <property name="tooltip-text" translatable="yes">Start Deal from Seed</property>
+                            <property name="tooltip-text" translatable="yes">Start Game from Seed</property>
                             <property name="has-frame">False</property>
                           </object>
                         </child>
@@ -251,9 +275,13 @@
                 </child>
                 <child>
                   <object class="GtkFrame" id="top_playfield_frame">
+                    <property name="vexpand">False</property>
+                    <property name="valign">start</property>
                     <child>
                       <object class="GtkBox" id="playfield_inner_box">
                         <property name="orientation">vertical</property>
+                        <property name="vexpand">False</property>
+                        <property name="valign">start</property>
                         <property name="spacing">10</property>
                         <property name="margin-top">12</property>
                         <property name="margin-bottom">12</property>
@@ -261,6 +289,8 @@
                         <property name="margin-end">12</property>
                         <child>
                           <object class="GtkBox" id="top_heading_row_box">
+                            <property name="vexpand">False</property>
+                            <property name="valign">start</property>
                             <property name="spacing">16</property>
                             <child>
                               <object class="GtkBox" id="stock_heading_box">
@@ -311,11 +341,14 @@
                         </child>
                         <child>
                           <object class="GtkBox" id="stock_waste_foundations_row_box">
+                            <property name="vexpand">False</property>
+                            <property name="valign">start</property>
                             <property name="spacing">16</property>
                             <child>
                               <object class="GtkBox" id="stock_column_box">
                                 <property name="orientation">vertical</property>
                                 <property name="spacing">4</property>
+                                <property name="vexpand">False</property>
                                 <property name="valign">start</property>
                                 <child>
                                   <object class="GtkPicture" id="stock_picture">
@@ -343,9 +376,12 @@
                               <object class="GtkBox" id="waste_column_box">
                                 <property name="orientation">vertical</property>
                                 <property name="spacing">4</property>
+                                <property name="vexpand">False</property>
                                 <property name="valign">start</property>
                                 <child>
                                   <object class="GtkOverlay" id="waste_overlay">
+                                    <property name="valign">start</property>
+                                    <property name="vexpand">False</property>
                                     <child>
                                       <object class="GtkPicture" id="waste_picture">
                                         <property name="width-request">70</property>
@@ -418,6 +454,18 @@
                                       </object>
                                     </child>
                                     <child type="overlay">
+                                      <object class="GtkPicture" id="waste_picture_6">
+                                        <property name="can-shrink">True</property>
+                                        <property name="content-fit">contain</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="visible">False</property>
+                                        <style>
+                                          <class name="card-slot"/>
+                                        </style>
+                                      </object>
+                                    </child>
+                                    <child type="overlay">
                                       <object class="GtkBox" id="waste_placeholder_box">
                                         <property name="halign">start</property>
                                         <property name="valign">start</property>
@@ -428,8 +476,8 @@
                                             <property name="label"></property>
                                             <property name="halign">center</property>
                                             <property name="valign">center</property>
-                                            <property name="hexpand">True</property>
-                                            <property name="vexpand">True</property>
+                                            <property name="hexpand">False</property>
+                                            <property name="vexpand">False</property>
                                             <style>
                                               <class name="slot-emoji"/>
                                             </style>
@@ -444,6 +492,8 @@
                                     <property name="visible">True</property>
                                     <property name="xalign">0</property>
                                     <property name="halign">start</property>
+                                    <property name="vexpand">False</property>
+                                    <property name="valign">start</property>
                                     <style>
                                       <class name="dim-label"/>
                                     </style>
@@ -794,111 +844,115 @@
                             <property name="min-content-height">60</property>
                             <property name="vexpand">True</property>
                             <child>
-                              <object class="GtkBox" id="tableau_row">
-                                <property name="spacing">4</property>
-                                <property name="halign">start</property>
-                                <property name="valign">start</property>
-                                <property name="hexpand">False</property>
-                                <property name="vexpand">False</property>
-                                <property name="homogeneous">False</property>
+                              <object class="GtkFixed" id="tableau_canvas">
                                 <child>
-                                  <object class="GtkFixed" id="tableau_stack_1">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
+                                  <object class="GtkBox" id="tableau_row">
+                                    <property name="spacing">4</property>
                                     <property name="halign">start</property>
                                     <property name="valign">start</property>
                                     <property name="hexpand">False</property>
                                     <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_2">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_3">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_4">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_5">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_6">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_7">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_8">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_9">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
-                                  </object>
-                                </child>
-                                <child>
-                                  <object class="GtkFixed" id="tableau_stack_10">
-                                    <property name="width-request">74</property>
-                                    <property name="height-request">120</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="hexpand">False</property>
-                                    <property name="vexpand">False</property>
+                                    <property name="homogeneous">False</property>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_1">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_2">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_3">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_4">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_5">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_6">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_7">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_8">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_9">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
+                                    <child>
+                                      <object class="GtkFixed" id="tableau_stack_10">
+                                        <property name="width-request">74</property>
+                                        <property name="height-request">120</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="hexpand">False</property>
+                                        <property name="vexpand">False</property>
+                                      </object>
+                                    </child>
                                   </object>
                                 </child>
                               </object>
@@ -933,15 +987,15 @@
         <attribute name="custom">game-mode-row</attribute>
       </item>
       <item>
-        <attribute name="label" translatable="yes">_Deal</attribute>
+        <attribute name="label" translatable="yes">_Game State</attribute>
         <link name="submenu">
           <section>
             <item>
-              <attribute name="label" translatable="yes">_Start Random Deal</attribute>
+              <attribute name="label" translatable="yes">_Start Random Game</attribute>
               <attribute name="action">win.random-seed</attribute>
             </item>
             <item>
-              <attribute name="label" translatable="yes">_Winnable Deal</attribute>
+              <attribute name="label" translatable="yes">_Find Winnable Game</attribute>
               <attribute name="action">win.winnable-seed</attribute>
             </item>
             <item>
@@ -1036,6 +1090,10 @@
             <item>
               <attribute name="label" translatable="yes">_Copy Benchmark Snapshot</attribute>
               <attribute name="action">win.copy-benchmark-snapshot</attribute>
+            </item>
+            <item>
+              <attribute name="label" translatable="yes">_Clear All Cardthropic Settings and History</attribute>
+              <attribute name="action">win.clear-all-settings-history</attribute>
             </item>
           </section>
         </link>

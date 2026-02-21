@@ -104,6 +104,16 @@ impl CardthropicWindow {
     }
 
     pub(super) fn play_hint_for_player(&self) -> bool {
+        if self.imp().chess_mode_active.get() {
+            if self.has_pending_chess_ai_search() {
+                self.cancel_pending_chess_ai_search();
+                *self.imp().status_override.borrow_mut() =
+                    Some("Chess AI search canceled.".to_string());
+                self.render();
+                return true;
+            }
+            return self.play_chess_ai_hint_move();
+        }
         if !self.guard_mode_engine("Play hint move") {
             return false;
         }
@@ -242,7 +252,7 @@ impl CardthropicWindow {
 
     fn freecell_mobility_count_for_wand(game: &FreecellGame) -> u32 {
         let mut count = 0_u32;
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             if game.can_move_freecell_to_foundation(cell) {
                 count = count.saturating_add(1);
             }
@@ -256,7 +266,7 @@ impl CardthropicWindow {
             if game.can_move_tableau_top_to_foundation(src) {
                 count = count.saturating_add(1);
             }
-            for cell in 0..4 {
+            for cell in 0..game.freecell_count() {
                 if game.can_move_tableau_top_to_freecell(src, cell) {
                     count = count.saturating_add(1);
                 }
@@ -638,7 +648,7 @@ impl CardthropicWindow {
         } else {
             (
                 if self.imp().game.borrow().freecell().is_lost() {
-                    "Hint: no legal moves. FreeCell game is lost.".to_string()
+                    "Hint: no legal moves. FreeCell line is blocked.".to_string()
                 } else {
                     "Hint: no legal moves. FreeCell line is blocked.".to_string()
                 },
@@ -1418,7 +1428,7 @@ impl CardthropicWindow {
         };
         let state_ref = state_guard.as_ref();
 
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             let legal = if let Some(state) = state_ref {
                 boundary::can_move_freecell_to_foundation(state, GameMode::Freecell, cell)
             } else {
@@ -1494,7 +1504,7 @@ impl CardthropicWindow {
             });
         }
 
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             for dst in 0..8 {
                 let legal = if let Some(state) = state_ref {
                     boundary::can_move_freecell_to_tableau(state, GameMode::Freecell, cell, dst)
@@ -1586,7 +1596,7 @@ impl CardthropicWindow {
                 continue;
             };
             let card = game.tableau_top(src);
-            for cell in 0..4 {
+            for cell in 0..game.freecell_count() {
                 if !game.can_move_tableau_top_to_freecell(src, cell) {
                     continue;
                 }
@@ -1702,8 +1712,9 @@ impl CardthropicWindow {
             .iter()
             .filter(|slot| slot.is_none())
             .count();
-        let used_before = 4_usize.saturating_sub(empty_before);
-        let used_after = 4_usize.saturating_sub(empty_after);
+        let total_free = current.freecell_count();
+        let used_before = total_free.saturating_sub(empty_before);
+        let used_after = total_free.saturating_sub(empty_after);
         let mobility_delta = Self::freecell_legal_move_count(next) as i64
             - Self::freecell_legal_move_count(current) as i64;
         let mut bias = 0_i64;
@@ -1723,7 +1734,7 @@ impl CardthropicWindow {
         } else if used_after < used_before {
             // Small reward for freeing slots, especially when previously saturated.
             bias += 90;
-            if used_before == 4 {
+            if used_before == total_free {
                 bias += 110;
             }
         }
@@ -1793,7 +1804,7 @@ impl CardthropicWindow {
     }
 
     fn freecell_has_foundation_push(game: &FreecellGame) -> bool {
-        (0..4).any(|cell| game.can_move_freecell_to_foundation(cell))
+        (0..game.freecell_count()).any(|cell| game.can_move_freecell_to_foundation(cell))
             || (0..8).any(|src| game.can_move_tableau_top_to_foundation(src))
     }
 
@@ -1903,7 +1914,7 @@ impl CardthropicWindow {
 
     fn freecell_legal_move_count(game: &FreecellGame) -> usize {
         let mut count = 0_usize;
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             if game.can_move_freecell_to_foundation(cell) {
                 count += 1;
             }
@@ -1917,7 +1928,7 @@ impl CardthropicWindow {
             if game.can_move_tableau_top_to_foundation(src) {
                 count += 1;
             }
-            for cell in 0..4 {
+            for cell in 0..game.freecell_count() {
                 if game.can_move_tableau_top_to_freecell(src, cell) {
                     count += 1;
                 }
@@ -1935,7 +1946,7 @@ impl CardthropicWindow {
     }
 
     fn freecell_foundation_push_count(game: &FreecellGame) -> usize {
-        let from_freecells = (0..4)
+        let from_freecells = (0..game.freecell_count())
             .filter(|&cell| game.can_move_freecell_to_foundation(cell))
             .count();
         let from_tableau = (0..8)

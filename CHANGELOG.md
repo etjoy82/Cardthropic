@@ -9,7 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Documentation and maintainer release tooling continue to be refined for the beta testbed workflow.
+- Card rendering moved from SVG/PNG sheet rasterization to a CSS + Unicode card pipeline.
+- FreeCell ludicrous robot now tracks a formal Unicode-render baseline of ~40ms/move with stable RSS at 38 MiB (see `benchmarks/freecell_baseline.json`).
+- Rendering stack dependencies were reduced by removing direct `resvg` and `png` usage (lockfile package count: 162 -> 107).
 
+
+
+## [0.10.0-beta] - 2026-02-20
+
+### Changed
+- Added Atomic Chess (preview) variant wiring and ruleset scaffolding.
+- Migrated card rendering from SVG/PNG assets to CSS + Unicode symbols for lower memory and smoother ludicrous robot pacing.
+- Hardened Flatpak/AppStream release metadata flow and bundle metadata wiring.
 
 ## [0.9.5-beta] - 2026-02-18
 

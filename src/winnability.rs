@@ -1916,17 +1916,57 @@ fn spider_rollout_candidate_score(attempt: &SpiderSinglePlaythroughResult) -> i6
         - (attempt.face_down_cards as i64) * 90
 }
 
-fn spider4_candidate_is_promising(attempt: &SpiderSinglePlaythroughResult) -> bool {
-    attempt.completed_runs > 0
-        || attempt.peak_empty_cols > 0
-        || attempt.empty_creates > 0
-        || attempt.peak_suited_edges >= 12
-        || attempt.peak_tail_run >= 16
+fn spider_candidate_is_promising(
+    attempt: &SpiderSinglePlaythroughResult,
+    suit_mode: SpiderSuitMode,
+) -> bool {
+    match suit_mode {
+        SpiderSuitMode::One => {
+            attempt.completed_runs > 0
+                || attempt.peak_empty_cols > 0
+                || attempt.empty_creates > 0
+                || attempt.peak_suited_edges >= 10
+                || attempt.peak_tail_run >= 14
+        }
+        SpiderSuitMode::Two => {
+            attempt.completed_runs > 0
+                || attempt.peak_empty_cols > 0
+                || attempt.empty_creates > 0
+                || attempt.peak_suited_edges >= 8
+                || attempt.peak_tail_run >= 12
+                || attempt.reveal_moves >= 10
+        }
+        SpiderSuitMode::Three => {
+            attempt.completed_runs > 0
+                || attempt.peak_empty_cols > 0
+                || attempt.empty_creates > 0
+                || attempt.peak_suited_edges >= 10
+                || attempt.peak_tail_run >= 14
+                || attempt.reveal_moves >= 12
+        }
+        SpiderSuitMode::Four => {
+            attempt.completed_runs > 0
+                || attempt.peak_empty_cols > 0
+                || attempt.empty_creates > 0
+                || attempt.peak_suited_edges >= 12
+                || attempt.peak_tail_run >= 16
+        }
+    }
 }
 
-fn spider4_verifier_budgets(guided_budget: usize, exhaustive_budget: usize) -> (usize, usize) {
-    let base = guided_budget.saturating_add(exhaustive_budget).max(240_000);
-    let boosted = base.saturating_mul(2).clamp(240_000, 1_200_000);
+fn spider_verifier_budgets(
+    suit_mode: SpiderSuitMode,
+    guided_budget: usize,
+    exhaustive_budget: usize,
+) -> (usize, usize) {
+    let (floor, cap) = match suit_mode {
+        SpiderSuitMode::One => (180_000, 900_000),
+        SpiderSuitMode::Two => (220_000, 1_000_000),
+        SpiderSuitMode::Three => (260_000, 1_200_000),
+        SpiderSuitMode::Four => (240_000, 1_200_000),
+    };
+    let base = guided_budget.saturating_add(exhaustive_budget).max(floor);
+    let boosted = base.saturating_mul(2).clamp(floor, cap);
     (boosted, boosted / 2)
 }
 
@@ -2163,7 +2203,7 @@ fn freecell_foundation_cards(game: &FreecellGame) -> usize {
 
 fn freecell_legal_move_count(game: &FreecellGame) -> usize {
     let mut count = 0_usize;
-    for cell in 0..4 {
+    for cell in 0..game.freecell_count() {
         if game.can_move_freecell_to_foundation(cell) {
             count += 1;
         }
@@ -2177,7 +2217,7 @@ fn freecell_legal_move_count(game: &FreecellGame) -> usize {
         if game.can_move_tableau_top_to_foundation(src) {
             count += 1;
         }
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             if game.can_move_tableau_top_to_freecell(src, cell) {
                 count += 1;
             }
@@ -2234,13 +2274,14 @@ fn freecell_state_eval(game: &FreecellGame) -> i64 {
     let empty_cols = game.tableau().iter().filter(|col| col.is_empty()).count() as i64;
     let buried_starters_penalty = freecell_buried_starter_depth_penalty(game);
     let deadlock_penalty = freecell_same_suit_deadlock_penalty(game);
+    let total_free = game.freecell_count() as i64;
 
     let mut score = foundation * 10_000 + empty_free * 500 + empty_cols * 2_000 + mobility * 160;
-    let occupied = 4_i64.saturating_sub(empty_free);
-    if occupied >= 3 {
+    let occupied = total_free.saturating_sub(empty_free);
+    if occupied >= (total_free - 1).max(1) {
         score -= 2_000;
     }
-    if occupied == 4 {
+    if occupied == total_free {
         score -= 6_500;
     }
     score - buried_starters_penalty - deadlock_penalty
@@ -2276,7 +2317,7 @@ fn freecell_slot_preference_bias(card: Option<crate::game::Card>, cell: usize) -
 }
 
 fn freecell_has_foundation_push(game: &FreecellGame) -> bool {
-    (0..4).any(|cell| game.can_move_freecell_to_foundation(cell))
+    (0..game.freecell_count()).any(|cell| game.can_move_freecell_to_foundation(cell))
         || (0..8).any(|src| game.can_move_tableau_top_to_foundation(src))
 }
 
@@ -2408,8 +2449,9 @@ fn freecell_multi_cell_utilization_bias(current: &FreecellGame, next: &FreecellG
         .iter()
         .filter(|slot| slot.is_none())
         .count();
-    let used_before = 4_usize.saturating_sub(empty_before);
-    let used_after = 4_usize.saturating_sub(empty_after);
+    let total_free = current.freecell_count();
+    let used_before = total_free.saturating_sub(empty_before);
+    let used_after = total_free.saturating_sub(empty_after);
     let mobility_delta =
         freecell_legal_move_count(next) as i64 - freecell_legal_move_count(current) as i64;
     let mut bias = 0_i64;
@@ -2427,7 +2469,7 @@ fn freecell_multi_cell_utilization_bias(current: &FreecellGame, next: &FreecellG
         }
     } else if used_after < used_before {
         bias += 90;
-        if used_before == 4 {
+        if used_before == total_free {
             bias += 110;
         }
     }
@@ -2494,7 +2536,7 @@ fn freecell_wand_candidates(
 ) -> Vec<(FreecellGame, FreecellPlannerAction, i64)> {
     let mut out = Vec::new();
 
-    for cell in 0..4 {
+    for cell in 0..game.freecell_count() {
         if !game.can_move_freecell_to_foundation(cell) {
             continue;
         }
@@ -2534,7 +2576,7 @@ fn freecell_wand_candidates(
         ));
     }
 
-    for cell in 0..4 {
+    for cell in 0..game.freecell_count() {
         for dst in 0..8 {
             if !game.can_move_freecell_to_tableau(cell, dst) {
                 continue;
@@ -2587,7 +2629,7 @@ fn freecell_wand_candidates(
 
     for src in 0..8 {
         let card = game.tableau_top(src);
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             if !game.can_move_tableau_top_to_freecell(src, cell) {
                 continue;
             }
@@ -3131,14 +3173,25 @@ pub fn find_winnable_spider_seed_parallel(
         let progress_checked = progress_checked.clone();
         let progress_stats = progress_stats.clone();
         let handle = thread::spawn(move || loop {
-            const SPIDER4_TOP_K: usize = 6;
-            const SPIDER4_VERIFY_INTERVAL: u32 = 24;
+            let verification_enabled = suit_mode != SpiderSuitMode::One;
+            let top_k = match suit_mode {
+                SpiderSuitMode::One => 0,
+                SpiderSuitMode::Two => 8,
+                SpiderSuitMode::Three => 8,
+                SpiderSuitMode::Four => 6,
+            };
+            let verify_interval = match suit_mode {
+                SpiderSuitMode::One => u32::MAX,
+                SpiderSuitMode::Two => 12,
+                SpiderSuitMode::Three => 16,
+                SpiderSuitMode::Four => 24,
+            };
             let mut candidate_pool: Vec<(i64, u64, u32)> = Vec::new();
             let mut verified_candidates: HashSet<u64> = HashSet::new();
             let mut since_verify = 0_u32;
 
             let mut verify_best_candidate = |candidate_pool: &mut Vec<(i64, u64, u32)>| -> bool {
-                if suit_mode != SpiderSuitMode::Four || cancel.load(Ordering::Relaxed) {
+                if !verification_enabled || cancel.load(Ordering::Relaxed) {
                     return false;
                 }
                 candidate_pool.sort_by(|a, b| b.0.cmp(&a.0));
@@ -3148,7 +3201,7 @@ pub fn find_winnable_spider_seed_parallel(
                         continue;
                     }
                     let (verify_guided, verify_exhaustive) =
-                        spider4_verifier_budgets(guided_budget, exhaustive_budget);
+                        spider_verifier_budgets(suit_mode, guided_budget, exhaustive_budget);
                     let won_line = is_spider_seed_winnable(
                         cseed,
                         suit_mode,
@@ -3219,9 +3272,12 @@ pub fn find_winnable_spider_seed_parallel(
                     return;
                 }
 
-                if suit_mode == SpiderSuitMode::Four && spider4_candidate_is_promising(&attempt) {
-                    let score = spider_rollout_candidate_score(&attempt);
-                    if candidate_pool.len() < SPIDER4_TOP_K {
+                if verification_enabled && top_k > 0 {
+                    let mut score = spider_rollout_candidate_score(&attempt);
+                    if spider_candidate_is_promising(&attempt, suit_mode) {
+                        score = score.saturating_add(50_000);
+                    }
+                    if candidate_pool.len() < top_k {
                         candidate_pool.push((score, seed, index + 1));
                     } else if let Some((min_i, _)) = candidate_pool
                         .iter()
@@ -3235,7 +3291,7 @@ pub fn find_winnable_spider_seed_parallel(
                 }
 
                 since_verify = since_verify.saturating_add(1);
-                if since_verify >= SPIDER4_VERIFY_INTERVAL {
+                if verification_enabled && since_verify >= verify_interval {
                     since_verify = 0;
                     if verify_best_candidate(&mut candidate_pool) {
                         return;
@@ -3246,7 +3302,10 @@ pub fn find_winnable_spider_seed_parallel(
                 }
             }
 
-            while !cancel.load(Ordering::Relaxed) && !candidate_pool.is_empty() {
+            while verification_enabled
+                && !cancel.load(Ordering::Relaxed)
+                && !candidate_pool.is_empty()
+            {
                 if verify_best_candidate(&mut candidate_pool) {
                     return;
                 }
@@ -3487,6 +3546,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "winnability-diagnostics")]
     #[test]
     fn spider_four_suit_headless_search_emits_empty_metrics() {
         let cancel = Arc::new(AtomicBool::new(false));
@@ -3531,6 +3591,7 @@ mod tests {
         assert!(checked > 0, "search should evaluate at least one seed");
     }
 
+    #[cfg(feature = "winnability-diagnostics")]
     #[test]
     fn spider_four_suit_headless_batch_diagnostics() {
         let starts = [
@@ -3613,6 +3674,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "winnability-diagnostics")]
     #[test]
     fn spider_one_suit_headless_batch_winrate() {
         let starts = [

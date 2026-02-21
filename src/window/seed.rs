@@ -4,6 +4,15 @@ use crate::game::FreecellGame;
 use crate::game::SpiderGame;
 
 impl CardthropicWindow {
+    pub(super) fn new_game_started_timestamp_status(&self) -> String {
+        let formatted = glib::DateTime::now_local()
+            .ok()
+            .and_then(|now| now.format("%Y-%m-%d %H:%M:%S %Z (UTC%z)").ok())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "unknown local time".to_string());
+        format!("New game started at {formatted}.")
+    }
+
     pub(super) fn start_new_game_with_seed(&self, seed: u64, status: String) {
         self.start_new_game_with_seed_internal(seed, status, false);
     }
@@ -29,12 +38,14 @@ impl CardthropicWindow {
                 .set_spider(SpiderGame::new_with_seed_and_mode(seed, suit_mode));
         } else if mode == GameMode::Freecell {
             let card_count_mode = imp.freecell_card_count_mode.get();
-            imp.game
-                .borrow_mut()
-                .set_freecell(FreecellGame::new_with_seed_and_card_count(
+            let freecell_count = imp.freecell_cell_count.get();
+            imp.game.borrow_mut().set_freecell(
+                FreecellGame::new_with_seed_and_card_count_and_cells(
                     seed,
                     card_count_mode,
-                ));
+                    freecell_count,
+                ),
+            );
         }
         let _ = boundary::initialize_seeded_with_draw_mode(
             &mut imp.game.borrow_mut(),
@@ -50,7 +61,6 @@ impl CardthropicWindow {
         *imp.selected_run.borrow_mut() = None;
         imp.selected_freecell.set(None);
         imp.waste_selected.set(false);
-        *imp.deck_error.borrow_mut() = None;
         imp.pending_deal_instructions.set(true);
         imp.history.borrow_mut().clear();
         imp.future.borrow_mut().clear();
@@ -66,6 +76,17 @@ impl CardthropicWindow {
         }
         let state_hash = self.current_game_hash();
         self.start_hint_loss_analysis_if_needed(state_hash);
+        let status = if mode == GameMode::Freecell {
+            let already_mentions_cells = status.to_ascii_lowercase().contains("free cell");
+            if already_mentions_cells {
+                status
+            } else {
+                format!("{status} | Free Cells: {}", imp.freecell_cell_count.get())
+            }
+        } else {
+            status
+        };
+
         if imp.robot_debug_enabled.get() {
             let snapshot = self.build_saved_session();
             self.append_status_history_only(&format!("game_state_begin\n{snapshot}"));
@@ -74,6 +95,7 @@ impl CardthropicWindow {
         } else {
             *imp.status_override.borrow_mut() = Some(status);
         }
+        self.append_status_history_only(&self.new_game_started_timestamp_status());
         self.render();
         self.grab_focus();
     }

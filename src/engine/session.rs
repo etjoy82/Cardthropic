@@ -48,7 +48,9 @@ fn derive_freecell_card_count_mode(runtime: &VariantRuntime) -> FreecellCardCoun
 pub fn decode_persisted_session(raw: &str) -> Option<PersistedSession> {
     let mut fields = HashMap::<&str, &str>::new();
     for line in raw.lines() {
-        let (key, value) = line.split_once('=')?;
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
         fields.insert(key.trim(), value.trim());
     }
 

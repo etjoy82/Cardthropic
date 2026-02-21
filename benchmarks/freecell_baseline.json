@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "generated_at_unix": 1771376554,
+  "generated_at_unix": 1771610826,
+  "generated_at_utc": "2026-02-20T18:07:06Z",
   "mode": "freecell",
   "card_count": 52,
   "start_seed": 4954934047608000431,
@@ -20,6 +21,13 @@
     "elapsed_seconds": 0.000
   },
   "memory": {
-    "peak_rss_mib": 23
+    "peak_rss_mib": 38,
+    "steady_rss_mib": 38
+  },
+  "render_pipeline": {
+    "cards": "css-unicode",
+    "robot_ludicrous_ms_per_move": 40,
+    "stutter_observed": false,
+    "source": "interactive_desktop_measurement"
   }
 }

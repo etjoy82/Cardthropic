@@ -1,4 +1,4 @@
-use crate::game::{Card, FreecellCardCountMode, FreecellGame, Suit};
+use crate::game::{Card, FreecellCardCountMode, FreecellGame, Suit, FREECELL_MAX_CELL_COUNT};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
@@ -90,7 +90,8 @@ struct PlannerUndo {
 #[derive(Clone)]
 struct PlannerState {
     foundations: [u8; 4],
-    freecells: [Option<Card>; 4],
+    freecell_count: u8,
+    freecells: [Option<Card>; FREECELL_SLOT_MAX],
     cols: [Vec<Card>; 8],
     zhash: u64,
 }
@@ -168,7 +169,8 @@ struct Node {
     path: Vec<FreecellPlannerAction>,
 }
 
-const PLANNER_KEY_BYTES: usize = 68;
+const FREECELL_SLOT_MAX: usize = FREECELL_MAX_CELL_COUNT as usize;
+const PLANNER_KEY_BYTES: usize = 4 + FREECELL_SLOT_MAX + 8 + 52;
 const PLANNER_KEY_EMPTY: u8 = 0xFF;
 
 #[derive(Clone, Copy)]
@@ -533,7 +535,7 @@ pub fn zobrist_hash(game: &FreecellGame) -> u64 {
     let mut hash = 0_u64;
     let tableau_base = 0usize; // 8 * 52 slots
     let freecell_base = tableau_base + (8 * 52);
-    let foundation_base = freecell_base + 4;
+    let foundation_base = freecell_base + FREECELL_SLOT_MAX;
 
     // Keep tableau column identity stable in the hash (no column sorting).
     for (col, pile) in game.tableau().iter().enumerate() {
@@ -550,7 +552,7 @@ pub fn zobrist_hash(game: &FreecellGame) -> u64 {
     fc_cards.sort_by_key(|card| (card.suit.foundation_index(), card.rank));
     for (idx, card) in fc_cards.iter().enumerate() {
         let card_idx = zobrist_card_index(*card);
-        let pos_idx = freecell_base + idx.min(3);
+        let pos_idx = freecell_base + idx.min(FREECELL_SLOT_MAX.saturating_sub(1));
         hash ^= zobrist_value(card_idx, pos_idx);
     }
 
@@ -579,6 +581,9 @@ fn make_planner_key_from_state(st: &PlannerState) -> PlannerKey {
 
 fn pack_state_key(game: &FreecellGame) -> [u8; PLANNER_KEY_BYTES] {
     let mut bytes = [PLANNER_KEY_EMPTY; PLANNER_KEY_BYTES];
+    let freecell_offset = 4usize;
+    let tableau_len_offset = freecell_offset + FREECELL_SLOT_MAX;
+    let tableau_cards_offset = tableau_len_offset + 8;
 
     for suit in 0..4 {
         bytes[suit] = game
@@ -597,8 +602,12 @@ fn pack_state_key(game: &FreecellGame) -> [u8; PLANNER_KEY_BYTES] {
         .map(card_to_u8)
         .collect();
     freecell_cards.sort_unstable();
-    for (idx, card) in freecell_cards.into_iter().take(4).enumerate() {
-        bytes[4 + idx] = card;
+    for (idx, card) in freecell_cards
+        .into_iter()
+        .take(FREECELL_SLOT_MAX)
+        .enumerate()
+    {
+        bytes[freecell_offset + idx] = card;
     }
 
     // Canonicalize tableau columns in key view only (safe for replay since state is unchanged).
@@ -611,10 +620,10 @@ fn pack_state_key(game: &FreecellGame) -> [u8; PLANNER_KEY_BYTES] {
 
     for col in 0..8 {
         let len = canonical_cols.get(col).map(Vec::len).unwrap_or(0).min(52);
-        bytes[8 + col] = len as u8;
+        bytes[tableau_len_offset + col] = len as u8;
     }
 
-    let mut out = 16usize;
+    let mut out = tableau_cards_offset;
     for cards in canonical_cols.iter().take(8) {
         for &card in cards {
             if out >= PLANNER_KEY_BYTES {
@@ -633,17 +642,25 @@ fn pack_state_key(game: &FreecellGame) -> [u8; PLANNER_KEY_BYTES] {
 
 fn pack_planner_state_key(st: &PlannerState) -> [u8; PLANNER_KEY_BYTES] {
     let mut bytes = [PLANNER_KEY_EMPTY; PLANNER_KEY_BYTES];
+    let freecell_offset = 4usize;
+    let tableau_len_offset = freecell_offset + FREECELL_SLOT_MAX;
+    let tableau_cards_offset = tableau_len_offset + 8;
 
     bytes[..4].copy_from_slice(&st.foundations);
 
     let mut freecell_cards: Vec<u8> = st
         .freecells
         .iter()
+        .take(st.freecell_count as usize)
         .filter_map(|slot| slot.map(card_to_u8))
         .collect();
     freecell_cards.sort_unstable();
-    for (idx, card) in freecell_cards.into_iter().take(4).enumerate() {
-        bytes[4 + idx] = card;
+    for (idx, card) in freecell_cards
+        .into_iter()
+        .take(FREECELL_SLOT_MAX)
+        .enumerate()
+    {
+        bytes[freecell_offset + idx] = card;
     }
 
     let mut canonical_cols: Vec<Vec<u8>> = st
@@ -655,10 +672,10 @@ fn pack_planner_state_key(st: &PlannerState) -> [u8; PLANNER_KEY_BYTES] {
 
     for col in 0..8 {
         let len = canonical_cols.get(col).map(Vec::len).unwrap_or(0).min(52);
-        bytes[8 + col] = len as u8;
+        bytes[tableau_len_offset + col] = len as u8;
     }
 
-    let mut out = 16usize;
+    let mut out = tableau_cards_offset;
     for cards in canonical_cols.iter().take(8) {
         for &card in cards {
             if out >= PLANNER_KEY_BYTES {
@@ -725,9 +742,17 @@ fn can_move_to_foundation(card: Card, foundations: &[u8; 4]) -> bool {
 
 fn planner_state_from_game(game: &FreecellGame) -> PlannerState {
     let z = planner_zobrist();
+    let mut freecells = [None; FREECELL_SLOT_MAX];
+    for (idx, slot) in game.freecells().iter().copied().enumerate() {
+        if idx >= freecells.len() {
+            break;
+        }
+        freecells[idx] = slot;
+    }
     let mut st = PlannerState {
         foundations: [0; 4],
-        freecells: *game.freecells(),
+        freecell_count: game.freecell_count() as u8,
+        freecells,
         cols: game.tableau().clone(),
         zhash: 0,
     };
@@ -740,7 +765,12 @@ fn planner_state_from_game(game: &FreecellGame) -> PlannerState {
             .min(13) as u8;
         st.zhash ^= z.found[suit_idx][st.foundations[suit_idx] as usize];
     }
-    for card in st.freecells.iter().flatten() {
+    for card in st
+        .freecells
+        .iter()
+        .take(st.freecell_count as usize)
+        .flatten()
+    {
         st.zhash ^= z.fc_any[card_id(*card)];
     }
     for (col, pile) in st.cols.iter().enumerate() {
@@ -763,7 +793,13 @@ fn planner_state_to_game(
         }
         pile
     });
-    FreecellGame::from_parts_unchecked(card_count_mode, foundations, st.freecells, st.cols.clone())
+    FreecellGame::from_parts_unchecked_with_cell_count(
+        card_count_mode,
+        foundations,
+        st.freecell_count,
+        st.freecells,
+        st.cols.clone(),
+    )
 }
 
 fn peek_source_card(
@@ -776,7 +812,13 @@ fn peek_source_card(
             .last()
             .copied()
             .ok_or(PlannerIllegalMove::EmptySource),
-        PlannerLoc::Free(fi) => st.freecells[fi as usize].ok_or(PlannerIllegalMove::EmptySource),
+        PlannerLoc::Free(fi) => {
+            let idx = fi as usize;
+            if idx >= st.freecell_count as usize {
+                return Err(PlannerIllegalMove::EmptySource);
+            }
+            st.freecells[idx].ok_or(PlannerIllegalMove::EmptySource)
+        }
         PlannerLoc::Found(su) => {
             if !allow_found_as_source {
                 return Err(PlannerIllegalMove::FoundationMoveNotAllowed);
@@ -806,7 +848,11 @@ fn check_dest_legal(
             Ok(())
         }
         PlannerLoc::Free(fi) => {
-            if st.freecells[fi as usize].is_some() {
+            let idx = fi as usize;
+            if idx >= st.freecell_count as usize {
+                return Err(PlannerIllegalMove::NonEmptyFreecellDest);
+            }
+            if st.freecells[idx].is_some() {
                 return Err(PlannerIllegalMove::NonEmptyFreecellDest);
             }
             Ok(())
@@ -992,6 +1038,7 @@ fn generate_moves(
     let first_empty_fc = st
         .freecells
         .iter()
+        .take(st.freecell_count as usize)
         .position(|slot| slot.is_none())
         .map(|idx| idx as u8);
     let first_empty_col = (0..8)
@@ -1029,7 +1076,7 @@ fn generate_moves(
         }
     }
 
-    for free in 0..4_u8 {
+    for free in 0..st.freecell_count {
         if let Some(card) = st.freecells[free as usize] {
             if can_move_to_foundation(card, &st.foundations) {
                 let suit = card.suit.foundation_index() as u8;
@@ -1042,7 +1089,7 @@ fn generate_moves(
         }
     }
 
-    for free in 0..4_u8 {
+    for free in 0..st.freecell_count {
         let Some(card) = st.freecells[free as usize] else {
             continue;
         };
@@ -1288,7 +1335,11 @@ fn count_foundation_cards_state(st: &PlannerState) -> u32 {
 }
 
 fn count_empty_freecells_state(st: &PlannerState) -> u32 {
-    st.freecells.iter().filter(|slot| slot.is_none()).count() as u32
+    st.freecells
+        .iter()
+        .take(st.freecell_count as usize)
+        .filter(|slot| slot.is_none())
+        .count() as u32
 }
 
 fn count_empty_cols_state(st: &PlannerState) -> u32 {
@@ -1304,7 +1355,7 @@ fn count_immediate_found_moves_state(st: &PlannerState) -> u32 {
             }
         }
     }
-    for free in 0..4 {
+    for free in 0..st.freecell_count as usize {
         if let Some(card) = st.freecells[free] {
             if can_move_to_foundation(card, &st.foundations) {
                 n = n.saturating_add(1);
@@ -1782,7 +1833,7 @@ fn generate_relocation_candidates(game: &FreecellGame) -> Vec<Candidate> {
         }
 
         // Relocation attempt 1: move top blocker card to freecell.
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             if is_empty_freecell_slot(game, cell) && Some(cell) != first_empty_fc {
                 continue;
             }
@@ -1930,7 +1981,7 @@ fn heuristic(game: &FreecellGame) -> i64 {
 }
 
 fn first_safe_foundation_action(game: &FreecellGame) -> Option<FreecellPlannerAction> {
-    for cell in 0..4 {
+    for cell in 0..game.freecell_count() {
         if game.can_move_freecell_to_foundation(cell)
             && safe_foundation_card(game, game.freecell_card(cell))
         {
@@ -2038,7 +2089,7 @@ fn legal_move_count(game: &FreecellGame) -> usize {
     let mut count = 0usize;
     let first_empty_fc = first_empty_freecell(game);
     let first_empty_col = first_empty_tableau_col(game);
-    for cell in 0..4 {
+    for cell in 0..game.freecell_count() {
         if game.can_move_freecell_to_foundation(cell) {
             count += 1;
         }
@@ -2055,7 +2106,7 @@ fn legal_move_count(game: &FreecellGame) -> usize {
         if game.can_move_tableau_top_to_foundation(src) {
             count += 1;
         }
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             if is_empty_freecell_slot(game, cell) && Some(cell) != first_empty_fc {
                 continue;
             }

@@ -6,7 +6,7 @@ impl CardthropicWindow {
     pub(super) fn render_tableau_columns(
         &self,
         game: &KlondikeGame,
-        deck: &AngloDeck,
+        deck: Option<&AngloDeck>,
         card_width: i32,
         card_height: i32,
         face_up_step: i32,
@@ -18,6 +18,7 @@ impl CardthropicWindow {
         let stacks = self.tableau_stacks();
         let mut tableau_card_pictures = imp.tableau_card_pictures.borrow_mut();
         let mut tableau_picture_state_cache = imp.tableau_picture_state_cache.borrow_mut();
+        let card_render_mode = self.current_card_render_mode();
         if tableau_card_pictures.len() < stacks.len() {
             tableau_card_pictures.resize_with(stacks.len(), Vec::new);
         }
@@ -89,15 +90,32 @@ impl CardthropicWindow {
                     }
                 }
 
-                if previous.map(|state| (state.card, state.display_face_up))
-                    != Some((*card, show_face_up))
-                {
-                    let texture = if show_face_up {
-                        deck.texture_for_card(*card)
+                if previous.map(|state| {
+                    (
+                        state.card,
+                        state.display_face_up,
+                        state.card_render_mode,
+                        state.card_width,
+                        state.card_height,
+                    )
+                }) != Some((
+                    *card,
+                    show_face_up,
+                    card_render_mode,
+                    card_width,
+                    card_height,
+                )) {
+                    if let Some(paintable) = self.paintable_for_card_display(
+                        Some(*card),
+                        show_face_up,
+                        deck,
+                        card_width,
+                        card_height,
+                    ) {
+                        picture.set_paintable(Some(&paintable));
                     } else {
-                        deck.back_texture()
-                    };
-                    picture.set_paintable(Some(&texture));
+                        picture.set_paintable(None::<&gdk::Paintable>);
+                    }
                 }
 
                 if previous.map(|state| state.y) != Some(y) {
@@ -108,6 +126,7 @@ impl CardthropicWindow {
                     *slot = Some(TableauPictureRenderState {
                         card: *card,
                         display_face_up: show_face_up,
+                        card_render_mode,
                         selected,
                         y,
                         card_width,
@@ -142,7 +161,7 @@ impl CardthropicWindow {
     pub(super) fn render_tableau_columns_spider(
         &self,
         game: &SpiderGame,
-        deck: &AngloDeck,
+        deck: Option<&AngloDeck>,
         card_width: i32,
         card_height: i32,
         face_up_step: i32,
@@ -154,6 +173,7 @@ impl CardthropicWindow {
         let stacks = self.tableau_stacks();
         let mut tableau_card_pictures = imp.tableau_card_pictures.borrow_mut();
         let mut tableau_picture_state_cache = imp.tableau_picture_state_cache.borrow_mut();
+        let card_render_mode = self.current_card_render_mode();
         if tableau_card_pictures.len() < stacks.len() {
             tableau_card_pictures.resize_with(stacks.len(), Vec::new);
         }
@@ -225,15 +245,32 @@ impl CardthropicWindow {
                     }
                 }
 
-                if previous.map(|state| (state.card, state.display_face_up))
-                    != Some((*card, show_face_up))
-                {
-                    let texture = if show_face_up {
-                        deck.texture_for_card(*card)
+                if previous.map(|state| {
+                    (
+                        state.card,
+                        state.display_face_up,
+                        state.card_render_mode,
+                        state.card_width,
+                        state.card_height,
+                    )
+                }) != Some((
+                    *card,
+                    show_face_up,
+                    card_render_mode,
+                    card_width,
+                    card_height,
+                )) {
+                    if let Some(paintable) = self.paintable_for_card_display(
+                        Some(*card),
+                        show_face_up,
+                        deck,
+                        card_width,
+                        card_height,
+                    ) {
+                        picture.set_paintable(Some(&paintable));
                     } else {
-                        deck.back_texture()
-                    };
-                    picture.set_paintable(Some(&texture));
+                        picture.set_paintable(None::<&gdk::Paintable>);
+                    }
                 }
 
                 if previous.map(|state| state.y) != Some(y) {
@@ -244,6 +281,7 @@ impl CardthropicWindow {
                     *slot = Some(TableauPictureRenderState {
                         card: *card,
                         display_face_up: show_face_up,
+                        card_render_mode,
                         selected,
                         y,
                         card_width,
@@ -278,7 +316,7 @@ impl CardthropicWindow {
     pub(super) fn render_tableau_columns_freecell(
         &self,
         game: &FreecellGame,
-        deck: &AngloDeck,
+        deck: Option<&AngloDeck>,
         card_width: i32,
         card_height: i32,
         face_up_step: i32,
@@ -289,6 +327,7 @@ impl CardthropicWindow {
         let stacks = self.tableau_stacks();
         let mut tableau_card_pictures = imp.tableau_card_pictures.borrow_mut();
         let mut tableau_picture_state_cache = imp.tableau_picture_state_cache.borrow_mut();
+        let card_render_mode = self.current_card_render_mode();
         if tableau_card_pictures.len() < stacks.len() {
             tableau_card_pictures.resize_with(stacks.len(), Vec::new);
         }
@@ -355,9 +394,26 @@ impl CardthropicWindow {
                     }
                 }
 
-                if previous.map(|state| state.card) != Some(*card) {
-                    let texture = deck.texture_for_card(*card);
-                    picture.set_paintable(Some(&texture));
+                if previous.map(|state| {
+                    (
+                        state.card,
+                        state.card_render_mode,
+                        state.card_width,
+                        state.card_height,
+                    )
+                }) != Some((*card, card_render_mode, card_width, card_height))
+                {
+                    if let Some(paintable) = self.paintable_for_card_display(
+                        Some(*card),
+                        true,
+                        deck,
+                        card_width,
+                        card_height,
+                    ) {
+                        picture.set_paintable(Some(&paintable));
+                    } else {
+                        picture.set_paintable(None::<&gdk::Paintable>);
+                    }
                 }
 
                 if previous.map(|state| state.y) != Some(y) {
@@ -368,6 +424,7 @@ impl CardthropicWindow {
                     *slot = Some(TableauPictureRenderState {
                         card: *card,
                         display_face_up: true,
+                        card_render_mode,
                         selected,
                         y,
                         card_width,

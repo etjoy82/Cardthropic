@@ -43,7 +43,9 @@ use crate::engine::variant::variant_for_mode;
 use crate::engine::variant_engine::engine_for_mode;
 use crate::engine::variant_state::VariantStateStore;
 use crate::game::{
-    Card, DrawMode, FreecellCardCountMode, GameMode, KlondikeGame, SolverMove, SpiderSuitMode, Suit,
+    Card, ChessPosition, ChessVariant, DrawMode, FreecellCardCountMode, GameMode, KlondikeGame,
+    SolverMove, SpiderSuitMode, Square, Suit, FREECELL_DEFAULT_CELL_COUNT, FREECELL_MAX_CELL_COUNT,
+    FREECELL_MIN_CELL_COUNT,
 };
 use crate::startup_trace;
 use crate::winnability;
@@ -58,6 +60,8 @@ mod actions_selection;
 mod ai;
 #[path = "window/ai_winnability_check.rs"]
 mod ai_winnability_check;
+#[path = "window/chess/mod.rs"]
+mod chess;
 #[path = "window/dialogs_apm.rs"]
 mod dialogs_apm;
 #[path = "window/dialogs_command_search.rs"]
@@ -104,6 +108,8 @@ mod overflow_hints;
 mod parsing;
 #[path = "window/render.rs"]
 mod render;
+#[path = "window/render_cards.rs"]
+mod render_cards;
 #[path = "window/render_stock_waste_foundation.rs"]
 mod render_stock_waste_foundation;
 #[path = "window/render_tableau.rs"]
@@ -118,6 +124,8 @@ mod seed_history;
 mod seed_input;
 #[path = "window/session.rs"]
 mod session;
+#[path = "window/shortcut_labels.rs"]
+mod shortcut_labels;
 #[path = "window/state.rs"]
 mod state;
 #[path = "window/theme_color.rs"]
@@ -179,6 +187,8 @@ mod imp {
         pub waste_picture_4: TemplateChild<gtk::Picture>,
         #[template_child]
         pub waste_picture_5: TemplateChild<gtk::Picture>,
+        #[template_child]
+        pub waste_picture_6: TemplateChild<gtk::Picture>,
         #[template_child]
         pub waste_placeholder_box: TemplateChild<gtk::Box>,
         #[template_child]
@@ -253,6 +263,8 @@ mod imp {
         #[allow(deprecated)]
         pub seed_combo: TemplateChild<gtk::ComboBoxText>,
         #[template_child]
+        pub command_search_button: TemplateChild<gtk::Button>,
+        #[template_child]
         pub seed_random_button: TemplateChild<gtk::Button>,
         #[template_child]
         pub seed_rescue_button: TemplateChild<gtk::Button>,
@@ -291,6 +303,8 @@ mod imp {
         #[template_child]
         pub tableau_scroller: TemplateChild<gtk::ScrolledWindow>,
         #[template_child]
+        pub tableau_canvas: TemplateChild<gtk::Fixed>,
+        #[template_child]
         pub tableau_row: TemplateChild<gtk::Box>,
         #[template_child]
         pub main_menu_popover: TemplateChild<gtk::PopoverMenu>,
@@ -321,6 +335,29 @@ mod imp {
         #[template_child]
         pub motion_layer: TemplateChild<gtk::Fixed>,
         pub game: RefCell<VariantStateStore>,
+        pub chess_position: RefCell<ChessPosition>,
+        pub chess_variant: Cell<ChessVariant>,
+        pub chess_mode_active: Cell<bool>,
+        pub chess_selected_square: Cell<Option<Square>>,
+        pub chess_keyboard_square: Cell<Option<Square>>,
+        pub chess_last_move_from: Cell<Option<Square>>,
+        pub chess_last_move_to: Cell<Option<Square>>,
+        pub chess_square_size: Cell<i32>,
+        pub chess_drag_hover_row_from_top: Cell<Option<i32>>,
+        pub chess_board_rotation_degrees: Cell<i32>,
+        pub chess_history: RefCell<Vec<ChessPosition>>,
+        pub chess_future: RefCell<Vec<ChessPosition>>,
+        pub(crate) chess_ai_pending_search: RefCell<Option<crate::engine::chess::ai::AsyncSearch>>,
+        pub(crate) chess_ai_search_poll_timer: RefCell<Option<glib::SourceId>>,
+        pub(crate) chess_ai_pending_kind: Cell<Option<ChessAiPendingKind>>,
+        pub(crate) chess_ai_pending_position_hash: Cell<Option<u64>>,
+        pub(crate) chess_ai_pending_started_mono_us: Cell<i64>,
+        pub(crate) chess_ai_pending_started_elapsed_seconds: Cell<u32>,
+        pub(crate) chess_ai_pending_poll_count: Cell<u32>,
+        pub(crate) chess_ai_pending_legal_moves: Cell<u32>,
+        pub(crate) chess_ai_pending_limits: Cell<Option<crate::engine::chess::ai::SearchLimits>>,
+        pub(crate) chess_ai_pending_wait_log_step: Cell<u32>,
+        pub(crate) chess_last_system_sound_mono_us: Cell<i64>,
         pub current_seed: Cell<u64>,
         pub current_seed_win_recorded: Cell<bool>,
         pub(super) seed_history: RefCell<SeedHistoryStore>,
@@ -339,6 +376,7 @@ mod imp {
         pub board_color_preview: RefCell<Option<gtk::DrawingArea>>,
         pub board_color_swatches: RefCell<Vec<gtk::DrawingArea>>,
         pub board_color_provider: RefCell<Option<gtk::CssProvider>>,
+        pub chess_css_provider: RefCell<Option<gtk::CssProvider>>,
         pub interface_font_provider: RefCell<Option<gtk::CssProvider>>,
         pub custom_userstyle_css: RefCell<String>,
         pub saved_custom_userstyle_css: RefCell<String>,
@@ -347,6 +385,7 @@ mod imp {
         pub theme_presets_window: RefCell<Option<gtk::Window>>,
         pub status_history: RefCell<VecDeque<String>>,
         pub status_last_appended: RefCell<String>,
+        pub klondike_controls_history_logged: Cell<bool>,
         pub layout_debug_last_appended: RefCell<String>,
         pub status_history_dialog: RefCell<Option<gtk::Window>>,
         pub status_history_buffer: RefCell<Option<gtk::TextBuffer>>,
@@ -354,6 +393,9 @@ mod imp {
         pub deck_load_attempted: Cell<bool>,
         pub deck_load_in_progress: Cell<bool>,
         pub deck_error: RefCell<Option<String>>,
+        pub card_render_mode: Cell<CardRenderMode>,
+        pub(super) unicode_card_paintable_cache:
+            RefCell<HashMap<UnicodeCardPaintableKey, gdk::Paintable>>,
         pub status_override: RefCell<Option<String>>,
         pub status_ephemeral_timer: RefCell<Option<glib::SourceId>>,
         pub history: RefCell<Vec<Snapshot>>,
@@ -404,7 +446,7 @@ mod imp {
         pub tableau_card_pictures: RefCell<Vec<Vec<gtk::Picture>>>,
         pub(super) tableau_picture_state_cache:
             RefCell<Vec<Vec<Option<TableauPictureRenderState>>>>,
-        pub last_stock_waste_foundation_size: Cell<(i32, i32, GameMode)>,
+        pub last_stock_waste_foundation_size: Cell<(i32, i32, GameMode, u8)>,
         pub hint_timeouts: RefCell<Vec<glib::SourceId>>,
         pub hint_widgets: RefCell<Vec<gtk::Widget>>,
         pub hint_recent_states: RefCell<VecDeque<u64>>,
@@ -501,6 +543,7 @@ mod imp {
         pub klondike_draw_mode: Cell<DrawMode>,
         pub spider_suit_mode: Cell<SpiderSuitMode>,
         pub freecell_card_count_mode: Cell<FreecellCardCountMode>,
+        pub freecell_cell_count: Cell<u8>,
         pub game_mode_buttons: RefCell<HashMap<GameMode, gtk::Button>>,
         pub help_dialog: RefCell<Option<gtk::Window>>,
         pub command_search_dialog: RefCell<Option<gtk::Window>>,
@@ -513,7 +556,6 @@ mod imp {
         pub apm_tilt_label: RefCell<Option<gtk::Label>>,
         pub keyboard_target: Cell<KeyboardTarget>,
         pub startup_first_map_logged: Cell<bool>,
-        pub startup_deck_logged: Cell<bool>,
     }
 
     impl Default for CardthropicWindow {
@@ -537,6 +579,7 @@ mod imp {
                 waste_picture_3: TemplateChild::default(),
                 waste_picture_4: TemplateChild::default(),
                 waste_picture_5: TemplateChild::default(),
+                waste_picture_6: TemplateChild::default(),
                 waste_placeholder_box: TemplateChild::default(),
                 waste_placeholder_label: TemplateChild::default(),
                 stock_label: TemplateChild::default(),
@@ -573,6 +616,7 @@ mod imp {
                 status_label: TemplateChild::default(),
                 status_history_button: TemplateChild::default(),
                 seed_combo: TemplateChild::default(),
+                command_search_button: TemplateChild::default(),
                 seed_random_button: TemplateChild::default(),
                 seed_rescue_button: TemplateChild::default(),
                 seed_winnable_button: TemplateChild::default(),
@@ -592,6 +636,7 @@ mod imp {
                 tableau_stack_9: TemplateChild::default(),
                 tableau_stack_10: TemplateChild::default(),
                 tableau_scroller: TemplateChild::default(),
+                tableau_canvas: TemplateChild::default(),
                 tableau_row: TemplateChild::default(),
                 main_menu_popover: TemplateChild::default(),
                 board_color_menu_button: TemplateChild::default(),
@@ -608,6 +653,29 @@ mod imp {
                 toolbar_box: TemplateChild::default(),
                 motion_layer: TemplateChild::default(),
                 game: RefCell::new(VariantStateStore::new(seed)),
+                chess_position: RefCell::new(ChessPosition::empty(ChessVariant::Standard)),
+                chess_variant: Cell::new(ChessVariant::Standard),
+                chess_mode_active: Cell::new(false),
+                chess_selected_square: Cell::new(None),
+                chess_keyboard_square: Cell::new(None),
+                chess_last_move_from: Cell::new(None),
+                chess_last_move_to: Cell::new(None),
+                chess_square_size: Cell::new(64),
+                chess_drag_hover_row_from_top: Cell::new(None),
+                chess_board_rotation_degrees: Cell::new(0),
+                chess_history: RefCell::new(Vec::new()),
+                chess_future: RefCell::new(Vec::new()),
+                chess_ai_pending_search: RefCell::new(None),
+                chess_ai_search_poll_timer: RefCell::new(None),
+                chess_ai_pending_kind: Cell::new(None),
+                chess_ai_pending_position_hash: Cell::new(None),
+                chess_ai_pending_started_mono_us: Cell::new(0),
+                chess_ai_pending_started_elapsed_seconds: Cell::new(0),
+                chess_ai_pending_poll_count: Cell::new(0),
+                chess_ai_pending_legal_moves: Cell::new(0),
+                chess_ai_pending_limits: Cell::new(None),
+                chess_ai_pending_wait_log_step: Cell::new(0),
+                chess_last_system_sound_mono_us: Cell::new(0),
                 current_seed: Cell::new(seed),
                 current_seed_win_recorded: Cell::new(false),
                 seed_history: RefCell::new(SeedHistoryStore::default()),
@@ -626,6 +694,7 @@ mod imp {
                 board_color_preview: RefCell::new(None),
                 board_color_swatches: RefCell::new(Vec::new()),
                 board_color_provider: RefCell::new(None),
+                chess_css_provider: RefCell::new(None),
                 interface_font_provider: RefCell::new(None),
                 custom_userstyle_css: RefCell::new(String::new()),
                 saved_custom_userstyle_css: RefCell::new(String::new()),
@@ -634,6 +703,7 @@ mod imp {
                 theme_presets_window: RefCell::new(None),
                 status_history: RefCell::new(VecDeque::new()),
                 status_last_appended: RefCell::new(String::new()),
+                klondike_controls_history_logged: Cell::new(false),
                 layout_debug_last_appended: RefCell::new(String::new()),
                 status_history_dialog: RefCell::new(None),
                 status_history_buffer: RefCell::new(None),
@@ -641,6 +711,8 @@ mod imp {
                 deck_load_attempted: Cell::new(false),
                 deck_load_in_progress: Cell::new(false),
                 deck_error: RefCell::new(None),
+                card_render_mode: Cell::new(CardRenderMode::Unicode),
+                unicode_card_paintable_cache: RefCell::new(HashMap::new()),
                 status_override: RefCell::new(None),
                 status_ephemeral_timer: RefCell::new(None),
                 history: RefCell::new(Vec::new()),
@@ -690,7 +762,7 @@ mod imp {
                 last_metrics_key: Cell::new(0),
                 tableau_card_pictures: RefCell::new(vec![Vec::new(); 10]),
                 tableau_picture_state_cache: RefCell::new(vec![Vec::new(); 10]),
-                last_stock_waste_foundation_size: Cell::new((0, 0, GameMode::Klondike)),
+                last_stock_waste_foundation_size: Cell::new((0, 0, GameMode::Klondike, 0)),
                 hint_timeouts: RefCell::new(Vec::new()),
                 hint_widgets: RefCell::new(Vec::new()),
                 hint_recent_states: RefCell::new(VecDeque::new()),
@@ -786,6 +858,7 @@ mod imp {
                 klondike_draw_mode: Cell::new(DrawMode::One),
                 spider_suit_mode: Cell::new(SpiderSuitMode::One),
                 freecell_card_count_mode: Cell::new(FreecellCardCountMode::FiftyTwo),
+                freecell_cell_count: Cell::new(FREECELL_DEFAULT_CELL_COUNT),
                 game_mode_buttons: RefCell::new(HashMap::new()),
                 help_dialog: RefCell::new(None),
                 command_search_dialog: RefCell::new(None),
@@ -798,7 +871,6 @@ mod imp {
                 apm_tilt_label: RefCell::new(None),
                 keyboard_target: Cell::new(KeyboardTarget::Stock),
                 startup_first_map_logged: Cell::new(false),
-                startup_deck_logged: Cell::new(false),
             }
         }
     }
@@ -859,8 +931,24 @@ mod imp {
             klass.install_action("win.paste-game-state", None, |window, _, _| {
                 window.paste_game_state_from_clipboard();
             });
+            klass.install_action("win.insert-note", None, |window, _, _| {
+                window.popdown_main_menu_later();
+                window.show_insert_note_dialog(None);
+            });
+            klass.install_action("win.clear-seed-history", None, |window, _, _| {
+                window.clear_seed_history_from_menu();
+            });
             klass.install_action("win.copy-benchmark-snapshot", None, |window, _, _| {
                 window.copy_benchmark_snapshot();
+            });
+            klass.install_action("win.clear-all-settings-history", None, |window, _, _| {
+                window.show_clear_all_settings_and_history_confirmation();
+            });
+            klass.install_action("win.copy-all-gsettings-variables", None, |window, _, _| {
+                window.copy_all_cardthropic_gsettings_variables_to_clipboard();
+            });
+            klass.install_action("win.load-all-gsettings-variables", None, |window, _, _| {
+                window.load_all_cardthropic_gsettings_variables_from_clipboard();
             });
             klass.install_action("win.command-search", None, |window, _, _| {
                 window.show_command_search_dialog();
@@ -879,6 +967,9 @@ mod imp {
             });
             klass.install_action("win.open-theme-presets", None, |window, _, _| {
                 window.show_theme_presets_window();
+            });
+            klass.install_action("win.open-custom-css", None, |window, _, _| {
+                window.open_custom_userstyle_dialog();
             });
             klass.install_action("win.mode-klondike", None, |window, _, _| {
                 window.select_game_mode("klondike");
@@ -925,6 +1016,48 @@ mod imp {
             klass.install_action("win.mode-freecell-card-52", None, |window, _, _| {
                 window.select_freecell_card_count_mode(FreecellCardCountMode::FiftyTwo);
             });
+            klass.install_action("win.freecell-cell-count-dialog", None, |window, _, _| {
+                window.show_freecell_cell_count_dialog();
+            });
+            klass.install_action("win.mode-chess-standard", None, |window, _, _| {
+                window.launch_chess_standard_placeholder();
+            });
+            klass.install_action("win.mode-chess-960", None, |window, _, _| {
+                window.launch_chess960_placeholder();
+            });
+            klass.install_action("win.mode-chess-atomic", None, |window, _, _| {
+                window.launch_chess_atomic_placeholder();
+            });
+            klass.install_action("win.chess-rotate-board-dialog", None, |window, _, _| {
+                window.show_chess_board_rotation_dialog();
+            });
+            klass.install_action("win.chess-ai-strength-dialog", None, |window, _, _| {
+                window.show_chess_ai_strength_dialog();
+            });
+            klass.install_action(
+                "win.chess-w-question-ai-strength-dialog",
+                None,
+                |window, _, _| {
+                    window.show_chess_w_question_ai_strength_dialog();
+                },
+            );
+            klass.install_action("win.chess-wand-ai-strength-dialog", None, |window, _, _| {
+                window.show_chess_wand_ai_strength_dialog();
+            });
+            klass.install_action(
+                "win.chess-robot-white-ai-strength-dialog",
+                None,
+                |window, _, _| {
+                    window.show_chess_robot_white_ai_strength_dialog();
+                },
+            );
+            klass.install_action(
+                "win.chess-robot-black-ai-strength-dialog",
+                None,
+                |window, _, _| {
+                    window.show_chess_robot_black_ai_strength_dialog();
+                },
+            );
             klass.install_action("win.smart-move-double-click", None, |window, _, _| {
                 window.set_smart_move_mode(SmartMoveMode::DoubleClick, true, true);
             });
@@ -1002,6 +1135,12 @@ mod imp {
             obj.setup_forever_mode_action();
             obj.setup_robot_auto_new_game_on_loss_action();
             obj.setup_ludicrous_speed_action();
+            obj.setup_chess_flip_board_action();
+            obj.setup_chess_auto_flip_board_each_move_action();
+            obj.setup_chess_show_board_coordinates_action();
+            obj.setup_chess_system_sounds_action();
+            obj.setup_chess_wand_ai_opponent_auto_response_action();
+            obj.setup_chess_auto_response_plays_white_action();
             obj.setup_memory_guard_action();
             obj.setup_robot_debug_action();
             obj.setup_robot_strict_debug_invariants_action();
@@ -1014,6 +1153,7 @@ mod imp {
             }
             startup_trace::mark("window:after-restore-session");
             obj.setup_handlers();
+            obj.apply_main_window_shortcut_labels();
             startup_trace::mark("window:handlers-ready");
             obj.connect_close_request(glib::clone!(
                 #[weak(rename_to = window)]
@@ -1032,6 +1172,7 @@ mod imp {
             obj.sync_mobile_phone_mode_to_size();
             obj.setup_timer();
             obj.render();
+            obj.schedule_first_launch_intro_if_needed();
             obj.reset_hint_cycle_memory();
             obj.reset_auto_play_memory();
             let state_hash = obj.current_game_hash();
@@ -1059,11 +1200,23 @@ const SETTINGS_KEY_BOARD_COLOR: &str = "board-color";
 const SETTINGS_KEY_SMART_MOVE_MODE: &str = "smart-move-mode";
 const SETTINGS_KEY_SPIDER_SUIT_MODE: &str = "spider-suit-mode";
 const SETTINGS_KEY_FREECELL_CARD_COUNT_MODE: &str = "freecell-card-count-mode";
+const SETTINGS_KEY_FREECELL_CELL_COUNT: &str = "freecell-cell-count";
+const SETTINGS_KEY_CHESS_BOARD_ROTATION_DEGREES: &str = "chess-board-rotation-degrees";
+const SETTINGS_KEY_CHESS_AI_STRENGTH: &str = "chess-ai-strength";
+const SETTINGS_KEY_CHESS_WAND_AI_STRENGTH: &str = "chess-wand-ai-strength";
+const SETTINGS_KEY_CHESS_W_QUESTION_AI_STRENGTH: &str = "chess-w-question-ai-strength";
+const SETTINGS_KEY_CHESS_ROBOT_WHITE_AI_STRENGTH: &str = "chess-robot-white-ai-strength";
+const SETTINGS_KEY_CHESS_ROBOT_BLACK_AI_STRENGTH: &str = "chess-robot-black-ai-strength";
+const SETTINGS_KEY_CHESS_WAND_AI_OPPONENT_AUTO_RESPONSE: &str =
+    "chess-wand-ai-opponent-auto-response";
+const SETTINGS_KEY_CHESS_AUTO_RESPONSE_PLAYS_WHITE: &str = "chess-auto-response-plays-white";
+const SETTINGS_KEY_CHESS_AUTO_FLIP_BOARD_EACH_MOVE: &str = "chess-auto-flip-board-each-move";
+const SETTINGS_KEY_CHESS_SHOW_BOARD_COORDINATES: &str = "chess-show-board-coordinates";
+const SETTINGS_KEY_CHESS_SYSTEM_SOUNDS_ENABLED: &str = "chess-system-sounds-enabled";
 const SETTINGS_KEY_SAVED_SESSION: &str = "saved-session";
 const SETTINGS_KEY_CUSTOM_USERSTYLE_CSS: &str = "custom-userstyle-css";
 const SETTINGS_KEY_SAVED_CUSTOM_USERSTYLE_CSS: &str = "saved-custom-userstyle-css";
 const SETTINGS_KEY_CUSTOM_USERSTYLE_WORD_WRAP: &str = "custom-userstyle-word-wrap";
-const SETTINGS_KEY_CUSTOM_CARD_SVG: &str = "custom-card-svg";
 const SETTINGS_KEY_ENABLE_HUD: &str = "enable-hud";
 const SETTINGS_KEY_FOREVER_MODE: &str = "forever-mode";
 const SETTINGS_KEY_ROBOT_AUTO_NEW_GAME_ON_LOSS: &str = "robot-auto-new-game-on-loss";
@@ -1080,6 +1233,7 @@ const SETTINGS_KEY_COMMAND_PALETTE_QUERY: &str = "command-palette-query";
 const SETTINGS_KEY_STATUS_HISTORY_WIDTH: &str = "status-history-width";
 const SETTINGS_KEY_STATUS_HISTORY_HEIGHT: &str = "status-history-height";
 const SETTINGS_KEY_STATUS_HISTORY_MAXIMIZED: &str = "status-history-maximized";
+const SETTINGS_KEY_STATUS_HISTORY_RETENTION_LINES: &str = "status-history-retention-lines";
 const SETTINGS_KEY_THEME_PRESETS_WIDTH: &str = "theme-presets-width";
 const SETTINGS_KEY_THEME_PRESETS_HEIGHT: &str = "theme-presets-height";
 const SETTINGS_KEY_THEME_PRESETS_MAXIMIZED: &str = "theme-presets-maximized";
@@ -1089,6 +1243,7 @@ const SETTINGS_KEY_APM_GRAPH_MAXIMIZED: &str = "apm-graph-maximized";
 const SETTINGS_KEY_HELP_WIDTH: &str = "help-width";
 const SETTINGS_KEY_HELP_HEIGHT: &str = "help-height";
 const SETTINGS_KEY_HELP_MAXIMIZED: &str = "help-maximized";
+const SETTINGS_KEY_FIRST_LAUNCH_INTRO_SHOWN: &str = "first-launch-intro-shown";
 const SETTINGS_KEY_MEMORY_GUARD_ENABLED: &str = "memory-guard-enabled";
 const SETTINGS_KEY_MEMORY_GUARD_SOFT_LIMIT_MIB: &str = "memory-guard-soft-limit-mib";
 const SETTINGS_KEY_MEMORY_GUARD_HARD_LIMIT_MIB: &str = "memory-guard-hard-limit-mib";
@@ -1154,16 +1309,6 @@ impl CardthropicWindow {
         }
         self.append_status_history_only("startup_trace_begin");
         for line in startup_trace::history_lines() {
-            self.append_status_history_only(&line);
-        }
-    }
-
-    pub(super) fn append_startup_deck_history_if_robot_debug(&self) {
-        if self.imp().startup_deck_logged.replace(true) || !self.imp().robot_debug_enabled.get() {
-            return;
-        }
-        self.append_status_history_only("startup_trace_deck_ready");
-        for line in startup_trace::deck_history_lines() {
             self.append_status_history_only(&line);
         }
     }

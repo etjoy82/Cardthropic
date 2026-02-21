@@ -4,14 +4,19 @@ use crate::engine::freecell_planner::{
     self, FreecellPlannerAction, FreecellPlannerConfig, FreecellPlannerResult,
 };
 use crate::engine::seed_ops;
+use crate::game::{terminal_state, ChessColor, ChessPosition, ChessTerminalState};
 use crate::window::hint_core::FreecellHintAction;
 use crate::winnability;
 
 impl CardthropicWindow {
     const ROBOT_STALL_LIMIT: u32 = 10;
     const ROBOT_FOUNDATION_DROUGHT_LIMIT: u32 = 50;
+    const ROBOT_SPIDER_FOUNDATION_DROUGHT_LOSS_LIMIT: u32 = 200;
     const ROBOT_OSCILLATION_LIMIT: u32 = 5;
     const ROBOT_SEEN_STATES_CAP: usize = 50_000;
+    const CHESS_ROBOT_RECENT_POSITION_WINDOW: usize = 64;
+    const CHESS_ROBOT_REPEAT_POSITION_LIMIT: u32 = 3;
+    const CHESS_ROBOT_CYCLE_STREAK_LIMIT: u32 = 3;
     const FREECELL_PLANNER_WAIT_TICK_LIMIT_NORMAL: u32 = 36;
     const FREECELL_PLANNER_WAIT_TICK_LIMIT_LUDICROUS: u32 = 90;
     const FREECELL_NO_MOVE_RECOVERY_TICKS_NORMAL: u32 = 120;
@@ -96,7 +101,7 @@ impl CardthropicWindow {
 
     fn freecell_mobility_count(game: &crate::game::FreecellGame) -> u32 {
         let mut count = 0_u32;
-        for cell in 0..4 {
+        for cell in 0..game.freecell_count() {
             if game.can_move_freecell_to_foundation(cell) {
                 count = count.saturating_add(1);
             }
@@ -110,7 +115,7 @@ impl CardthropicWindow {
             if game.can_move_tableau_top_to_foundation(src) {
                 count = count.saturating_add(1);
             }
-            for cell in 0..4 {
+            for cell in 0..game.freecell_count() {
                 if game.can_move_tableau_top_to_freecell(src, cell) {
                     count = count.saturating_add(1);
                 }
@@ -639,18 +644,23 @@ impl CardthropicWindow {
         if let Some((period, blocks)) = detected {
             self.emit_robot_status(
                 "running",
-                "lost",
-                "spider repeated-move cycle threshold reached; treating state as lost",
+                "search_reset",
+                "spider repeated-move cycle detected; resetting cycle tracker",
                 Some(&format!(
-                    "same {period}-move tail repeated {blocks} times (limit > {})",
+                    "same {period}-move tail repeated {blocks} times (limit > {}), continuing search",
                     winnability::SPIDER_SOLVER_REPEAT_SEQUENCE_LIMIT
                 )),
                 None,
                 Some(false),
                 solver_source,
             );
+            self.imp()
+                .robot_recent_action_signatures
+                .borrow_mut()
+                .clear();
+            self.imp().robot_action_cycle_streak.set(0);
             self.render();
-            return true;
+            return false;
         }
         false
     }
@@ -1063,15 +1073,16 @@ impl CardthropicWindow {
                 .saturating_add(1);
             imp.robot_moves_since_foundation_progress.set(drought);
             if self.active_game_mode() == GameMode::Spider
-                && drought >= winnability::SPIDER_SOLVER_STAGNATION_MOVE_LIMIT as u32
+                && drought >= Self::ROBOT_SPIDER_FOUNDATION_DROUGHT_LOSS_LIMIT
             {
                 self.emit_robot_status(
                     "running",
                     "lost",
-                    "spider stagnation threshold reached; treating state as lost",
+                    "spider foundation-run drought threshold reached; marking loss",
                     Some(&format!(
-                        "no completed Spider run in {} moves",
-                        winnability::SPIDER_SOLVER_STAGNATION_MOVE_LIMIT
+                        "no completed Spider run in {} moves (limit={})",
+                        drought,
+                        Self::ROBOT_SPIDER_FOUNDATION_DROUGHT_LOSS_LIMIT
                     )),
                     None,
                     Some(false),
@@ -1135,15 +1146,21 @@ impl CardthropicWindow {
         if streak >= Self::ROBOT_STALL_LIMIT {
             self.emit_robot_status(
                 "running",
-                "lost",
-                "stall threshold reached; treating state as lost",
+                "search_reset",
+                "stall threshold reached; resetting search trackers",
                 Some("no foundation/empty-column/mobility/capacity progress in 10 moves"),
                 None,
                 Some(false),
                 "search",
             );
+            self.imp().robot_recent_hashes.borrow_mut().clear();
+            self.imp()
+                .robot_recent_action_signatures
+                .borrow_mut()
+                .clear();
+            imp.robot_stall_streak.set(0);
             self.render();
-            return true;
+            return false;
         }
         false
     }
@@ -1974,35 +1991,238 @@ impl CardthropicWindow {
         let _ = self.imp().rapid_wand_timer.borrow_mut().take();
     }
 
+    fn chess_robot_position_key(position: &ChessPosition) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        position.variant().hash(&mut hasher);
+        position.board().hash(&mut hasher);
+        position.side_to_move().hash(&mut hasher);
+        position.castling_rights().hash(&mut hasher);
+        position.en_passant().hash(&mut hasher);
+        position.back_rank(ChessColor::White).hash(&mut hasher);
+        position.back_rank(ChessColor::Black).hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn chess_robot_repeat_position_limit(&self) -> u32 {
+        if self.imp().robot_ludicrous_enabled.get() {
+            2
+        } else {
+            Self::CHESS_ROBOT_REPEAT_POSITION_LIMIT
+        }
+    }
+
+    fn chess_robot_cycle_streak_limit(&self) -> u32 {
+        if self.imp().robot_ludicrous_enabled.get() {
+            2
+        } else {
+            Self::CHESS_ROBOT_CYCLE_STREAK_LIMIT
+        }
+    }
+
+    fn robot_track_chess_loop_and_mark_loss(&self) -> Option<&'static str> {
+        let position = self.imp().chess_position.borrow().clone();
+        let key = Self::chess_robot_position_key(&position);
+
+        let mut two_cycle = false;
+        let mut three_cycle = false;
+        let repeat_count = {
+            let mut recent = self.imp().robot_recent_hashes.borrow_mut();
+            if recent.back().copied() == Some(key) {
+                return None;
+            }
+            recent.push_back(key);
+            while recent.len() > Self::CHESS_ROBOT_RECENT_POSITION_WINDOW {
+                recent.pop_front();
+            }
+            let len = recent.len();
+            if len >= 4 {
+                two_cycle = recent[len - 1] == recent[len - 3]
+                    && recent[len - 2] == recent[len - 4]
+                    && recent[len - 1] != recent[len - 2];
+            }
+            if len >= 6 {
+                three_cycle = recent[len - 1] == recent[len - 4]
+                    && recent[len - 2] == recent[len - 5]
+                    && recent[len - 3] == recent[len - 6]
+                    && recent[len - 1] != recent[len - 2]
+                    && recent[len - 2] != recent[len - 3]
+                    && recent[len - 1] != recent[len - 3];
+            }
+            recent.iter().filter(|state| **state == key).count() as u32
+        };
+
+        if repeat_count >= self.chess_robot_repeat_position_limit() {
+            self.imp().robot_hash_oscillation_streak.set(0);
+            self.imp().robot_hash_oscillation_period.set(0);
+            return Some("game ended by anti-loop repetition guard");
+        }
+
+        let detected_period = if three_cycle {
+            Some(3_u8)
+        } else if two_cycle {
+            Some(2_u8)
+        } else {
+            None
+        };
+        let streak = if let Some(period) = detected_period {
+            let prev_period = self.imp().robot_hash_oscillation_period.get();
+            if prev_period == period {
+                let next = self
+                    .imp()
+                    .robot_hash_oscillation_streak
+                    .get()
+                    .saturating_add(1);
+                self.imp().robot_hash_oscillation_streak.set(next);
+                next
+            } else {
+                self.imp().robot_hash_oscillation_period.set(period);
+                self.imp().robot_hash_oscillation_streak.set(1);
+                1
+            }
+        } else {
+            self.imp().robot_hash_oscillation_period.set(0);
+            self.imp().robot_hash_oscillation_streak.set(0);
+            0
+        };
+
+        if streak > self.chess_robot_cycle_streak_limit() {
+            return Some("game ended by anti-loop cycle guard");
+        }
+
+        None
+    }
+
+    fn chess_robot_terminal_outcome(&self) -> Option<(bool, &'static str)> {
+        let position = self.imp().chess_position.borrow().clone();
+        match terminal_state(&position)? {
+            ChessTerminalState::Checkmate { .. } => Some((true, "game ended by checkmate")),
+            ChessTerminalState::DrawStalemate => Some((false, "game ended by stalemate")),
+            ChessTerminalState::DrawFiftyMoveRule => Some((false, "game ended by fifty-move draw")),
+            ChessTerminalState::DrawInsufficientMaterial => {
+                Some((false, "game ended by insufficient-material draw"))
+            }
+        }
+    }
+
+    fn handle_chess_robot_win(&self, reason: &str) {
+        self.imp()
+            .robot_playback
+            .borrow_mut()
+            .set_use_scripted_line(false);
+        self.imp()
+            .robot_freecell_playback
+            .borrow_mut()
+            .set_use_scripted_line(false);
+        let wins = self.imp().robot_wins.get().saturating_add(1);
+        self.imp().robot_wins.set(wins);
+        self.maybe_emit_periodic_benchmark_dump("win");
+        if !self.imp().robot_forever_enabled.get() {
+            self.stop_robot_mode_with_message(&format!(
+                "Robot Mode stopped: chess {reason} (Forever Mode disabled)."
+            ));
+            return;
+        }
+        let seed = seed_ops::random_seed();
+        let status = format!("Robot chess {reason}. Forever Mode started random seed {seed}.");
+        self.start_new_chess_game_with_seed_preserving_robot(seed, status);
+    }
+
+    fn handle_chess_robot_loss(&self, reason: &str) {
+        self.imp()
+            .robot_playback
+            .borrow_mut()
+            .set_use_scripted_line(false);
+        self.imp()
+            .robot_freecell_playback
+            .borrow_mut()
+            .set_use_scripted_line(false);
+        let losses = self.imp().robot_losses.get().saturating_add(1);
+        self.imp().robot_losses.set(losses);
+        self.maybe_emit_periodic_benchmark_dump("loss");
+        let next_deals_tried = self.imp().robot_deals_tried.get().saturating_add(1);
+        self.imp().robot_deals_tried.set(next_deals_tried);
+        if !self.imp().robot_auto_new_game_on_loss.get() {
+            self.stop_robot_mode_with_message(&format!(
+                "Robot Mode stopped: chess {reason} (auto new game on loss disabled)."
+            ));
+            return;
+        }
+        let seed = seed_ops::random_seed();
+        let status = if self.imp().robot_forever_enabled.get() {
+            format!("Robot chess {reason}. Forever Mode started random seed {seed}.")
+        } else {
+            format!("Robot chess {reason}. Started random seed {seed}.")
+        };
+        self.start_new_chess_game_with_seed_preserving_robot(seed, status);
+    }
+
+    fn robot_mode_step_chess(&self) {
+        if let Some((is_win, reason)) = self.chess_robot_terminal_outcome() {
+            if is_win {
+                self.handle_chess_robot_win(reason);
+            } else {
+                self.handle_chess_robot_loss(reason);
+            }
+            return;
+        }
+
+        if let Some(reason) = self.robot_track_chess_loop_and_mark_loss() {
+            self.handle_chess_robot_loss(reason);
+            return;
+        }
+
+        if self.has_pending_chess_ai_search() {
+            return;
+        }
+
+        if !self.play_chess_ai_robot_move() {
+            self.handle_chess_robot_loss("robot could not apply a move");
+        }
+    }
+
     pub(super) fn toggle_robot_mode(&self) {
         if self.imp().robot_mode_running.get() {
             self.stop_robot_mode();
         } else {
-            let mode = self.active_game_mode();
-            if boundary::is_won(&self.imp().game.borrow(), mode) {
-                self.start_random_seed_game();
-                if boundary::is_won(&self.imp().game.borrow(), mode) {
-                    return;
-                }
-            }
-            if mode == GameMode::Freecell {
-                let use_solver_line = self.robot_freecell_solver_anchor_matches_current_state()
-                    && self
-                        .imp()
-                        .robot_freecell_playback
-                        .borrow()
-                        .has_scripted_line();
-                self.imp()
-                    .robot_freecell_playback
-                    .borrow_mut()
-                    .set_use_scripted_line(use_solver_line);
-            } else {
-                let use_solver_line = self.robot_solver_anchor_matches_current_state()
-                    && self.imp().robot_playback.borrow().has_scripted_line();
+            if self.imp().chess_mode_active.get() {
                 self.imp()
                     .robot_playback
                     .borrow_mut()
-                    .set_use_scripted_line(use_solver_line);
+                    .set_use_scripted_line(false);
+                self.imp()
+                    .robot_freecell_playback
+                    .borrow_mut()
+                    .set_use_scripted_line(false);
+            } else {
+                let mode = self.active_game_mode();
+                if boundary::is_won(&self.imp().game.borrow(), mode) {
+                    self.start_random_seed_game();
+                    if boundary::is_won(&self.imp().game.borrow(), mode) {
+                        return;
+                    }
+                }
+                if mode == GameMode::Freecell {
+                    let use_solver_line = self.robot_freecell_solver_anchor_matches_current_state()
+                        && self
+                            .imp()
+                            .robot_freecell_playback
+                            .borrow()
+                            .has_scripted_line();
+                    self.imp()
+                        .robot_freecell_playback
+                        .borrow_mut()
+                        .set_use_scripted_line(use_solver_line);
+                } else {
+                    let use_solver_line = self.robot_solver_anchor_matches_current_state()
+                        && self.imp().robot_playback.borrow().has_scripted_line();
+                    self.imp()
+                        .robot_playback
+                        .borrow_mut()
+                        .set_use_scripted_line(use_solver_line);
+                }
             }
             self.start_robot_mode();
         }
@@ -2019,6 +2239,11 @@ impl CardthropicWindow {
         self.stop_rapid_wand();
         self.cancel_hint_loss_analysis();
         self.cancel_freecell_planner();
+        // Robot mode should not wait behind stale/manual chess searches.
+        // Preempt anything pending so the first robot move starts immediately.
+        if self.imp().chess_mode_active.get() && self.has_pending_chess_ai_search() {
+            self.cancel_pending_chess_ai_search();
+        }
         self.imp().robot_mode_running.set(true);
         self.imp().robot_deals_tried.set(0);
         self.imp().robot_moves_applied.set(0);
@@ -2037,7 +2262,9 @@ impl CardthropicWindow {
         self.imp().robot_cpu_last_pct.set(0.0);
         self.imp().robot_last_benchmark_dump_total.set(0);
         self.reset_robot_search_tracking_for_current_deal();
-        let using_solver = if self.active_game_mode() == GameMode::Freecell {
+        let using_solver = if self.imp().chess_mode_active.get() {
+            false
+        } else if self.active_game_mode() == GameMode::Freecell {
             self.imp()
                 .robot_freecell_playback
                 .borrow()
@@ -2064,15 +2291,27 @@ impl CardthropicWindow {
         if !self.imp().robot_mode_running.get() {
             return;
         }
+        if self.imp().chess_mode_active.get() {
+            self.robot_mode_step_chess();
+            return;
+        }
 
         let mode = self.active_game_mode();
+        let scripted_active = if mode == GameMode::Freecell {
+            self.imp()
+                .robot_freecell_playback
+                .borrow()
+                .use_scripted_line()
+        } else {
+            self.imp().robot_playback.borrow().use_scripted_line()
+        };
         let was_won = boundary::is_won(&self.imp().game.borrow(), mode);
         if was_won {
             let _ = self.handle_robot_win();
             return;
         }
 
-        let mut moved = if self.imp().robot_playback.borrow().use_scripted_line() {
+        let mut moved = if mode != GameMode::Freecell && scripted_active {
             let scripted_move = {
                 let mut playback = self.imp().robot_playback.borrow_mut();
                 playback.pop_scripted_move()
@@ -2090,16 +2329,10 @@ impl CardthropicWindow {
                         &format!("solver {desc}"),
                         "scripted",
                     );
-                    if mode == GameMode::Spider
-                        && self.robot_track_spider_action_cycle_and_mark_loss(hint_move, "scripted")
-                    {
-                        false
-                    } else {
-                        if self.should_render_after_robot_move() {
-                            self.render();
-                        }
-                        true
+                    if self.should_render_after_robot_move() {
+                        self.render();
                     }
+                    true
                 } else {
                     self.imp().robot_playback.borrow_mut().clear_scripted_line();
                     self.stop_robot_mode_with_message(
@@ -2114,11 +2347,6 @@ impl CardthropicWindow {
                 return;
             }
         } else if mode == GameMode::Freecell {
-            let scripted_active = self
-                .imp()
-                .robot_freecell_playback
-                .borrow()
-                .use_scripted_line();
             if scripted_active && self.imp().robot_freecell_plan.borrow().is_empty() {
                 let scripted_step = self
                     .imp()
@@ -2458,10 +2686,12 @@ impl CardthropicWindow {
                                     Self::freecell_action_cycle_signature(action);
                                 *self.imp().robot_last_move_signature.borrow_mut() =
                                     action_signature.clone();
-                                if self.robot_track_action_cycle_and_mark_loss(
-                                    Some(action_cycle_signature),
-                                    &solver_source,
-                                ) {
+                                if !scripted_active
+                                    && self.robot_track_action_cycle_and_mark_loss(
+                                        Some(action_cycle_signature),
+                                        &solver_source,
+                                    )
+                                {
                                     false
                                 } else {
                                     let move_fields = format!(
@@ -2544,14 +2774,14 @@ impl CardthropicWindow {
                         let freecell_lost = self.imp().game.borrow().freecell().is_lost();
                         self.emit_robot_status(
                             "running",
-                            if freecell_lost { "lost" } else { "no_move" },
+                            "no_move",
                             if freecell_lost {
-                                "no legal moves remain (loss detected)"
+                                "no legal moves remain; move search exhausted"
                             } else {
                                 "no productive freecell hint move"
                             },
                             Some(if freecell_lost {
-                                "freecell loss detected"
+                                "freecell move search exhausted"
                             } else {
                                 "freecell hint action unavailable"
                             }),
@@ -2662,7 +2892,7 @@ impl CardthropicWindow {
             let _ = self.handle_robot_win();
             return;
         }
-        if moved {
+        if moved && (!scripted_active || mode == GameMode::Spider) {
             let cooldown = self.imp().robot_freecell_planner_cooldown_ticks.get();
             if mode == GameMode::Freecell && cooldown > 0 {
                 self.imp()
@@ -2883,10 +3113,10 @@ impl CardthropicWindow {
             self.imp().robot_deals_tried.set(next_deals_tried);
             if !self.imp().robot_auto_new_game_on_loss.get() {
                 self.stop_robot_mode_with_message(
-                    "Robot Mode stopped: game lost (auto new game on loss disabled).",
+                    "Robot Mode stopped: no productive move found (auto new game on loss disabled).",
                 );
             } else if self.imp().robot_forever_enabled.get() {
-                self.begin_robot_forever_random_reseed("stuck_or_lost");
+                self.begin_robot_forever_random_reseed("stuck_or_blocked");
             } else {
                 let seed = seed_ops::random_seed();
                 let status = if self.imp().robot_debug_enabled.get() {
@@ -2895,7 +3125,7 @@ impl CardthropicWindow {
                         .map(|d| d.as_secs())
                         .unwrap_or(0);
                     format!(
-                        "robot_v=1{} unix={} strategy={} state=running event=reseed mode={} seed={} draw={} app_moves={} robot_moves={} deals_tried={} elapsed={} timer={} solver_source=search move_changed=false detail=\"stuck_or_lost\" reason=\"no productive move\"{}{} move_kind=na src_col=na src_start=na dst_col=na cards_moved_total=na draw_from_stock_cards=na recycle_cards=na{}",
+                        "robot_v=1{} unix={} strategy={} state=running event=reseed mode={} seed={} draw={} app_moves={} robot_moves={} deals_tried={} elapsed={} timer={} solver_source=search move_changed=false detail=\"stuck_or_blocked\" reason=\"no productive move\"{}{} move_kind=na src_col=na src_start=na dst_col=na cards_moved_total=na draw_from_stock_cards=na recycle_cards=na{}",
                         self.robot_outcome_fields(),
                         unix,
                         self.robot_strategy().as_setting(),
@@ -2923,6 +3153,7 @@ impl CardthropicWindow {
         if !self.imp().robot_mode_running.replace(false) {
             return;
         }
+        self.cancel_pending_chess_ai_search();
         self.cancel_hint_loss_analysis();
         self.cancel_freecell_planner();
         self.imp().robot_freecell_plan.borrow_mut().clear();
@@ -2952,6 +3183,7 @@ impl CardthropicWindow {
         if !self.imp().robot_mode_running.replace(false) {
             return;
         }
+        self.cancel_pending_chess_ai_search();
         self.cancel_hint_loss_analysis();
         self.cancel_freecell_planner();
         self.imp().robot_freecell_plan.borrow_mut().clear();

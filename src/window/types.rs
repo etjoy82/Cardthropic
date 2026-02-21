@@ -1,5 +1,7 @@
 use crate::engine::game_mode::VariantRuntime;
-use crate::game::{Card, DrawMode, GameMode, Suit};
+use crate::game::{
+    Card, ChessColor, ChessPosition, ChessVariant, DrawMode, GameMode, Square, Suit,
+};
 
 #[derive(Debug, Clone)]
 pub struct Snapshot {
@@ -14,6 +16,14 @@ pub struct Snapshot {
     pub(super) apm_elapsed_offset_seconds: u32,
     pub(super) apm_samples: Vec<ApmSample>,
     pub(super) foundation_slot_suits: [Option<Suit>; 4],
+    pub(super) chess_mode_active: bool,
+    pub(super) chess_variant: ChessVariant,
+    pub(super) chess_position: Option<ChessPosition>,
+    pub(super) chess_selected_square: Option<Square>,
+    pub(super) chess_last_move_from: Option<Square>,
+    pub(super) chess_last_move_to: Option<Square>,
+    pub(super) chess_history: Vec<ChessPosition>,
+    pub(super) chess_future: Vec<ChessPosition>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -58,6 +68,25 @@ impl SmartMoveMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CardRenderMode {
+    Unicode,
+}
+
+impl CardRenderMode {
+    pub fn as_setting(self) -> &'static str {
+        "unicode"
+    }
+
+    pub fn from_setting(_value: &str) -> Self {
+        Self::Unicode
+    }
+
+    pub fn label(self) -> &'static str {
+        "Unicode Cards (Recommended)"
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RobotStrategy {
     Deep,
@@ -67,6 +96,16 @@ impl RobotStrategy {
     pub fn as_setting(self) -> &'static str {
         "deep"
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ChessAiPendingKind {
+    Wand {
+        include_opponent_auto_response: bool,
+    },
+    Robot {
+        side_to_move: ChessColor,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -100,8 +139,17 @@ pub(super) struct WorkspaceLayoutProfile {
 pub(super) struct TableauPictureRenderState {
     pub(super) card: Card,
     pub(super) display_face_up: bool,
+    pub(super) card_render_mode: CardRenderMode,
     pub(super) selected: bool,
     pub(super) y: i32,
     pub(super) card_width: i32,
     pub(super) card_height: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct UnicodeCardPaintableKey {
+    pub(super) card: Option<Card>,
+    pub(super) face_up: bool,
+    pub(super) width: i32,
+    pub(super) height: i32,
 }

@@ -1,5 +1,9 @@
 use super::*;
+use crate::engine::chess::ai::{self as chess_ai, api::SearchTermination, AiConfig};
 use crate::engine::seed_ops;
+use crate::game::{
+    is_in_check, legal_moves, square_name, ChessColor, ChessPieceKind, ChessPosition, Square,
+};
 
 const SEED_WINNABILITY_TIMEOUT_SECS: u32 = 300;
 const SEED_WINNABILITY_MEMORY_HEADROOM_MIB: u64 = 512;
@@ -22,7 +26,7 @@ impl CardthropicWindow {
             Self::remove_source_if_present(source_id);
         }
         imp.seed_winnable_button
-            .set_label(SEED_WINNABLE_BUTTON_LABEL);
+            .set_label(&self.seed_winnable_idle_button_label());
         imp.seed_check_memory_guard_triggered.set(false);
         imp.seed_check_memory_limit_mib.set(0);
         self.trim_process_memory_if_supported();
@@ -45,7 +49,7 @@ impl CardthropicWindow {
             Self::remove_source_if_present(source_id);
         }
         imp.seed_winnable_button
-            .set_label(SEED_WINNABLE_BUTTON_LABEL);
+            .set_label(&self.seed_winnable_idle_button_label());
         imp.seed_check_memory_guard_triggered.set(false);
         imp.seed_check_memory_limit_mib.set(0);
         self.trim_process_memory_if_supported();
@@ -53,6 +57,10 @@ impl CardthropicWindow {
     }
 
     pub(super) fn toggle_seed_winnable_check(&self) {
+        if self.imp().chess_mode_active.get() {
+            self.toggle_chess_w_question_analysis();
+            return;
+        }
         if !self.guard_mode_engine("Winnability analysis") {
             return;
         }
@@ -95,7 +103,8 @@ impl CardthropicWindow {
             .unwrap_or(SEED_WINNABILITY_MEMORY_MAX_MIB)
             .min(SEED_WINNABILITY_MEMORY_MAX_MIB);
         imp.seed_check_memory_limit_mib.set(memory_limit_mib);
-        imp.seed_winnable_button.set_label("Checking 1s");
+        imp.seed_winnable_button
+            .set_label(&self.seed_winnable_progress_button_label("Checking", 1));
         if let Some(source_id) = imp.seed_check_timer.borrow_mut().take() {
             Self::remove_source_if_present(source_id);
         }
@@ -118,7 +127,7 @@ impl CardthropicWindow {
                     let next = imp.seed_check_seconds.get().saturating_add(1);
                     imp.seed_check_seconds.set(next);
                     imp.seed_winnable_button
-                        .set_label(&format!("Checking {next}s"));
+                        .set_label(&window.seed_winnable_progress_button_label("Checking", next));
                     if window
                         .current_memory_mib()
                         .is_some_and(|mib| mib > imp.seed_check_memory_limit_mib.get())
@@ -127,14 +136,16 @@ impl CardthropicWindow {
                         if let Some(cancel_flag) = imp.seed_check_cancel.borrow().as_ref() {
                             cancel_flag.store(true, Ordering::Relaxed);
                         }
-                        imp.seed_winnable_button.set_label("Stopping...");
+                        imp.seed_winnable_button
+                            .set_label(&window.seed_winnable_stopping_button_label());
                         return glib::ControlFlow::Continue;
                     }
                     if next >= SEED_WINNABILITY_TIMEOUT_SECS {
                         if let Some(cancel_flag) = imp.seed_check_cancel.borrow().as_ref() {
                             cancel_flag.store(true, Ordering::Relaxed);
                         }
-                        imp.seed_winnable_button.set_label("Stopping...");
+                        imp.seed_winnable_button
+                            .set_label(&window.seed_winnable_stopping_button_label());
                         return glib::ControlFlow::Continue;
                     }
                     glib::ControlFlow::Continue
@@ -233,26 +244,26 @@ impl CardthropicWindow {
                                 let message = if memory_guarded {
                                     match mode {
                                         GameMode::Spider => format!(
-                                            "Winnability check stopped by memory guard at ~{} MiB (Spider {spider_suit_count}-suit): no wins found in {} iterations.",
+                                            "Winnability check stopped by memory guard at ~{} MiB (Spider {spider_suit_count}-suit): solver found no winning line within {} iterations.",
                                             memory_limit, result.iterations
                                         ),
                                         GameMode::Freecell => format!(
-                                            "Winnability check stopped by memory guard at ~{} MiB (FreeCell {freecell_card_count}): no wins found in {} iterations.",
+                                            "Winnability check stopped by memory guard at ~{} MiB (FreeCell {freecell_card_count}): solver found no winning line within {} iterations.",
                                             memory_limit, result.iterations
                                         ),
                                         GameMode::Klondike => format!(
-                                            "Winnability check stopped by memory guard at ~{} MiB (Deal {deal_count}): no wins found in {} iterations.",
+                                            "Winnability check stopped by memory guard at ~{} MiB (Deal {deal_count}): solver found no winning line within {} iterations.",
                                             memory_limit, result.iterations
                                         ),
                                     }
                                 } else {
                                     match mode {
                                         GameMode::Spider => format!(
-                                            "Winnability check timed out after {}s (Spider {spider_suit_count}-suit): no wins found in {} iterations before giving up.",
+                                            "Winnability check timed out after {}s (Spider {spider_suit_count}-suit): solver found no winning line within {} iterations.",
                                             SEED_WINNABILITY_TIMEOUT_SECS, result.iterations
                                         ),
                                         GameMode::Freecell => format!(
-                                            "Winnability check timed out after {}s (FreeCell {freecell_card_count}): no wins found in {} iterations before giving up.",
+                                            "Winnability check timed out after {}s (FreeCell {freecell_card_count}): solver found no winning line within {} iterations.",
                                             SEED_WINNABILITY_TIMEOUT_SECS, result.iterations
                                         ),
                                         GameMode::Klondike => seed_ops::msg_winnability_check_timed_out(
@@ -321,7 +332,7 @@ impl CardthropicWindow {
                                         result.iterations
                                     ),
                                     GameMode::Spider => format!(
-                                        "Seed {seed} is not winnable for Spider {spider_suit_count}-suit from a fresh deal ({} iterations).",
+                                        "Seed {seed}: solver found no winning line for Spider {spider_suit_count}-suit from a fresh deal ({} iterations).",
                                         result.iterations
                                     ),
                                     GameMode::Freecell if result.hit_state_limit => format!(
@@ -329,7 +340,7 @@ impl CardthropicWindow {
                                         result.iterations
                                     ),
                                     GameMode::Freecell => format!(
-                                        "Seed {seed} is not winnable for FreeCell {freecell_card_count} from a fresh deal ({} iterations).",
+                                        "Seed {seed}: solver found no winning line for FreeCell {freecell_card_count} from a fresh deal ({} iterations).",
                                         result.iterations
                                     ),
                                     GameMode::Klondike if result.hit_state_limit => {
@@ -383,5 +394,332 @@ impl CardthropicWindow {
                 }
             ),
         );
+    }
+
+    fn toggle_chess_w_question_analysis(&self) {
+        if self.imp().seed_check_running.get() {
+            self.cancel_seed_winnable_check(Some("W? Chess analysis canceled."));
+            return;
+        }
+        self.run_chess_w_question_analysis();
+    }
+
+    fn run_chess_w_question_analysis(&self) {
+        if !self.guard_mode_engine("W? Chess analysis") {
+            return;
+        }
+        let imp = self.imp();
+        let position = imp.chess_position.borrow().clone();
+        let side_to_move = position.side_to_move();
+        let side_to_move_label = chess_color_label(side_to_move);
+        let analysis_anchor = chess_analysis_anchor_label(
+            imp.move_count.get(),
+            side_to_move,
+            imp.chess_last_move_from.get(),
+            imp.chess_last_move_to.get(),
+        );
+        let analysis_prefix = format!("W? [Based on {analysis_anchor}]");
+        let captured_by_white = format_captured_piece_counts(
+            captured_against_side(&position, ChessColor::Black),
+            ChessColor::Black,
+        );
+        let captured_by_black = format_captured_piece_counts(
+            captured_against_side(&position, ChessColor::White),
+            ChessColor::White,
+        );
+
+        let next_moves = legal_moves(&position);
+        if next_moves.is_empty() {
+            let status = if is_in_check(&position, side_to_move) {
+                format!(
+                    "{analysis_prefix} Chess analysis ({side_to_move_label} to move): checkmate on board ({} already won). Captured by White: {captured_by_white}. Captured by Black: {captured_by_black}.",
+                    chess_color_label(side_to_move.opposite())
+                )
+            } else {
+                format!(
+                    "{analysis_prefix} Chess analysis ({side_to_move_label} to move): draw by stalemate. Captured by White: {captured_by_white}. Captured by Black: {captured_by_black}."
+                )
+            };
+            *self.imp().status_override.borrow_mut() = Some(status);
+            self.render();
+            return;
+        }
+
+        let ai_limits = self.chess_w_question_ai_search_limits();
+        let strength_label = self.chess_w_question_ai_strength_label();
+        let started_elapsed_seconds = imp.elapsed_seconds.get();
+        imp.seed_check_running.set(true);
+        let generation = imp.seed_check_generation.get().wrapping_add(1);
+        imp.seed_check_generation.set(generation);
+        imp.seed_check_seconds.set(1);
+        imp.seed_check_memory_guard_triggered.set(false);
+        imp.seed_check_memory_limit_mib.set(0);
+        imp.seed_winnable_button
+            .set_label(&self.seed_winnable_progress_button_label("Analyzing", 1));
+        if let Some(source_id) = imp.seed_check_timer.borrow_mut().take() {
+            Self::remove_source_if_present(source_id);
+        }
+        let tick = glib::timeout_add_seconds_local(
+            1,
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || {
+                    let imp = window.imp();
+                    if !imp.seed_check_running.get()
+                        || imp.seed_check_generation.get() != generation
+                    {
+                        return glib::ControlFlow::Break;
+                    }
+                    let next = imp.seed_check_seconds.get().saturating_add(1);
+                    imp.seed_check_seconds.set(next);
+                    imp.seed_winnable_button
+                        .set_label(&window.seed_winnable_progress_button_label("Analyzing", next));
+                    glib::ControlFlow::Continue
+                }
+            ),
+        );
+        *self.imp().seed_check_timer.borrow_mut() = Some(tick);
+
+        let cancel_flag = Arc::new(AtomicBool::new(false));
+        *self.imp().seed_check_cancel.borrow_mut() = Some(Arc::clone(&cancel_flag));
+        let will_finish_suffix =
+            self.chess_think_will_finish_suffix(started_elapsed_seconds, ai_limits.time_budget_ms);
+
+        *self.imp().status_override.borrow_mut() = Some(format!(
+            "{analysis_prefix} Chess analysis started ({side_to_move_label} to move, {strength_label}, ply={}, time={}, nodes={}).{} Click W? again to cancel.",
+            ai_limits.max_depth,
+            Self::chess_time_budget_seconds_label(ai_limits.time_budget_ms),
+            ai_limits.node_budget,
+            will_finish_suffix,
+        ));
+        self.render();
+
+        let (sender, receiver) = mpsc::channel::<chess_ai::SearchResult>();
+        let position_for_search = position.clone();
+        thread::spawn(move || {
+            let result = chess_ai::search::iterative::search(
+                &position_for_search,
+                ai_limits,
+                AiConfig::default(),
+                Some(cancel_flag.as_ref()),
+            );
+            let _ = sender.send(result);
+        });
+
+        glib::timeout_add_local(
+            Duration::from_millis(40),
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || {
+                    let imp = window.imp();
+                    if !imp.seed_check_running.get()
+                        || imp.seed_check_generation.get() != generation
+                    {
+                        return glib::ControlFlow::Break;
+                    }
+
+                    match receiver.try_recv() {
+                        Ok(result) => {
+                            if !window.finish_seed_winnable_check(generation) {
+                                return glib::ControlFlow::Break;
+                            }
+
+                            let status = if matches!(
+                                result.termination,
+                                SearchTermination::Canceled
+                            ) {
+                                "W? Chess analysis canceled.".to_string()
+                            } else {
+                                let score_white_cp = match side_to_move {
+                                    ChessColor::White => result.best_score_cp,
+                                    ChessColor::Black => -result.best_score_cp,
+                                };
+                                let verdict = chess_eval_advantage_label(score_white_cp);
+                                let score_pawns = score_white_cp as f32 / 100.0;
+                                format!(
+                                    "{analysis_prefix} Chess analysis ({side_to_move_label} to move): {verdict} ({score_pawns:+.2} for White, ply={}, time={}, nodes={}). Captured by White: {captured_by_white}. Captured by Black: {captured_by_black}.",
+                                    ai_limits.max_depth,
+                                    Self::chess_time_budget_seconds_label(ai_limits.time_budget_ms),
+                                    ai_limits.node_budget,
+                                )
+                            };
+
+                            *window.imp().status_override.borrow_mut() = Some(status);
+                            window.render();
+                            glib::ControlFlow::Break
+                        }
+                        Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
+                        Err(mpsc::TryRecvError::Disconnected) => {
+                            if window.finish_seed_winnable_check(generation) {
+                                *window.imp().status_override.borrow_mut() =
+                                    Some("W? Chess analysis stopped unexpectedly.".to_string());
+                                window.render();
+                            }
+                            glib::ControlFlow::Break
+                        }
+                    }
+                }
+            ),
+        );
+    }
+}
+
+#[derive(Default, Clone, Copy)]
+struct ChessPieceCounts {
+    pawns: u8,
+    knights: u8,
+    bishops: u8,
+    rooks: u8,
+    queens: u8,
+}
+
+fn piece_counts_for_side(position: &ChessPosition, side: ChessColor) -> ChessPieceCounts {
+    let mut counts = ChessPieceCounts::default();
+    for piece in position.board().iter().flatten() {
+        if piece.color != side {
+            continue;
+        }
+        match piece.kind {
+            ChessPieceKind::Pawn => counts.pawns = counts.pawns.saturating_add(1),
+            ChessPieceKind::Knight => counts.knights = counts.knights.saturating_add(1),
+            ChessPieceKind::Bishop => counts.bishops = counts.bishops.saturating_add(1),
+            ChessPieceKind::Rook => counts.rooks = counts.rooks.saturating_add(1),
+            ChessPieceKind::Queen => counts.queens = counts.queens.saturating_add(1),
+            ChessPieceKind::King => {}
+        }
+    }
+    counts
+}
+
+fn captured_against_side(position: &ChessPosition, side: ChessColor) -> ChessPieceCounts {
+    let on_board = piece_counts_for_side(position, side);
+    ChessPieceCounts {
+        pawns: 8_u8.saturating_sub(on_board.pawns),
+        knights: 2_u8.saturating_sub(on_board.knights),
+        bishops: 2_u8.saturating_sub(on_board.bishops),
+        rooks: 2_u8.saturating_sub(on_board.rooks),
+        queens: 1_u8.saturating_sub(on_board.queens),
+    }
+}
+
+fn piece_unicode(color: ChessColor, kind: ChessPieceKind) -> &'static str {
+    match (color, kind) {
+        (ChessColor::White, ChessPieceKind::King) => "♔",
+        (ChessColor::White, ChessPieceKind::Queen) => "♕",
+        (ChessColor::White, ChessPieceKind::Rook) => "♖",
+        (ChessColor::White, ChessPieceKind::Bishop) => "♗",
+        (ChessColor::White, ChessPieceKind::Knight) => "♘",
+        (ChessColor::White, ChessPieceKind::Pawn) => "♙",
+        (ChessColor::Black, ChessPieceKind::King) => "♚",
+        (ChessColor::Black, ChessPieceKind::Queen) => "♛",
+        (ChessColor::Black, ChessPieceKind::Rook) => "♜",
+        (ChessColor::Black, ChessPieceKind::Bishop) => "♝",
+        (ChessColor::Black, ChessPieceKind::Knight) => "♞",
+        (ChessColor::Black, ChessPieceKind::Pawn) => "♟",
+    }
+}
+
+fn push_capture_glyph(parts: &mut Vec<String>, count: u8, color: ChessColor, kind: ChessPieceKind) {
+    if count == 0 {
+        return;
+    }
+    let glyph = piece_unicode(color, kind);
+    if count == 1 {
+        parts.push(glyph.to_string());
+    } else {
+        parts.push(format!("{glyph}x{count}"));
+    }
+}
+
+fn format_captured_piece_counts(captured: ChessPieceCounts, captured_color: ChessColor) -> String {
+    let mut parts = Vec::new();
+    push_capture_glyph(
+        &mut parts,
+        captured.queens,
+        captured_color,
+        ChessPieceKind::Queen,
+    );
+    push_capture_glyph(
+        &mut parts,
+        captured.rooks,
+        captured_color,
+        ChessPieceKind::Rook,
+    );
+    push_capture_glyph(
+        &mut parts,
+        captured.bishops,
+        captured_color,
+        ChessPieceKind::Bishop,
+    );
+    push_capture_glyph(
+        &mut parts,
+        captured.knights,
+        captured_color,
+        ChessPieceKind::Knight,
+    );
+    push_capture_glyph(
+        &mut parts,
+        captured.pawns,
+        captured_color,
+        ChessPieceKind::Pawn,
+    );
+    if parts.is_empty() {
+        "—".to_string()
+    } else {
+        parts.join(", ")
+    }
+}
+
+fn chess_eval_advantage_label(score_white_cp: i32) -> &'static str {
+    if score_white_cp >= 250 {
+        "White is winning"
+    } else if score_white_cp >= 70 {
+        "White is better"
+    } else if score_white_cp <= -250 {
+        "Black is winning"
+    } else if score_white_cp <= -70 {
+        "Black is better"
+    } else {
+        "Position is roughly equal"
+    }
+}
+
+fn chess_analysis_anchor_label(
+    move_count: u32,
+    side_to_move: ChessColor,
+    last_move_from: Option<Square>,
+    last_move_to: Option<Square>,
+) -> String {
+    if move_count == 0 {
+        return "opening position before 1. White".to_string();
+    }
+    let fullmove = move_count.saturating_sub(1) / 2 + 1;
+    let mover = side_to_move.opposite();
+    let move_marker = match mover {
+        ChessColor::White => format!("{fullmove}."),
+        ChessColor::Black => format!("{fullmove}..."),
+    };
+    if let (Some(from), Some(to)) = (last_move_from, last_move_to) {
+        format!(
+            "after {move_marker} {} {} -> {}",
+            chess_color_label(mover),
+            square_name(from),
+            square_name(to),
+        )
+    } else {
+        format!("after {move_marker} {}", chess_color_label(mover))
+    }
+}
+
+fn chess_color_label(color: ChessColor) -> &'static str {
+    match color {
+        ChessColor::White => "White",
+        ChessColor::Black => "Black",
     }
 }

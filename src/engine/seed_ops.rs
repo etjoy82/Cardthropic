@@ -83,7 +83,7 @@ pub fn msg_winnability_check_canceled(deal_count: u8) -> String {
 
 pub fn msg_winnability_check_timed_out(deal_count: u8, seconds: u32, iterations: usize) -> String {
     format!(
-        "Winnability check timed out after {seconds}s (Deal {deal_count}): no wins found in {iterations} iterations before giving up."
+        "Winnability check timed out after {seconds}s (Deal {deal_count}): solver found no winning line within {iterations} iterations."
     )
 }
 
@@ -105,7 +105,7 @@ pub fn msg_seed_unwinnable_limited(seed: u64, deal_count: u8, iterations: usize)
 
 pub fn msg_seed_unwinnable(seed: u64, deal_count: u8, iterations: usize) -> String {
     format!(
-        "Seed {seed} is not winnable for Deal {deal_count} from a fresh deal ({iterations} iterations)."
+        "Seed {seed}: solver found no winning line for Deal {deal_count} from a fresh deal ({iterations} iterations)."
     )
 }
 

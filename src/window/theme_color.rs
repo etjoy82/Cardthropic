@@ -46,7 +46,7 @@ impl CardthropicWindow {
         };
 
         provider.load_from_string(&format!(
-            ".board-background {{ background-color: {}; border-radius: 12px; transition: background-color 180ms ease-in-out; }}",
+            ".board-background {{ background-color: {}; border-radius: 12px; }}",
             css_color
         ));
     }

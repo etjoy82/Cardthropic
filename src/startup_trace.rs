@@ -15,7 +15,6 @@ struct TraceMark {
 static MARKS: OnceLock<Mutex<HashMap<&'static str, TraceMark>>> = OnceLock::new();
 static ONCE_MARKS: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
 static SUMMARY_PRINTED: AtomicBool = AtomicBool::new(false);
-static DECK_SUMMARY_PRINTED: AtomicBool = AtomicBool::new(false);
 static MARK_SEQ: AtomicU64 = AtomicU64::new(0);
 
 pub fn enabled() -> bool {
@@ -126,30 +125,6 @@ fn summary_line() -> String {
     )
 }
 
-fn deck_ready_line() -> String {
-    let total_to_deck = delta("main:start", "render:first-deck-load-exit").unwrap_or(0);
-    let map_to_deck = delta("window:first-map", "render:first-deck-load-exit").unwrap_or(0);
-    let deck_total = delta(
-        "render:first-deck-load-enter",
-        "render:first-deck-load-exit",
-    )
-    .unwrap_or(0);
-    let deck_worker = delta(
-        "render:first-deck-worker-enter",
-        "render:first-deck-worker-exit",
-    )
-    .unwrap_or(0);
-    let deck_main = delta(
-        "render:first-deck-main-build-enter",
-        "render:first-deck-main-build-exit",
-    )
-    .unwrap_or(0);
-    format!(
-        "[startup] deck_ready total_to_cards_ms={} map_to_cards_ms={} first_deck_load_ms={} first_deck_worker_ms={} first_deck_main_build_ms={}",
-        total_to_deck, map_to_deck, deck_total, deck_worker, deck_main
-    )
-}
-
 pub fn history_lines() -> Vec<String> {
     if !enabled() {
         return Vec::new();
@@ -175,21 +150,5 @@ pub fn print_summary_once() {
     }
     if stderr_enabled() {
         eprintln!("{}", summary_line());
-    }
-}
-
-pub fn deck_history_lines() -> Vec<String> {
-    if !enabled() {
-        return Vec::new();
-    }
-    vec![deck_ready_line()]
-}
-
-pub fn print_deck_summary_once() {
-    if !enabled() || DECK_SUMMARY_PRINTED.swap(true, Ordering::Relaxed) {
-        return;
-    }
-    if stderr_enabled() {
-        eprintln!("{}", deck_ready_line());
     }
 }

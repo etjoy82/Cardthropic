@@ -4,19 +4,23 @@ use std::hash::{Hash, Hasher};
 
 impl CardthropicWindow {
     pub(super) fn update_tableau_metrics(&self) {
-        let columns = match self.active_game_mode() {
-            GameMode::Spider => 10,
-            GameMode::Freecell => 8,
-            _ => 7,
+        let chess_mode_active = self.imp().chess_mode_active.get();
+        let columns = if chess_mode_active {
+            8
+        } else {
+            match self.active_game_mode() {
+                GameMode::Spider => 10,
+                GameMode::Freecell => 8,
+                _ => 7,
+            }
         };
         let mobile_phone_mode = self.imp().mobile_phone_mode.get();
         let mut profile = self.workspace_layout_profile();
 
         let imp = self.imp();
-        imp.tableau_row.set_spacing(profile.gap);
         let window_width = self.width().max(MIN_WINDOW_WIDTH);
         let window_height = self.height().max(MIN_WINDOW_HEIGHT);
-        let column_gap = imp.tableau_row.spacing().max(0);
+        let base_column_gap = profile.gap.max(0);
         let scroller_width = imp.tableau_scroller.width();
         if mobile_phone_mode && scroller_width > 0 {
             imp.observed_scroller_width.set(scroller_width);
@@ -58,31 +62,9 @@ impl CardthropicWindow {
             profile.max_card_width = proportional_max;
         }
 
-        let mut metrics_hasher = DefaultHasher::new();
-        window_width.hash(&mut metrics_hasher);
-        window_height.hash(&mut metrics_hasher);
-        self.active_game_mode().hash(&mut metrics_hasher);
-        columns.hash(&mut metrics_hasher);
-        self.is_maximized().hash(&mut metrics_hasher);
-        profile.side_padding.hash(&mut metrics_hasher);
-        profile.tableau_vertical_padding.hash(&mut metrics_hasher);
-        column_gap.hash(&mut metrics_hasher);
-        profile.assumed_depth.hash(&mut metrics_hasher);
-        profile.min_card_width.hash(&mut metrics_hasher);
-        profile.max_card_width.hash(&mut metrics_hasher);
-        profile.min_card_height.hash(&mut metrics_hasher);
-        mobile_phone_mode.hash(&mut metrics_hasher);
-        imp.observed_scroller_width.get().hash(&mut metrics_hasher);
-        TABLEAU_FACE_UP_STEP_PX.hash(&mut metrics_hasher);
-        TABLEAU_FACE_DOWN_STEP_PX.hash(&mut metrics_hasher);
-        let metrics_key = metrics_hasher.finish();
-        if metrics_key == imp.last_metrics_key.get() {
-            return;
-        }
-        imp.last_metrics_key.set(metrics_key);
-
-        let slots = (available_width - column_gap * (columns - 1)).max(0);
-        let width_limited_by_columns = if slots > 0 { slots / columns } else { 70 };
+        let mut column_gap = base_column_gap;
+        let mut slots = (available_width - column_gap * (columns - 1)).max(0);
+        let mut width_limited_by_columns = if slots > 0 { slots / columns } else { 70 };
         let width_limited_by_top_row = self.max_card_width_for_top_row_fit(available_width);
         let reserve = self.vertical_layout_reserve(window_height);
         let usable_window_height = (window_height - reserve).max(220);
@@ -109,6 +91,56 @@ impl CardthropicWindow {
             // Keep even desktop widths for crispness and consistency.
             card_width = (card_width - (card_width % 2)).max(profile.min_card_width);
         }
+
+        if !mobile_phone_mode && self.active_game_mode() == GameMode::Freecell && columns > 1 {
+            let adaptive_gap = Self::adaptive_freecell_tableau_gap(
+                available_width,
+                columns,
+                card_width,
+                base_column_gap,
+            );
+            if adaptive_gap != column_gap {
+                column_gap = adaptive_gap;
+                slots = (available_width - column_gap * (columns - 1)).max(0);
+                width_limited_by_columns = if slots > 0 { slots / columns } else { 70 };
+                card_width = width_limited_by_columns
+                    .min(width_limited_by_top_row)
+                    .min(width_limited_by_window_height)
+                    .clamp(profile.min_card_width, profile.max_card_width);
+                card_width = (card_width - (card_width % 2)).max(profile.min_card_width);
+            }
+        }
+
+        imp.tableau_row.set_spacing(column_gap);
+
+        let mut metrics_hasher = DefaultHasher::new();
+        window_width.hash(&mut metrics_hasher);
+        window_height.hash(&mut metrics_hasher);
+        self.active_game_mode().hash(&mut metrics_hasher);
+        columns.hash(&mut metrics_hasher);
+        self.is_maximized().hash(&mut metrics_hasher);
+        profile.side_padding.hash(&mut metrics_hasher);
+        profile.tableau_vertical_padding.hash(&mut metrics_hasher);
+        column_gap.hash(&mut metrics_hasher);
+        profile.assumed_depth.hash(&mut metrics_hasher);
+        profile.min_card_width.hash(&mut metrics_hasher);
+        profile.max_card_width.hash(&mut metrics_hasher);
+        profile.min_card_height.hash(&mut metrics_hasher);
+        mobile_phone_mode.hash(&mut metrics_hasher);
+        imp.observed_scroller_width.get().hash(&mut metrics_hasher);
+        if self.active_game_mode() == GameMode::Freecell {
+            self.current_freecell_cell_count()
+                .clamp(FREECELL_MIN_CELL_COUNT, FREECELL_MAX_CELL_COUNT)
+                .hash(&mut metrics_hasher);
+        }
+        TABLEAU_FACE_UP_STEP_PX.hash(&mut metrics_hasher);
+        TABLEAU_FACE_DOWN_STEP_PX.hash(&mut metrics_hasher);
+        let metrics_key = metrics_hasher.finish();
+        if metrics_key == imp.last_metrics_key.get() {
+            return;
+        }
+        imp.last_metrics_key.set(metrics_key);
+
         let card_height = (card_width * 108 / 70).max(profile.min_card_height);
         let (face_up_step, face_down_step) = if mobile_phone_mode {
             Self::tableau_steps_for_mobile_card_height(card_height)
@@ -135,12 +167,20 @@ impl CardthropicWindow {
             .iter()
             .filter(|picture| picture.is_visible())
             .count();
-        let expected_foundation_slots = match self.active_game_mode() {
-            GameMode::Spider => 8usize,
-            GameMode::Klondike | GameMode::Freecell => 4usize,
+        let expected_foundation_slots = if chess_mode_active {
+            0usize
+        } else {
+            match self.active_game_mode() {
+                GameMode::Spider => 8usize,
+                GameMode::Klondike | GameMode::Freecell => 4usize,
+            }
         };
         let foundation_slots_ok = visible_foundation_slots == expected_foundation_slots;
-        let mode_label = self.active_game_mode().label();
+        let mode_label = if chess_mode_active {
+            self.imp().chess_variant.get().label()
+        } else {
+            self.active_game_mode().label()
+        };
 
         imp.card_width.set(card_width);
         imp.card_height.set(card_height);
@@ -365,13 +405,17 @@ impl CardthropicWindow {
             let mid = (lo + hi) / 2;
             let waste_step = (mid / 6).clamp(8, 22);
             let top_row_width = if spider_mode {
-                // Spider hides foundations; only stock + waste need to fit.
-                (2 * mid) + (4 * waste_step) + 32
+                // Spider shows stock + 8 completed-run slots.
+                // Width = stock + one row gap + foundations(8 cards, no inner gap).
+                (9 * mid) + 16
             } else if freecell_mode {
-                // FreeCell top row is free-cell strip (4 cards) + foundation strip (4 cards).
-                // The old estimate reused Klondike's waste fan math and could undercount
-                // width by a large margin, allowing oversized cards on resize.
-                (8 * mid) + 96
+                // FreeCell shows free-cell strip + 4 foundations.
+                // Width = freecell strip + one row gap + foundations + 8px foundation inset.
+                let free_cells = i32::from(
+                    self.current_freecell_cell_count()
+                        .clamp(FREECELL_MIN_CELL_COUNT, FREECELL_MAX_CELL_COUNT),
+                );
+                ((free_cells + 4) * mid) + 48
             } else {
                 (6 * mid) + (4 * waste_step) + 56
             };
@@ -384,6 +428,22 @@ impl CardthropicWindow {
         }
 
         best
+    }
+
+    fn adaptive_freecell_tableau_gap(
+        available_width: i32,
+        columns: i32,
+        card_width: i32,
+        base_gap: i32,
+    ) -> i32 {
+        let base_gap = base_gap.max(0);
+        if columns <= 1 {
+            return base_gap;
+        }
+        let slack = available_width.saturating_sub(card_width.saturating_mul(columns));
+        let target_gap = (slack / (columns - 1)).max(base_gap);
+        let max_gap = (card_width / 2).max(base_gap);
+        target_gap.clamp(base_gap, max_gap)
     }
 
     fn tallest_tableau_height_with_steps(
@@ -538,23 +598,50 @@ mod tests {
         profile
     }
 
-    fn top_row_width(mode: GameMode, card_width: i32) -> i32 {
+    fn top_row_width(mode: GameMode, card_width: i32, freecell_cells: u8) -> i32 {
         let waste_step = (card_width / 6).clamp(8, 22);
         match mode {
-            GameMode::Spider => (2 * card_width) + (4 * waste_step) + 32,
-            GameMode::Freecell => (8 * card_width) + 96,
+            GameMode::Spider => (9 * card_width) + 16,
+            GameMode::Freecell => ((i32::from(freecell_cells) + 4) * card_width) + 48,
             _ => (6 * card_width) + (4 * waste_step) + 56,
         }
     }
 
-    fn max_card_width_for_top_row_fit(mode: GameMode, available_width: i32) -> i32 {
+    #[test]
+    fn freecell_adaptive_tableau_gap_expands_to_use_horizontal_slack() {
+        let available_width = 520;
+        let columns = 8;
+        let card_width = 46;
+        let base_gap = 4;
+        let gap = CardthropicWindow::adaptive_freecell_tableau_gap(
+            available_width,
+            columns,
+            card_width,
+            base_gap,
+        );
+        assert!(gap > base_gap);
+        let used = (card_width * columns) + (gap * (columns - 1));
+        assert!(used <= available_width);
+    }
+
+    #[test]
+    fn freecell_adaptive_tableau_gap_caps_at_half_card_width() {
+        let gap = CardthropicWindow::adaptive_freecell_tableau_gap(2000, 8, 120, 4);
+        assert_eq!(gap, 60);
+    }
+
+    fn max_card_width_for_top_row_fit(
+        mode: GameMode,
+        available_width: i32,
+        freecell_cells: u8,
+    ) -> i32 {
         let usable = available_width.saturating_sub(24).max(120);
         let mut best = 18;
         let mut lo = 18;
         let mut hi = (usable / 4).min(900);
         while lo <= hi {
             let mid = (lo + hi) / 2;
-            if top_row_width(mode, mid) <= usable {
+            if top_row_width(mode, mid, freecell_cells) <= usable {
                 best = mid;
                 lo = mid + 1;
             } else {
@@ -598,6 +685,7 @@ mod tests {
         window_width: i32,
         window_height: i32,
         is_maximized: bool,
+        freecell_cells: u8,
     ) -> (i32, i32, i32, i32) {
         let columns = desktop_columns(mode);
         let mut profile = desktop_workspace_profile(window_width, window_height, is_maximized);
@@ -610,7 +698,8 @@ mod tests {
         let column_gap = profile.gap.max(0);
         let slots = (available_width - column_gap * (columns - 1)).max(0);
         let width_limited_by_columns = if slots > 0 { slots / columns } else { 70 };
-        let width_limited_by_top_row = max_card_width_for_top_row_fit(mode, available_width);
+        let width_limited_by_top_row =
+            max_card_width_for_top_row_fit(mode, available_width, freecell_cells);
         let reserve = desktop_vertical_layout_reserve(window_height);
         let usable_window_height = (window_height - reserve).max(220);
         let tableau_overhead = profile.tableau_vertical_padding + 12;
@@ -640,19 +729,38 @@ mod tests {
 
         for mode in modes {
             for (w, h, maximized) in cases {
-                let (card_width, used, available, gap) =
-                    compute_desktop_metrics(mode, w, h, maximized);
-                assert!(
-                    used <= available,
-                    "desktop overflow: mode={mode:?} win={}x{} maximized={} card_width={} gap={} used={} available={}",
-                    w,
-                    h,
-                    maximized,
-                    card_width,
-                    gap,
-                    used,
-                    available
-                );
+                if mode == GameMode::Freecell {
+                    for freecell_cells in FREECELL_MIN_CELL_COUNT..=FREECELL_MAX_CELL_COUNT {
+                        let (card_width, used, available, gap) =
+                            compute_desktop_metrics(mode, w, h, maximized, freecell_cells);
+                        assert!(
+                            used <= available,
+                            "desktop overflow: mode={mode:?} freecell_cells={} win={}x{} maximized={} card_width={} gap={} used={} available={}",
+                            freecell_cells,
+                            w,
+                            h,
+                            maximized,
+                            card_width,
+                            gap,
+                            used,
+                            available
+                        );
+                    }
+                } else {
+                    let (card_width, used, available, gap) =
+                        compute_desktop_metrics(mode, w, h, maximized, FREECELL_DEFAULT_CELL_COUNT);
+                    assert!(
+                        used <= available,
+                        "desktop overflow: mode={mode:?} win={}x{} maximized={} card_width={} gap={} used={} available={}",
+                        w,
+                        h,
+                        maximized,
+                        card_width,
+                        gap,
+                        used,
+                        available
+                    );
+                }
             }
         }
     }
@@ -669,19 +777,40 @@ mod tests {
 
         for mode in modes {
             for (w, h, maximized) in cases {
-                let (card_width, _, available, _) = compute_desktop_metrics(mode, w, h, maximized);
-                let usable = available.saturating_sub(24).max(120);
-                let needed = top_row_width(mode, card_width);
-                assert!(
-                    needed <= usable,
-                    "top-row overflow: mode={mode:?} win={}x{} maximized={} card_width={} needed={} usable={}",
-                    w,
-                    h,
-                    maximized,
-                    card_width,
-                    needed,
-                    usable
-                );
+                if mode == GameMode::Freecell {
+                    for freecell_cells in FREECELL_MIN_CELL_COUNT..=FREECELL_MAX_CELL_COUNT {
+                        let (card_width, _, available, _) =
+                            compute_desktop_metrics(mode, w, h, maximized, freecell_cells);
+                        let usable = available.saturating_sub(24).max(120);
+                        let needed = top_row_width(mode, card_width, freecell_cells);
+                        assert!(
+                            needed <= usable,
+                            "top-row overflow: mode={mode:?} freecell_cells={} win={}x{} maximized={} card_width={} needed={} usable={}",
+                            freecell_cells,
+                            w,
+                            h,
+                            maximized,
+                            card_width,
+                            needed,
+                            usable
+                        );
+                    }
+                } else {
+                    let (card_width, _, available, _) =
+                        compute_desktop_metrics(mode, w, h, maximized, FREECELL_DEFAULT_CELL_COUNT);
+                    let usable = available.saturating_sub(24).max(120);
+                    let needed = top_row_width(mode, card_width, FREECELL_DEFAULT_CELL_COUNT);
+                    assert!(
+                        needed <= usable,
+                        "top-row overflow: mode={mode:?} win={}x{} maximized={} card_width={} needed={} usable={}",
+                        w,
+                        h,
+                        maximized,
+                        card_width,
+                        needed,
+                        usable
+                    );
+                }
             }
         }
     }

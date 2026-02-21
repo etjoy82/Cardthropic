@@ -13,6 +13,129 @@ impl CardthropicWindow {
         }
     }
 
+    fn drag_icon_widget_from_layers(
+        &self,
+        layers: &[(Card, bool, i32)],
+        deck: Option<&AngloDeck>,
+        card_width: i32,
+        card_height: i32,
+    ) -> Option<gtk::Widget> {
+        if layers.is_empty() {
+            return None;
+        }
+        let run_height = layers
+            .last()
+            .map(|(_, _, pos_y)| pos_y + card_height)
+            .unwrap_or(card_height)
+            .max(card_height);
+
+        let fixed = gtk::Fixed::new();
+        fixed.set_width_request(card_width.max(1));
+        fixed.set_height_request(run_height.max(1));
+
+        for (card, face_up, pos_y) in layers {
+            let picture = gtk::Picture::new();
+            picture.set_width_request(card_width.max(1));
+            picture.set_height_request(card_height.max(1));
+            picture.set_can_shrink(true);
+            picture.set_content_fit(gtk::ContentFit::Contain);
+            if let Some(paintable) = self.paintable_for_card_display(
+                Some(*card),
+                *face_up,
+                deck,
+                card_width,
+                card_height,
+            ) {
+                picture.set_paintable(Some(&paintable));
+            }
+            fixed.put(&picture, 0.0, f64::from(*pos_y));
+        }
+
+        Some(fixed.upcast::<gtk::Widget>())
+    }
+
+    pub(super) fn drag_icon_widget_for_tableau_run(
+        &self,
+        game: &KlondikeGame,
+        deck: Option<&AngloDeck>,
+        col: usize,
+        start: usize,
+        card_width: i32,
+        card_height: i32,
+    ) -> Option<gtk::Widget> {
+        let len = game.tableau_len(col)?;
+        if start >= len {
+            return None;
+        }
+        let face_up_step = self.imp().face_up_step.get();
+        let face_down_step = self.imp().face_down_step.get();
+        let mut layers: Vec<(Card, bool, i32)> = Vec::new();
+        let mut y = 0_i32;
+        for idx in start..len {
+            let card = game.tableau_card(col, idx)?;
+            layers.push((card, card.face_up, y));
+            y += if card.face_up {
+                face_up_step
+            } else {
+                face_down_step
+            };
+        }
+        self.drag_icon_widget_from_layers(&layers, deck, card_width, card_height)
+    }
+
+    pub(super) fn drag_icon_widget_for_tableau_run_spider(
+        &self,
+        game: &SpiderGame,
+        deck: Option<&AngloDeck>,
+        col: usize,
+        start: usize,
+        card_width: i32,
+        card_height: i32,
+    ) -> Option<gtk::Widget> {
+        let len = game.tableau().get(col).map(Vec::len)?;
+        if start >= len {
+            return None;
+        }
+        let face_up_step = self.imp().face_up_step.get();
+        let face_down_step = self.imp().face_down_step.get();
+        let mut layers: Vec<(Card, bool, i32)> = Vec::new();
+        let mut y = 0_i32;
+        for idx in start..len {
+            let card = game.tableau_card(col, idx)?;
+            layers.push((card, card.face_up, y));
+            y += if card.face_up {
+                face_up_step
+            } else {
+                face_down_step
+            };
+        }
+        self.drag_icon_widget_from_layers(&layers, deck, card_width, card_height)
+    }
+
+    pub(super) fn drag_icon_widget_for_tableau_run_freecell(
+        &self,
+        game: &FreecellGame,
+        deck: Option<&AngloDeck>,
+        col: usize,
+        start: usize,
+        card_width: i32,
+        card_height: i32,
+    ) -> Option<gtk::Widget> {
+        let len = game.tableau().get(col).map(Vec::len)?;
+        if start >= len {
+            return None;
+        }
+        let step = self.imp().face_up_step.get();
+        let mut layers: Vec<(Card, bool, i32)> = Vec::new();
+        let mut y = 0_i32;
+        for idx in start..len {
+            let card = game.tableau_card(col, idx)?;
+            layers.push((card, true, y));
+            y += step;
+        }
+        self.drag_icon_widget_from_layers(&layers, deck, card_width, card_height)
+    }
+
     pub(super) fn tableau_card_y_offset(
         &self,
         game: &KlondikeGame,
@@ -108,61 +231,6 @@ impl CardthropicWindow {
             }
         }
         y
-    }
-
-    pub(super) fn texture_for_tableau_drag_run_spider(
-        &self,
-        game: &SpiderGame,
-        deck: &AngloDeck,
-        col: usize,
-        start: usize,
-        card_width: i32,
-        card_height: i32,
-    ) -> Option<gdk::Texture> {
-        let len = game.tableau().get(col).map(Vec::len)?;
-        if start >= len {
-            return None;
-        }
-
-        let face_up_step = self.imp().face_up_step.get();
-        let face_down_step = self.imp().face_down_step.get();
-        let mut y = 0_i32;
-        let mut layers: Vec<(gdk_pixbuf::Pixbuf, i32)> = Vec::new();
-
-        for idx in start..len {
-            let card = game.tableau_card(col, idx)?;
-            let pixbuf = if card.face_up {
-                deck.pixbuf_for_card_scaled(card, card_width, card_height)
-            } else {
-                deck.back_pixbuf_scaled(card_width, card_height)
-            };
-            layers.push((pixbuf, y));
-            y += if card.face_up {
-                face_up_step
-            } else {
-                face_down_step
-            };
-        }
-
-        let run_height = layers
-            .last()
-            .map(|(_, pos_y)| pos_y + card_height)
-            .unwrap_or(card_height)
-            .max(card_height);
-        let composed = gdk_pixbuf::Pixbuf::new(
-            gdk_pixbuf::Colorspace::Rgb,
-            true,
-            8,
-            card_width.max(1),
-            run_height.max(1),
-        )?;
-        composed.fill(0x00000000);
-
-        for (layer, pos_y) in layers {
-            layer.copy_area(0, 0, card_width, card_height, &composed, 0, pos_y);
-        }
-
-        Some(gdk::Texture::for_pixbuf(&composed))
     }
 
     pub(super) fn start_drag(&self, origin: DragOrigin) {
@@ -359,46 +427,5 @@ impl CardthropicWindow {
         let step = f64::from(self.imp().face_up_step.get().max(1));
         let idx = (y / step).floor().max(0.0) as usize;
         Some(idx.min(len - 1))
-    }
-
-    pub(super) fn texture_for_tableau_drag_run_freecell(
-        &self,
-        game: &FreecellGame,
-        deck: &AngloDeck,
-        col: usize,
-        start: usize,
-        card_width: i32,
-        card_height: i32,
-    ) -> Option<gdk::Texture> {
-        let len = game.tableau().get(col).map(Vec::len)?;
-        if start >= len {
-            return None;
-        }
-        let face_up_step = self.imp().face_up_step.get();
-        let mut y = 0_i32;
-        let mut layers: Vec<(gdk_pixbuf::Pixbuf, i32)> = Vec::new();
-        for idx in start..len {
-            let card = game.tableau_card(col, idx)?;
-            let pixbuf = deck.pixbuf_for_card_scaled(card, card_width, card_height);
-            layers.push((pixbuf, y));
-            y += face_up_step;
-        }
-        let run_height = layers
-            .last()
-            .map(|(_, pos_y)| pos_y + card_height)
-            .unwrap_or(card_height)
-            .max(card_height);
-        let composed = gdk_pixbuf::Pixbuf::new(
-            gdk_pixbuf::Colorspace::Rgb,
-            true,
-            8,
-            card_width.max(1),
-            run_height.max(1),
-        )?;
-        composed.fill(0x00000000);
-        for (layer, pos_y) in layers {
-            layer.copy_area(0, 0, card_width, card_height, &composed, 0, pos_y);
-        }
-        Some(gdk::Texture::for_pixbuf(&composed))
     }
 }

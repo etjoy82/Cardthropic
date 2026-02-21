@@ -1,8 +1,31 @@
 use super::*;
 
 impl CardthropicWindow {
-    fn manual_pages() -> [(&'static str, &'static str); 3] {
+    fn manual_pages() -> [(&'static str, &'static str); 5] {
         [
+            (
+                "Welcome",
+                r#"# Welcome to Cardthropic
+
+Thanks for trying Cardthropic.
+
+This first-launch intro opens after the main game window so you can see the board first, then jump into the manual.
+
+## Quick Start
+1. Pick a mode from the game menu (Klondike, Spider, FreeCell, or Chess).
+2. Play a few moves manually.
+3. Use Undo/Redo and seed controls to replay ideas.
+4. Open automation tools when you want help exploring lines.
+
+## What This Manual Covers
+- Philosophy and design goals
+- Practical play workflow
+- Automation and solver behavior
+- Keypad/gamepad mapping
+
+Close this window any time with `Esc`.
+"#,
+            ),
             (
                 "Philosophy",
                 r#"# Cardthropic Manual
@@ -122,6 +145,74 @@ These toggles are strongest when used with seed replay and benchmark snapshots.
 - Robot finishes conversion where execution density is high.
 
 This hybrid style typically outperforms either side used alone.
+"#,
+            ),
+            (
+                "Gamepad Keypad Mapping",
+                r#"## Goal
+Map a gamepad to keypad-driven controls so solitaire stays fully playable from controller input without distro-specific dependencies.
+
+## Works on Any Linux Distro
+Use any remapper that can emit keyboard keys:
+- Steam Input
+- Input Remapper
+- AntiMicroX
+- Other controller-to-keyboard tools
+
+The workflow is the same regardless of distro: map gamepad buttons to keyboard outputs, then keep that profile active while Cardthropic is focused.
+
+## Cardthropic Keypad Targets
+Cardthropic now supports these keypad controls:
+- `KP_7`: undo
+- `KP_9`: redo
+- `KP_1`: robot toggle (start/stop)
+- `KP_3`: peek (temporary reveal)
+- `KP_5`: activate focused target
+- `KP_Decimal` (`KP_Delete`): draw card
+- `KP_Multiply`: play wand move
+- `KP_Subtract`: undo
+- `KP_Divide`: open command palette
+
+## Recommended Controller Layout
+Use this baseline profile first:
+1. D-pad Up -> `KP_7` (undo)
+2. D-pad Right -> `KP_9` (redo)
+3. D-pad Left -> `KP_1` (robot toggle)
+4. D-pad Down -> `KP_3` (peek)
+5. South / A button -> `KP_5` (activate)
+6. East / B button -> `KP_Subtract` (undo fallback)
+7. North / Y button -> `KP_Multiply` (wand)
+8. West / X button -> `KP_Decimal` (draw)
+9. Start / Menu button -> `KP_Divide` (command palette)
+
+If your remapper supports layers, keep these in a dedicated `Cardthropic` layer/profile.
+
+## Setup Steps (Distro-Agnostic)
+1. Create a new profile in your remapper named `Cardthropic`.
+2. Bind each gamepad control to the keypad key targets above.
+3. Set profile scope to app/window focus if your tool supports per-app profiles.
+4. Disable remapper turbo/autofire for gameplay buttons to prevent accidental repeats.
+5. Keep `Num Lock` enabled unless your remapper explicitly emits keypad keysyms independent of lock state.
+6. Save and activate the profile.
+
+## In-App Validation
+1. Start any solitaire mode.
+2. Press your mapped `KP_7/9` controls and confirm undo/redo behavior.
+3. Press your mapped `KP_1` to toggle Robot Mode and `KP_3` to trigger Peek.
+4. Press mapped `KP_5` and confirm it activates the focused pile/slot/card.
+5. Press mapped draw/undo/wand buttons and verify expected behavior.
+6. Press mapped `KP_Divide` and confirm command palette opens.
+
+## Reliability Tips
+- Use press-once bindings, not hold-repeat, for `KP_1`, `KP_3`, `KP_5`, `KP_Subtract`, and `KP_Divide`.
+- If input feels doubled, disable duplicate mappings in desktop/game launcher overlays.
+- If a mapping appears ignored, re-check whether your remapper sent a top-row key (`1`, `/`, `-`) instead of keypad key (`KP_1`, `KP_Divide`, `KP_Subtract`).
+- Keep one active profile per controller to avoid key conflicts.
+
+## Optional Enhancements
+1. Add shoulder buttons mapped to Arrow keys for fine directional movement.
+2. Add a secondary modifier layer for non-solitaire shortcuts (fullscreen/help) if desired.
+3. Export your remapper profile so it can be reused across machines and distros.
 "#,
             ),
         ]
@@ -327,6 +418,55 @@ This hybrid style typically outperforms either side used alone.
         }
     }
 
+    pub(super) fn schedule_first_launch_intro_if_needed(&self) {
+        if !self.should_persist_shared_state() {
+            return;
+        }
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+        let Some(schema) = settings.settings_schema() else {
+            return;
+        };
+        if !schema.has_key(SETTINGS_KEY_FIRST_LAUNCH_INTRO_SHOWN) {
+            return;
+        }
+        if settings.boolean(SETTINGS_KEY_FIRST_LAUNCH_INTRO_SHOWN) {
+            return;
+        }
+
+        glib::timeout_add_seconds_local(
+            3,
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || {
+                    if !window.is_visible() {
+                        return glib::ControlFlow::Break;
+                    }
+                    let settings = window.imp().settings.borrow().clone();
+                    let Some(settings) = settings.as_ref() else {
+                        return glib::ControlFlow::Break;
+                    };
+                    let Some(schema) = settings.settings_schema() else {
+                        return glib::ControlFlow::Break;
+                    };
+                    if !schema.has_key(SETTINGS_KEY_FIRST_LAUNCH_INTRO_SHOWN)
+                        || settings.boolean(SETTINGS_KEY_FIRST_LAUNCH_INTRO_SHOWN)
+                    {
+                        return glib::ControlFlow::Break;
+                    }
+                    let _ = settings.set_boolean(SETTINGS_KEY_FIRST_LAUNCH_INTRO_SHOWN, true);
+                    window.show_help_dialog();
+                    glib::ControlFlow::Break
+                }
+            ),
+        );
+    }
+
     pub(super) fn show_help_dialog(&self) {
         if let Some(existing) = self.imp().help_dialog.borrow().as_ref() {
             existing.present();
@@ -395,17 +535,25 @@ This hybrid style typically outperforms either side used alone.
         stack.set_hexpand(true);
         stack.set_vexpand(true);
         let pages = Self::manual_pages();
-        for (name, markdown) in pages {
+        for (name, markdown) in pages.iter() {
             let page = Self::markdown_page_view(name, markdown);
             stack.add_titled(&page, Some(name), name);
         }
-        stack.set_visible_child_name("Philosophy");
+        if let Some((first_name, _)) = pages.first() {
+            stack.set_visible_child_name(first_name);
+        }
 
-        let tabs = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let tabs = gtk::Box::new(gtk::Orientation::Vertical, 6);
         tabs.set_halign(gtk::Align::Start);
+        let tabs_row_top = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        tabs_row_top.set_halign(gtk::Align::Start);
+        let tabs_row_bottom = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        tabs_row_bottom.set_halign(gtk::Align::Start);
+        let split_index = (pages.len() + 1) / 2;
         let mut group_anchor: Option<gtk::CheckButton> = None;
-        for (idx, (name, _)) in Self::manual_pages().iter().enumerate() {
-            let tab = gtk::CheckButton::with_label(name);
+        for (idx, (name, _)) in pages.iter().enumerate() {
+            let page_name = *name;
+            let tab = gtk::CheckButton::with_label(page_name);
             if let Some(anchor) = group_anchor.as_ref() {
                 tab.set_group(Some(anchor));
             } else {
@@ -418,15 +566,21 @@ This hybrid style typically outperforms either side used alone.
                 #[weak]
                 stack,
                 #[strong]
-                name,
+                page_name,
                 move |btn| {
                     if btn.is_active() {
-                        stack.set_visible_child_name(name);
+                        stack.set_visible_child_name(page_name);
                     }
                 }
             ));
-            tabs.append(&tab);
+            if idx < split_index {
+                tabs_row_top.append(&tab);
+            } else {
+                tabs_row_bottom.append(&tab);
+            }
         }
+        tabs.append(&tabs_row_top);
+        tabs.append(&tabs_row_bottom);
         root.append(&tabs);
         root.append(&stack);
 

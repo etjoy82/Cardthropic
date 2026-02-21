@@ -10,6 +10,204 @@ impl CardthropicWindow {
         }
     }
 
+    fn theme_preset_matches_query(name: &str, query: &str) -> bool {
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return true;
+        }
+
+        let lowered_name = name.to_ascii_lowercase();
+        let lowered_query = trimmed.to_ascii_lowercase();
+        if lowered_name.contains(&lowered_query) {
+            return true;
+        }
+
+        let query_chars: Vec<char> = trimmed
+            .chars()
+            .filter(|ch| !ch.is_whitespace())
+            .map(|ch| ch.to_ascii_lowercase())
+            .collect();
+        if query_chars.is_empty() {
+            return true;
+        }
+
+        let mut query_idx = 0usize;
+        for ch in name.chars() {
+            if query_idx >= query_chars.len() {
+                break;
+            }
+            if ch.to_ascii_lowercase() == query_chars[query_idx] {
+                query_idx += 1;
+            }
+        }
+        query_idx == query_chars.len()
+    }
+
+    fn visible_theme_preset_rows(listbox: &gtk::ListBox) -> Vec<gtk::ListBoxRow> {
+        let mut rows = Vec::new();
+        let mut index = 0;
+        while let Some(row) = listbox.row_at_index(index) {
+            if row.is_visible() {
+                rows.push(row);
+            }
+            index += 1;
+        }
+        rows
+    }
+
+    fn ensure_selected_theme_preset_visible(
+        listbox: &gtk::ListBox,
+        scroller: &gtk::ScrolledWindow,
+    ) {
+        let Some(row) = listbox.selected_row().filter(|row| row.is_visible()) else {
+            return;
+        };
+        let Some(bounds) = row.compute_bounds(listbox) else {
+            return;
+        };
+
+        let adj = scroller.vadjustment();
+        let current = adj.value();
+        let page = adj.page_size().max(1.0);
+        let top = f64::from(bounds.y());
+        let bottom = f64::from(bounds.y() + bounds.height());
+        let min = adj.lower();
+        let max = (adj.upper() - page).max(min);
+        let target = if top < current {
+            top
+        } else if bottom > current + page {
+            bottom - page
+        } else {
+            current
+        }
+        .clamp(min, max);
+
+        if (target - current).abs() > f64::EPSILON {
+            adj.set_value(target);
+        }
+    }
+
+    fn select_next_visible_theme_preset_row(
+        listbox: &gtk::ListBox,
+        direction: i32,
+        scroller: Option<&gtk::ScrolledWindow>,
+    ) {
+        let visible = Self::visible_theme_preset_rows(listbox);
+        if visible.is_empty() {
+            listbox.unselect_all();
+            return;
+        }
+
+        let current = listbox.selected_row().and_then(|selected| {
+            visible
+                .iter()
+                .position(|row| row.index() == selected.index())
+        });
+        let next_index = match current {
+            Some(current_idx) => {
+                if direction >= 0 {
+                    (current_idx + 1).min(visible.len().saturating_sub(1))
+                } else {
+                    current_idx.saturating_sub(1)
+                }
+            }
+            None => {
+                if direction >= 0 {
+                    0
+                } else {
+                    visible.len().saturating_sub(1)
+                }
+            }
+        };
+
+        if let Some(next) = visible.get(next_index) {
+            listbox.select_row(Some(next));
+            if let Some(scroller) = scroller {
+                Self::ensure_selected_theme_preset_visible(listbox, scroller);
+            }
+        }
+    }
+
+    fn select_theme_preset_row_home_end(
+        listbox: &gtk::ListBox,
+        to_end: bool,
+        scroller: Option<&gtk::ScrolledWindow>,
+    ) {
+        let visible = Self::visible_theme_preset_rows(listbox);
+        if visible.is_empty() {
+            listbox.unselect_all();
+            return;
+        }
+        let target = if to_end {
+            visible.last()
+        } else {
+            visible.first()
+        };
+        if let Some(row) = target {
+            listbox.select_row(Some(row));
+            if let Some(scroller) = scroller {
+                Self::ensure_selected_theme_preset_visible(listbox, scroller);
+            }
+        }
+    }
+
+    fn page_step_for_theme_preset_list(
+        listbox: &gtk::ListBox,
+        visible: &[gtk::ListBoxRow],
+    ) -> usize {
+        if visible.is_empty() {
+            return 1;
+        }
+        let fallback = 8usize.min(visible.len().max(1));
+        let viewport_height = listbox.height();
+        let row_height = visible.first().map(|row| row.height()).unwrap_or(0).max(1);
+        if viewport_height <= 1 {
+            return fallback;
+        }
+        let step = (viewport_height / row_height).max(1) as usize;
+        step.min(visible.len().max(1))
+    }
+
+    fn select_theme_preset_row_page(
+        listbox: &gtk::ListBox,
+        direction: i32,
+        scroller: Option<&gtk::ScrolledWindow>,
+    ) {
+        let visible = Self::visible_theme_preset_rows(listbox);
+        if visible.is_empty() {
+            listbox.unselect_all();
+            return;
+        }
+
+        let page = Self::page_step_for_theme_preset_list(listbox, &visible);
+        let current = listbox.selected_row().and_then(|selected| {
+            visible
+                .iter()
+                .position(|row| row.index() == selected.index())
+        });
+        let current_idx = current.unwrap_or_else(|| {
+            if direction >= 0 {
+                0
+            } else {
+                visible.len().saturating_sub(1)
+            }
+        });
+        let next_index = if direction >= 0 {
+            current_idx
+                .saturating_add(page)
+                .min(visible.len().saturating_sub(1))
+        } else {
+            current_idx.saturating_sub(page)
+        };
+
+        if let Some(row) = visible.get(next_index) {
+            listbox.select_row(Some(row));
+            if let Some(scroller) = scroller {
+                Self::ensure_selected_theme_preset_visible(listbox, scroller);
+            }
+        }
+    }
+
     fn theme_presets_window_size(&self, default_height: i32) -> (i32, i32) {
         const DEFAULT_WIDTH: i32 = 620;
         const MIN_WIDTH: i32 = 420;
@@ -99,99 +297,6 @@ impl CardthropicWindow {
         }
     }
 
-    fn normalize_pasted_svg(input: &str) -> Result<String, String> {
-        let trimmed = input.trim();
-        if trimmed.is_empty() {
-            return Err("Clipboard did not contain SVG text.".to_string());
-        }
-
-        let lower = trimmed.to_ascii_lowercase();
-        let Some(start) = lower.find("<svg") else {
-            return Err("Clipboard content is not an SVG document.".to_string());
-        };
-        let Some(end_tag_start) = lower.rfind("</svg>") else {
-            return Err("Clipboard SVG is missing a closing </svg> tag.".to_string());
-        };
-        let end = end_tag_start + "</svg>".len();
-        if end <= start || end > trimmed.len() {
-            return Err("Clipboard SVG bounds are invalid.".to_string());
-        }
-
-        Ok(trimmed[start..end].to_string())
-    }
-
-    fn apply_custom_card_svg_from_text_async(&self, svg: String, status_prefix: &'static str) {
-        *self.imp().status_override.borrow_mut() = Some(format!("{status_prefix}..."));
-        self.render();
-
-        let (sender, receiver) = mpsc::channel::<Result<String, String>>();
-        thread::spawn(move || {
-            let result = (|| {
-                let normalized_svg = Self::normalize_pasted_svg(&svg)?;
-                if normalized_svg.len() > 4 * 1024 * 1024 {
-                    return Err("SVG is too large (max 4 MiB).".to_string());
-                }
-                AngloDeck::load_with_custom_normal_svg(&normalized_svg)?;
-                Ok(normalized_svg)
-            })();
-            let _ = sender.send(result);
-        });
-
-        glib::timeout_add_local(
-            Duration::from_millis(24),
-            glib::clone!(
-                #[weak(rename_to = window)]
-                self,
-                #[upgrade_or]
-                glib::ControlFlow::Break,
-                move || match receiver.try_recv() {
-                    Ok(Ok(normalized_svg)) => {
-                        if let Some(settings) = window.imp().settings.borrow().as_ref() {
-                            let _ =
-                                settings.set_string(SETTINGS_KEY_CUSTOM_CARD_SVG, &normalized_svg);
-                        }
-                        window.imp().deck_load_attempted.set(false);
-                        window.imp().deck_load_in_progress.set(false);
-                        *window.imp().deck.borrow_mut() = None;
-                        *window.imp().deck_error.borrow_mut() = None;
-                        window.invalidate_card_render_cache();
-                        *window.imp().status_override.borrow_mut() =
-                            Some("Card design updated from SVG.".to_string());
-                        window.render();
-                        glib::ControlFlow::Break
-                    }
-                    Ok(Err(err)) => {
-                        *window.imp().status_override.borrow_mut() =
-                            Some(format!("Load SVG failed: {err}"));
-                        window.render();
-                        glib::ControlFlow::Break
-                    }
-                    Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
-                    Err(mpsc::TryRecvError::Disconnected) => {
-                        *window.imp().status_override.borrow_mut() =
-                            Some("Load SVG failed: worker disconnected.".to_string());
-                        window.render();
-                        glib::ControlFlow::Break
-                    }
-                }
-            ),
-        );
-    }
-
-    fn reset_custom_card_svg(&self) {
-        if let Some(settings) = self.imp().settings.borrow().as_ref() {
-            let _ = settings.set_string(SETTINGS_KEY_CUSTOM_CARD_SVG, "");
-        }
-        self.imp().deck_load_attempted.set(false);
-        self.imp().deck_load_in_progress.set(false);
-        *self.imp().deck.borrow_mut() = None;
-        *self.imp().deck_error.borrow_mut() = None;
-        self.invalidate_card_render_cache();
-        *self.imp().status_override.borrow_mut() =
-            Some("Card design reset to default.".to_string());
-        self.render();
-    }
-
     #[allow(deprecated)]
     pub(super) fn setup_board_color_dropdown(&self) {
         let imp = self.imp();
@@ -199,7 +304,7 @@ impl CardthropicWindow {
         color_menu.set_tooltip_text(Some("Theme presets"));
         color_menu.set_has_frame(true);
         color_menu.add_css_class("board-color-menu-button");
-        color_menu.set_label("🎨");
+        color_menu.set_label(&self.main_button_label_with_shortcut("🎨", "win.open-theme-presets"));
 
         let palette_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
         palette_box.set_margin_top(8);
@@ -366,10 +471,12 @@ impl CardthropicWindow {
         theme_filter_entry.connect_search_changed(glib::clone!(
             #[weak]
             preset_list,
+            #[weak]
+            preset_list_scroll,
             #[strong]
             display_preset_names,
             move |entry| {
-                let query = entry.text().to_string().to_ascii_lowercase();
+                let query = entry.text().to_string();
                 let mut first_visible: Option<gtk::ListBoxRow> = None;
                 let mut current_selected_visible = false;
                 let current_selected_index = preset_list.selected_row().map(|row| row.index());
@@ -378,7 +485,7 @@ impl CardthropicWindow {
                     let Some(row) = preset_list.row_at_index(idx as i32) else {
                         continue;
                     };
-                    let visible = query.is_empty() || name.to_ascii_lowercase().contains(&query);
+                    let visible = Self::theme_preset_matches_query(name, query.as_str());
                     row.set_visible(visible);
                     if visible {
                         if first_visible.is_none() {
@@ -393,8 +500,103 @@ impl CardthropicWindow {
                 if !current_selected_visible {
                     preset_list.select_row(first_visible.as_ref());
                 }
+                Self::ensure_selected_theme_preset_visible(&preset_list, &preset_list_scroll);
             }
         ));
+
+        let theme_filter_keys = gtk::EventControllerKey::new();
+        theme_filter_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        theme_filter_keys.connect_key_pressed(glib::clone!(
+            #[weak]
+            preset_list,
+            #[weak]
+            preset_list_scroll,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, _| match key {
+                gdk::Key::Down | gdk::Key::KP_Down => {
+                    Self::select_next_visible_theme_preset_row(
+                        &preset_list,
+                        1,
+                        Some(&preset_list_scroll),
+                    );
+                    glib::Propagation::Stop
+                }
+                gdk::Key::Up | gdk::Key::KP_Up => {
+                    Self::select_next_visible_theme_preset_row(
+                        &preset_list,
+                        -1,
+                        Some(&preset_list_scroll),
+                    );
+                    glib::Propagation::Stop
+                }
+                gdk::Key::Home | gdk::Key::KP_Home => {
+                    Self::select_theme_preset_row_home_end(
+                        &preset_list,
+                        false,
+                        Some(&preset_list_scroll),
+                    );
+                    glib::Propagation::Stop
+                }
+                gdk::Key::End | gdk::Key::KP_End => {
+                    Self::select_theme_preset_row_home_end(
+                        &preset_list,
+                        true,
+                        Some(&preset_list_scroll),
+                    );
+                    glib::Propagation::Stop
+                }
+                gdk::Key::Page_Down | gdk::Key::KP_Page_Down => {
+                    Self::select_theme_preset_row_page(&preset_list, 1, Some(&preset_list_scroll));
+                    glib::Propagation::Stop
+                }
+                gdk::Key::Page_Up | gdk::Key::KP_Page_Up => {
+                    Self::select_theme_preset_row_page(&preset_list, -1, Some(&preset_list_scroll));
+                    glib::Propagation::Stop
+                }
+                _ => glib::Propagation::Proceed,
+            }
+        ));
+        theme_filter_entry.add_controller(theme_filter_keys);
+
+        let preset_list_keys = gtk::EventControllerKey::new();
+        preset_list_keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        preset_list_keys.connect_key_pressed(glib::clone!(
+            #[weak]
+            preset_list,
+            #[weak]
+            preset_list_scroll,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, _| match key {
+                gdk::Key::Home | gdk::Key::KP_Home => {
+                    Self::select_theme_preset_row_home_end(
+                        &preset_list,
+                        false,
+                        Some(&preset_list_scroll),
+                    );
+                    glib::Propagation::Stop
+                }
+                gdk::Key::End | gdk::Key::KP_End => {
+                    Self::select_theme_preset_row_home_end(
+                        &preset_list,
+                        true,
+                        Some(&preset_list_scroll),
+                    );
+                    glib::Propagation::Stop
+                }
+                gdk::Key::Page_Down | gdk::Key::KP_Page_Down => {
+                    Self::select_theme_preset_row_page(&preset_list, 1, Some(&preset_list_scroll));
+                    glib::Propagation::Stop
+                }
+                gdk::Key::Page_Up | gdk::Key::KP_Page_Up => {
+                    Self::select_theme_preset_row_page(&preset_list, -1, Some(&preset_list_scroll));
+                    glib::Propagation::Stop
+                }
+                _ => glib::Propagation::Proceed,
+            }
+        ));
+        preset_list.add_controller(preset_list_keys);
 
         preset_list.connect_row_selected(glib::clone!(
             #[weak(rename_to = window)]
@@ -408,8 +610,12 @@ impl CardthropicWindow {
             }
         ));
 
-        let bottom_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        bottom_row.set_halign(gtk::Align::End);
+        let bottom_rows = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        bottom_rows.set_halign(gtk::Align::End);
+        let bottom_row_top = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        bottom_row_top.set_halign(gtk::Align::End);
+        let bottom_row_bottom = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        bottom_row_bottom.set_halign(gtk::Align::End);
         let copy_preset_button = gtk::Button::with_label("Copy Preset CSS");
         copy_preset_button.add_css_class("flat");
         copy_preset_button.connect_clicked(glib::clone!(
@@ -437,7 +643,7 @@ impl CardthropicWindow {
                 window.render();
             }
         ));
-        bottom_row.append(&copy_preset_button);
+        bottom_row_top.append(&copy_preset_button);
 
         let activate_custom_button = gtk::Button::with_label("Activate Custom CSS");
         activate_custom_button.add_css_class("flat");
@@ -455,7 +661,7 @@ impl CardthropicWindow {
                 window.apply_custom_userstyle(&saved_css, true);
             }
         ));
-        bottom_row.append(&activate_custom_button);
+        bottom_row_top.append(&activate_custom_button);
 
         let custom_userstyle_button = gtk::Button::with_label("Custom CSS Userstyle");
         custom_userstyle_button.add_css_class("flat");
@@ -466,7 +672,7 @@ impl CardthropicWindow {
                 window.open_custom_userstyle_dialog();
             }
         ));
-        bottom_row.append(&custom_userstyle_button);
+        bottom_row_bottom.append(&custom_userstyle_button);
 
         let reset_button = gtk::Button::with_label("Reset CSS to Default");
         reset_button.add_css_class("flat");
@@ -477,146 +683,10 @@ impl CardthropicWindow {
                 window.apply_custom_userstyle(Self::default_userstyle_css(), true);
             }
         ));
-        bottom_row.append(&reset_button);
-        palette_box.append(&bottom_row);
-
-        let card_design_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        card_design_row.set_halign(gtk::Align::End);
-
-        let load_svg_button = gtk::Button::with_label("Load SVG File...");
-        load_svg_button.add_css_class("flat");
-        load_svg_button.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |_| {
-                let file_dialog = gtk::FileDialog::builder()
-                    .title("Load Card Design SVG")
-                    .modal(true)
-                    .build();
-                let filter = gtk::FileFilter::new();
-                filter.set_name(Some("SVG files"));
-                filter.add_pattern("*.svg");
-                filter.add_mime_type("image/svg+xml");
-                filter.add_mime_type("text/plain");
-                let filters = gio::ListStore::new::<gtk::FileFilter>();
-                filters.append(&filter);
-                file_dialog.set_filters(Some(&filters));
-                file_dialog.set_default_filter(Some(&filter));
-
-                file_dialog.open(
-                    Some(window.upcast_ref::<gtk::Window>()),
-                    None::<&gio::Cancellable>,
-                    glib::clone!(
-                        #[weak(rename_to = window)]
-                        window,
-                        move |result: Result<gio::File, glib::Error>| match result {
-                            Ok(file) => {
-                                file.load_contents_async(
-                                    None::<&gio::Cancellable>,
-                                    glib::clone!(
-                                        #[weak(rename_to = window)]
-                                        window,
-                                        move |result| match result {
-                                            Ok((contents, _)) => {
-                                                let svg_text =
-                                                    String::from_utf8_lossy(contents.as_ref())
-                                                        .to_string();
-                                                window.apply_custom_card_svg_from_text_async(
-                                                    svg_text,
-                                                    "Loading SVG card design",
-                                                );
-                                            }
-                                            Err(err) => {
-                                                *window.imp().status_override.borrow_mut() =
-                                                    Some(format!("Load SVG failed: {err}"));
-                                                window.render();
-                                            }
-                                        }
-                                    ),
-                                );
-                            }
-                            Err(err) => {
-                                if err.matches(gio::IOErrorEnum::Cancelled) {
-                                    return;
-                                }
-                                *window.imp().status_override.borrow_mut() =
-                                    Some(format!("Load SVG failed: {err}"));
-                                window.render();
-                            }
-                        }
-                    ),
-                );
-            }
-        ));
-        card_design_row.append(&load_svg_button);
-
-        let paste_svg_button = gtk::Button::with_label("Paste SVG as Card Design");
-        paste_svg_button.add_css_class("flat");
-        paste_svg_button.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |button| {
-                button.set_sensitive(false);
-                button.set_label("Pasting SVG...");
-                *window.imp().status_override.borrow_mut() =
-                    Some("Applying pasted SVG card design...".to_string());
-                window.render();
-
-                let clipboard = window.clipboard();
-                clipboard.read_text_async(
-                    None::<&gio::Cancellable>,
-                    glib::clone!(
-                        #[weak]
-                        window,
-                        #[weak]
-                        button,
-                        move |result| {
-                            button.set_sensitive(true);
-                            button.set_label("Paste SVG as Card Design");
-                            match result {
-                                Ok(Some(text)) => {
-                                    window.apply_custom_card_svg_from_text_async(
-                                        text.to_string(),
-                                        "Applying pasted SVG card design",
-                                    );
-                                }
-                                Ok(None) => {
-                                    *window.imp().status_override.borrow_mut() =
-                                        Some("Paste SVG failed: clipboard is empty.".to_string());
-                                    window.render();
-                                }
-                                Err(err) => {
-                                    *window.imp().status_override.borrow_mut() =
-                                        Some(format!("Paste SVG failed: {err}"));
-                                    window.render();
-                                }
-                            }
-                        }
-                    ),
-                );
-            }
-        ));
-        card_design_row.append(&paste_svg_button);
-
-        let reset_card_design_button = gtk::Button::with_label("Reset Card Design");
-        reset_card_design_button.add_css_class("flat");
-        reset_card_design_button.connect_clicked(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |_| {
-                window.reset_custom_card_svg();
-            }
-        ));
-        card_design_row.append(&reset_card_design_button);
-        palette_box.append(&card_design_row);
-
-        let card_design_hint = gtk::Label::new(Some(
-            "Card SVG paste expects a full deck sheet layout compatible with anglo.svg.",
-        ));
-        card_design_hint.set_xalign(0.0);
-        card_design_hint.set_wrap(true);
-        card_design_hint.add_css_class("dim-label");
-        palette_box.append(&card_design_hint);
+        bottom_row_bottom.append(&reset_button);
+        bottom_rows.append(&bottom_row_top);
+        bottom_rows.append(&bottom_row_bottom);
+        palette_box.append(&bottom_rows);
 
         palette_window.set_child(Some(&palette_box));
         palette_window.connect_close_request(glib::clone!(
@@ -652,13 +722,5 @@ impl CardthropicWindow {
         ));
         palette_window.add_controller(palette_keys);
         *self.imp().theme_presets_window.borrow_mut() = Some(palette_window.clone());
-
-        color_menu.connect_clicked(glib::clone!(
-            #[weak]
-            palette_window,
-            move |_| {
-                palette_window.present();
-            }
-        ));
     }
 }

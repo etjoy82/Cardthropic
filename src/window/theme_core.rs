@@ -139,6 +139,7 @@ impl CardthropicWindow {
         } else {
             self.apply_custom_userstyle(&initial_userstyle, false);
         }
+        imp.card_render_mode.set(CardRenderMode::Unicode);
 
         let smart_move_mode = {
             let settings = imp.settings.borrow().clone();
@@ -192,6 +193,97 @@ impl CardthropicWindow {
                 .unwrap_or(false)
         };
         self.set_robot_ludicrous_enabled(ludicrous_speed_enabled, false, false);
+
+        let chess_wand_ai_opponent_auto_response_enabled = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| {
+                    if Self::settings_has_chess_wand_ai_opponent_auto_response_key(settings) {
+                        settings.boolean(SETTINGS_KEY_CHESS_WAND_AI_OPPONENT_AUTO_RESPONSE)
+                    } else {
+                        true
+                    }
+                })
+                .unwrap_or(true)
+        };
+        self.set_chess_wand_ai_opponent_auto_response_enabled(
+            chess_wand_ai_opponent_auto_response_enabled,
+            false,
+            false,
+        );
+
+        let chess_auto_response_plays_white_enabled = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| {
+                    if Self::settings_has_chess_auto_response_plays_white_key(settings) {
+                        settings.boolean(SETTINGS_KEY_CHESS_AUTO_RESPONSE_PLAYS_WHITE)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
+        };
+        self.set_chess_auto_response_plays_white_enabled(
+            chess_auto_response_plays_white_enabled,
+            false,
+            false,
+        );
+
+        let chess_auto_flip_board_each_move_enabled = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| {
+                    if Self::settings_has_chess_auto_flip_board_each_move_key(settings) {
+                        settings.boolean(SETTINGS_KEY_CHESS_AUTO_FLIP_BOARD_EACH_MOVE)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
+        };
+        self.set_chess_auto_flip_board_each_move_enabled(
+            chess_auto_flip_board_each_move_enabled,
+            false,
+            false,
+        );
+
+        let chess_show_board_coordinates_enabled = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| {
+                    if Self::settings_has_chess_show_board_coordinates_key(settings) {
+                        settings.boolean(SETTINGS_KEY_CHESS_SHOW_BOARD_COORDINATES)
+                    } else {
+                        true
+                    }
+                })
+                .unwrap_or(true)
+        };
+        self.set_chess_show_board_coordinates_enabled(
+            chess_show_board_coordinates_enabled,
+            false,
+            false,
+        );
+
+        let chess_system_sounds_enabled = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| {
+                    if Self::settings_has_chess_system_sounds_enabled_key(settings) {
+                        settings.boolean(SETTINGS_KEY_CHESS_SYSTEM_SOUNDS_ENABLED)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false)
+        };
+        self.set_chess_system_sounds_enabled(chess_system_sounds_enabled, false, false);
 
         let robot_debug_enabled = {
             let settings = imp.settings.borrow().clone();
@@ -289,17 +381,246 @@ impl CardthropicWindow {
                 })
                 .unwrap_or(FreecellCardCountMode::FiftyTwo)
         };
+        let freecell_cell_count = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .map(|settings| {
+                    if Self::settings_has_freecell_cell_count_key(settings) {
+                        settings.int(SETTINGS_KEY_FREECELL_CELL_COUNT)
+                    } else {
+                        i32::from(FREECELL_DEFAULT_CELL_COUNT)
+                    }
+                })
+                .and_then(|raw| u8::try_from(raw).ok())
+                .filter(|count| (FREECELL_MIN_CELL_COUNT..=FREECELL_MAX_CELL_COUNT).contains(count))
+                .unwrap_or(FREECELL_DEFAULT_CELL_COUNT)
+        };
         imp.freecell_card_count_mode.set(freecell_card_count_mode);
+        imp.freecell_cell_count.set(freecell_cell_count);
         let seed = imp.current_seed.get();
         imp.game
             .borrow_mut()
             .set_spider(SpiderGame::new_with_seed_and_mode(seed, spider_suit_mode));
         imp.game
             .borrow_mut()
-            .set_freecell(FreecellGame::new_with_seed_and_card_count(
+            .set_freecell(FreecellGame::new_with_seed_and_card_count_and_cells(
                 seed,
                 freecell_card_count_mode,
+                freecell_cell_count,
             ));
+
+        let chess_rotation_degrees = {
+            let settings = imp.settings.borrow().clone();
+            settings
+                .as_ref()
+                .and_then(|settings| {
+                    if Self::settings_has_chess_rotation_key(settings) {
+                        Some(settings.int(SETTINGS_KEY_CHESS_BOARD_ROTATION_DEGREES))
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(0)
+        };
+        self.set_chess_board_rotation_degrees(chess_rotation_degrees, false, false);
+
+        self.setup_theme_settings_sync();
+    }
+
+    fn setup_theme_settings_sync(&self) {
+        let settings = self.imp().settings.borrow().clone();
+        let Some(settings) = settings.as_ref() else {
+            return;
+        };
+
+        settings.connect_changed(
+            Some(SETTINGS_KEY_BOARD_COLOR),
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |settings, _| {
+                    let color = settings.string(SETTINGS_KEY_BOARD_COLOR).to_string();
+                    window.set_board_color(&color, false);
+                    window.render();
+                }
+            ),
+        );
+
+        settings.connect_changed(
+            Some(SETTINGS_KEY_CUSTOM_USERSTYLE_CSS),
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |settings, _| {
+                    let css = settings
+                        .string(SETTINGS_KEY_CUSTOM_USERSTYLE_CSS)
+                        .to_string();
+                    if css.trim().is_empty() {
+                        window.apply_custom_userstyle(Self::default_userstyle_css(), false);
+                    } else if let Some(migrated) = Self::migrate_legacy_userstyle_css(&css) {
+                        window.apply_custom_userstyle(migrated, false);
+                    } else {
+                        window.apply_custom_userstyle(&css, false);
+                    }
+                    window.render();
+                }
+            ),
+        );
+
+        settings.connect_changed(
+            Some(SETTINGS_KEY_SAVED_CUSTOM_USERSTYLE_CSS),
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |settings, _| {
+                    let css = settings
+                        .string(SETTINGS_KEY_SAVED_CUSTOM_USERSTYLE_CSS)
+                        .to_string();
+                    *window.imp().saved_custom_userstyle_css.borrow_mut() = css;
+                }
+            ),
+        );
+
+        settings.connect_changed(
+            Some(SETTINGS_KEY_INTERFACE_EMOJI_FONT),
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |settings, _| {
+                    let family = settings
+                        .string(SETTINGS_KEY_INTERFACE_EMOJI_FONT)
+                        .to_string();
+                    if family.trim().is_empty() {
+                        window.apply_interface_emoji_font(None, false);
+                    } else {
+                        window.apply_interface_emoji_font(Some(family.as_str()), false);
+                    }
+                    window.render();
+                }
+            ),
+        );
+
+        if Self::settings_has_freecell_cell_count_key(settings) {
+            settings.connect_changed(
+                Some(SETTINGS_KEY_FREECELL_CELL_COUNT),
+                glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |settings, _| {
+                        let count = u8::try_from(settings.int(SETTINGS_KEY_FREECELL_CELL_COUNT))
+                            .ok()
+                            .filter(|count| {
+                                (FREECELL_MIN_CELL_COUNT..=FREECELL_MAX_CELL_COUNT).contains(count)
+                            })
+                            .unwrap_or(FREECELL_DEFAULT_CELL_COUNT);
+                        window.set_freecell_cell_count(count, false);
+                    }
+                ),
+            );
+        }
+
+        if Self::settings_has_chess_rotation_key(settings) {
+            settings.connect_changed(
+                Some(SETTINGS_KEY_CHESS_BOARD_ROTATION_DEGREES),
+                glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |settings, _| {
+                        window.set_chess_board_rotation_degrees(
+                            settings.int(SETTINGS_KEY_CHESS_BOARD_ROTATION_DEGREES),
+                            false,
+                            false,
+                        );
+                    }
+                ),
+            );
+        }
+
+        if Self::settings_has_chess_wand_ai_opponent_auto_response_key(settings) {
+            settings.connect_changed(
+                Some(SETTINGS_KEY_CHESS_WAND_AI_OPPONENT_AUTO_RESPONSE),
+                glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |settings, _| {
+                        window.set_chess_wand_ai_opponent_auto_response_enabled(
+                            settings.boolean(SETTINGS_KEY_CHESS_WAND_AI_OPPONENT_AUTO_RESPONSE),
+                            false,
+                            false,
+                        );
+                    }
+                ),
+            );
+        }
+
+        if Self::settings_has_chess_auto_response_plays_white_key(settings) {
+            settings.connect_changed(
+                Some(SETTINGS_KEY_CHESS_AUTO_RESPONSE_PLAYS_WHITE),
+                glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |settings, _| {
+                        window.set_chess_auto_response_plays_white_enabled(
+                            settings.boolean(SETTINGS_KEY_CHESS_AUTO_RESPONSE_PLAYS_WHITE),
+                            false,
+                            false,
+                        );
+                    }
+                ),
+            );
+        }
+
+        if Self::settings_has_chess_auto_flip_board_each_move_key(settings) {
+            settings.connect_changed(
+                Some(SETTINGS_KEY_CHESS_AUTO_FLIP_BOARD_EACH_MOVE),
+                glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |settings, _| {
+                        window.set_chess_auto_flip_board_each_move_enabled(
+                            settings.boolean(SETTINGS_KEY_CHESS_AUTO_FLIP_BOARD_EACH_MOVE),
+                            false,
+                            false,
+                        );
+                    }
+                ),
+            );
+        }
+
+        if Self::settings_has_chess_show_board_coordinates_key(settings) {
+            settings.connect_changed(
+                Some(SETTINGS_KEY_CHESS_SHOW_BOARD_COORDINATES),
+                glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |settings, _| {
+                        window.set_chess_show_board_coordinates_enabled(
+                            settings.boolean(SETTINGS_KEY_CHESS_SHOW_BOARD_COORDINATES),
+                            false,
+                            false,
+                        );
+                    }
+                ),
+            );
+        }
+
+        if Self::settings_has_chess_system_sounds_enabled_key(settings) {
+            settings.connect_changed(
+                Some(SETTINGS_KEY_CHESS_SYSTEM_SOUNDS_ENABLED),
+                glib::clone!(
+                    #[weak(rename_to = window)]
+                    self,
+                    move |settings, _| {
+                        window.set_chess_system_sounds_enabled(
+                            settings.boolean(SETTINGS_KEY_CHESS_SYSTEM_SOUNDS_ENABLED),
+                            false,
+                            false,
+                        );
+                    }
+                ),
+            );
+        }
     }
 
     pub(super) fn load_app_settings() -> Option<gio::Settings> {

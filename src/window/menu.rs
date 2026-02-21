@@ -55,11 +55,69 @@ impl CardthropicWindow {
                 Some(action),
             );
         }
+        freecell.append(
+            Some("Number of Free Cells…"),
+            Some("win.freecell-cell-count-dialog"),
+        );
         section.append_submenu(Some("FreeCell"), &freecell);
 
+        let chess = gio::Menu::new();
+        chess.append(
+            Some("Standard Chess (Preview)"),
+            Some("win.mode-chess-standard"),
+        );
+        chess.append(Some("Chess960 (Preview)"), Some("win.mode-chess-960"));
+        chess.append(
+            Some("Atomic Chess (Preview)"),
+            Some("win.mode-chess-atomic"),
+        );
+        chess.append(Some("Flip Board"), Some("win.chess-flip-board"));
+        chess.append(
+            Some("Auto-flip Board Each Move"),
+            Some("win.chess-auto-flip-board-each-move"),
+        );
+        chess.append(
+            Some("Show Board Coordinates"),
+            Some("win.chess-show-board-coordinates"),
+        );
+        chess.append(
+            Some("System Move Sounds"),
+            Some("win.chess-system-sounds-enabled"),
+        );
+        chess.append(Some("Rotate Board…"), Some("win.chess-rotate-board-dialog"));
+        chess.append(
+            Some("Auto-Response AI Strength…"),
+            Some("win.chess-ai-strength-dialog"),
+        );
+        chess.append(
+            Some("W? AI Strength…"),
+            Some("win.chess-w-question-ai-strength-dialog"),
+        );
+        chess.append(
+            Some("Your Wand AI Strength…"),
+            Some("win.chess-wand-ai-strength-dialog"),
+        );
+        chess.append(
+            Some("Robot White AI Strength…"),
+            Some("win.chess-robot-white-ai-strength-dialog"),
+        );
+        chess.append(
+            Some("Robot Black AI Strength…"),
+            Some("win.chess-robot-black-ai-strength-dialog"),
+        );
+        chess.append(
+            Some("Wand AI Opponent Auto Response"),
+            Some("win.chess-wand-ai-opponent-auto-response"),
+        );
+        chess.append(
+            Some("Auto-Response Plays White"),
+            Some("win.chess-auto-response-plays-white"),
+        );
+        section.append_submenu(Some("Chessthropic"), &chess);
+
         let deal = gio::Menu::new();
-        deal.append(Some("Start Random Deal"), Some("win.random-seed"));
-        deal.append(Some("Winnable Deal"), Some("win.winnable-seed"));
+        deal.append(Some("Start Random Game"), Some("win.random-seed"));
+        deal.append(Some("Find Winnable Game"), Some("win.winnable-seed"));
         deal.append(Some("Seed Picker"), Some("win.seed-picker"));
         deal.append(Some("Repeat Current Seed"), Some("win.repeat-seed"));
         deal.append(
@@ -68,7 +126,9 @@ impl CardthropicWindow {
         );
         deal.append(Some("Copy Game State"), Some("win.copy-game-state"));
         deal.append(Some("Load Game State"), Some("win.paste-game-state"));
-        section.append_submenu(Some("Deal"), &deal);
+        deal.append(Some("Insert Note"), Some("win.insert-note"));
+        deal.append(Some("Clear Seed History"), Some("win.clear-seed-history"));
+        section.append_submenu(Some("Game State"), &deal);
 
         let play = gio::Menu::new();
         play.append(Some("Draw"), Some("win.draw"));
@@ -108,6 +168,18 @@ impl CardthropicWindow {
             Some("Copy Benchmark Snapshot"),
             Some("win.copy-benchmark-snapshot"),
         );
+        automation.append(
+            Some("Clear All Cardthropic Settings and History"),
+            Some("win.clear-all-settings-history"),
+        );
+        automation.append(
+            Some("Copy All Cardthropic GSettings Variables"),
+            Some("win.copy-all-gsettings-variables"),
+        );
+        automation.append(
+            Some("Load All Cardthropic GSettings Variables From Clipboard"),
+            Some("win.load-all-gsettings-variables"),
+        );
         section.append_submenu(Some("Automation"), &automation);
 
         let view_help = gio::Menu::new();
@@ -115,6 +187,7 @@ impl CardthropicWindow {
         view_help.append(Some("Enable HUD"), Some("win.enable-hud"));
         view_help.append(Some("Fullscreen"), Some("win.toggle-fullscreen"));
         view_help.append(Some("Theme Presets"), Some("win.open-theme-presets"));
+        view_help.append(Some("Custom CSS"), Some("win.open-custom-css"));
         view_help.append(Some("Status History"), Some("win.status-history"));
         view_help.append(Some("APM Graph"), Some("win.apm-graph"));
         section.append_submenu(Some("View"), &view_help);
@@ -350,5 +423,92 @@ impl CardthropicWindow {
                 button.remove_css_class("game-mode-selected");
             }
         }
+    }
+
+    pub(super) fn show_freecell_cell_count_dialog(&self) {
+        self.popdown_main_menu_later();
+
+        let dialog = gtk::Window::builder()
+            .title("Number of Free Cells")
+            .modal(true)
+            .transient_for(self)
+            .default_width(360)
+            .default_height(200)
+            .build();
+        dialog.set_resizable(false);
+        dialog.set_destroy_with_parent(true);
+
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        root.set_margin_top(14);
+        root.set_margin_bottom(14);
+        root.set_margin_start(14);
+        root.set_margin_end(14);
+
+        let heading = gtk::Label::new(Some("Choose FreeCell Cell Count"));
+        heading.set_xalign(0.0);
+        heading.add_css_class("title-4");
+        root.append(&heading);
+
+        let body = gtk::Label::new(Some(
+            "Set how many free cells appear at the top. 6 is the maximum that currently fits the UI.",
+        ));
+        body.set_xalign(0.0);
+        body.set_wrap(true);
+        body.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        root.append(&body);
+
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        let label = gtk::Label::new(Some("Number of Free Cells"));
+        label.set_xalign(0.0);
+        label.set_hexpand(true);
+        row.append(&label);
+
+        let options: Vec<String> = (FREECELL_MIN_CELL_COUNT..=FREECELL_MAX_CELL_COUNT)
+            .map(|count| count.to_string())
+            .collect();
+        let option_refs: Vec<&str> = options.iter().map(String::as_str).collect();
+        let dropdown = gtk::DropDown::from_strings(&option_refs);
+        let current = self
+            .current_freecell_cell_count()
+            .clamp(FREECELL_MIN_CELL_COUNT, FREECELL_MAX_CELL_COUNT);
+        dropdown.set_selected(u32::from(current.saturating_sub(FREECELL_MIN_CELL_COUNT)));
+        dropdown.connect_selected_notify(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |dd| {
+                let selected = dd.selected();
+                let count = FREECELL_MIN_CELL_COUNT.saturating_add(selected as u8);
+                window.set_freecell_cell_count(count, true);
+                let actual = window
+                    .current_freecell_cell_count()
+                    .clamp(FREECELL_MIN_CELL_COUNT, FREECELL_MAX_CELL_COUNT);
+                let actual_selected = u32::from(actual.saturating_sub(FREECELL_MIN_CELL_COUNT));
+                if dd.selected() != actual_selected {
+                    dd.set_selected(actual_selected);
+                }
+            }
+        ));
+        row.append(&dropdown);
+        root.append(&row);
+
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        actions.set_halign(gtk::Align::End);
+
+        let close = gtk::Button::with_label("Close");
+        close.add_css_class("suggested-action");
+        close.connect_clicked(glib::clone!(
+            #[weak]
+            dialog,
+            move |_| {
+                dialog.close();
+            }
+        ));
+        actions.append(&close);
+        root.append(&actions);
+
+        dialog.set_default_widget(Some(&close));
+        let _ = close.grab_focus();
+        dialog.set_child(Some(&root));
+        dialog.present();
     }
 }

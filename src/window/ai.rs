@@ -21,6 +21,12 @@ impl CardthropicWindow {
     }
 
     pub(super) fn start_random_winnable_seed_game(&self) {
+        if self.imp().chess_mode_active.get() {
+            *self.imp().status_override.borrow_mut() =
+                Some("Find Winnable Seed not applicable to Chess".to_string());
+            self.render();
+            return;
+        }
         if !self.guard_mode_engine("Starting a winnable deal") {
             return;
         }

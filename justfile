@@ -217,6 +217,14 @@ daily:
 perf-freecell:
     perf stat -d cargo test -q freecell_
 
+# Print current Unicode render guardrails used for manual perf regression checks.
+perf-gate:
+    @echo "Unicode render perf gate:"
+    @echo "  - Robot ludicrous target: <= 40 ms/move"
+    @echo "  - RSS target: <= 38 MiB steady"
+    @echo "Baseline source: benchmarks/freecell_baseline.json"
+    @rg -n "\"cards\"|\"robot_ludicrous_ms_per_move\"|\"steady_rss_mib\"|\"peak_rss_mib\"" benchmarks/freecell_baseline.json
+
 # Record and report perf profile for focused FreeCell tests.
 perf-record:
     perf record -g -- cargo test -q freecell_
@@ -284,3 +292,19 @@ ci-artifacts:
     just deny | tee reports/ci/deny.txt
     tar -czf reports/ci-bundle.tgz -C reports ci
     echo "Nightly artifacts: reports/ci-bundle.tgz"
+
+# Post-release verification against remotes + optional Flatpak checkout.
+post-release version='':
+    if [[ -n "{{version}}" ]]; then \
+      scripts/release/post-release-check.sh --version "{{version}}"; \
+    else \
+      scripts/release/post-release-check.sh; \
+    fi
+
+# Fast local verification with no network/flatpak-checkout checks.
+post-release-offline version='':
+    if [[ -n "{{version}}" ]]; then \
+      scripts/release/post-release-check.sh --version "{{version}}" --offline --skip-flatpak-checkout; \
+    else \
+      scripts/release/post-release-check.sh --offline --skip-flatpak-checkout; \
+    fi

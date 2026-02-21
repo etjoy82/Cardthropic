@@ -812,6 +812,57 @@ fn freecell_seeded_setup_respects_card_count_modes() {
 }
 
 #[test]
+fn freecell_cell_count_reduction_rejects_when_too_many_cells_are_occupied() {
+    let mut freecells = [None; FREECELL_MAX_CELL_COUNT as usize];
+    freecells[0] = Some(card(Suit::Clubs, 1, true));
+    freecells[1] = Some(card(Suit::Diamonds, 2, true));
+    freecells[2] = Some(card(Suit::Hearts, 3, true));
+
+    let mut game = FreecellGame::from_parts_unchecked_with_cell_count(
+        FreecellCardCountMode::FiftyTwo,
+        std::array::from_fn(|_| Vec::new()),
+        4,
+        freecells,
+        std::array::from_fn(|_| Vec::new()),
+    );
+
+    assert_eq!(game.try_set_freecell_count(2), Err(3));
+    assert_eq!(game.freecell_count(), 4);
+    assert_eq!(game.occupied_freecell_cells(), 3);
+}
+
+#[test]
+fn freecell_cell_count_reduction_compacts_cards_without_losing_them() {
+    let mut freecells = [None; FREECELL_MAX_CELL_COUNT as usize];
+    freecells[0] = Some(card(Suit::Clubs, 9, true));
+    freecells[5] = Some(card(Suit::Spades, 4, true));
+
+    let mut game = FreecellGame::from_parts_unchecked_with_cell_count(
+        FreecellCardCountMode::FiftyTwo,
+        std::array::from_fn(|_| Vec::new()),
+        FREECELL_MAX_CELL_COUNT,
+        freecells,
+        std::array::from_fn(|_| Vec::new()),
+    );
+
+    assert_eq!(game.try_set_freecell_count(4), Ok(()));
+    assert_eq!(game.freecell_count(), 4);
+    assert_eq!(game.occupied_freecell_cells(), 2);
+    assert!(game.freecells_storage()[4].is_none());
+    assert!(game.freecells_storage()[5].is_none());
+
+    let active_cards = game
+        .freecells()
+        .iter()
+        .filter_map(|slot| slot.map(|card| (card.suit, card.rank)))
+        .collect::<std::collections::HashSet<_>>();
+    let expected_cards = [(Suit::Clubs, 9), (Suit::Spades, 4)]
+        .into_iter()
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(active_cards, expected_cards);
+}
+
+#[test]
 fn freecell_win_condition_respects_card_count_mode() {
     let make_foundations = |total: usize| {
         let mut remaining = total;

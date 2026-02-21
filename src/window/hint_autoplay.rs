@@ -90,7 +90,7 @@ impl CardthropicWindow {
         {
             return HintSuggestion {
                 message: format!(
-                    "No winning path found from this position (explored {explored_states} states). Game is lost."
+                    "Solver did not find a winning line from this position (explored {explored_states} states)."
                 ),
                 source: None,
                 target: None,
@@ -120,7 +120,7 @@ impl CardthropicWindow {
         if candidates.is_empty() {
             self.start_hint_loss_analysis_if_needed(state_hash);
             return HintSuggestion {
-                message: "No legal moves remain. Game is lost.".to_string(),
+                message: "No legal moves remain from this position.".to_string(),
                 source: None,
                 target: None,
                 hint_move: None,
@@ -140,7 +140,7 @@ impl CardthropicWindow {
         } else {
             self.start_hint_loss_analysis_if_needed(state_hash);
             HintSuggestion {
-                message: "No productive moves remain from this line. Game is lost.".to_string(),
+                message: "No productive moves remain from this line.".to_string(),
                 source: None,
                 target: None,
                 hint_move: None,
@@ -424,15 +424,6 @@ impl CardthropicWindow {
                             }
                         }
 
-                        let current_hash = window.current_game_hash();
-                        if current_hash == analyzed_hash {
-                            if let LossVerdict::Lost { explored_states } = verdict {
-                                *imp.status_override.borrow_mut() = Some(format!(
-                                    "No winning path found from this position (explored {explored_states} states). Game is lost."
-                                ));
-                                window.render();
-                            }
-                        }
                         glib::ControlFlow::Break
                     }
                     Ok(None) => {

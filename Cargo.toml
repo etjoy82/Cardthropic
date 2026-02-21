@@ -1,14 +1,16 @@
 [package]
 name = "cardthropic"
-version = "0.9.5-beta"
+version = "0.10.0-beta"
 edition = "2021"
+
+[features]
+default = []
+winnability-diagnostics = []
 
 [dependencies]
 gettext-rs = { version = "0.7", features = ["gettext-system"] }
 gtk = { version = "0.9", package = "gtk4", features = ["gnome_47"] }
 rand = "0.8"
-resvg = "0.45"
-png = "0.17"
 sourceview5 = "0.9"
 
 [dependencies.adw]

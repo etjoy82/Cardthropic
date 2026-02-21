@@ -66,7 +66,7 @@ impl CardthropicWindow {
             HintNode::Stock => Some(imp.stock_picture.get().upcast()),
             HintNode::Waste => Some(imp.waste_picture.get().upcast()),
             HintNode::Freecell(index) => self
-                .waste_fan_slots()
+                .freecell_slot_pictures()
                 .get(index)
                 .map(|picture| picture.clone().upcast()),
             HintNode::Foundation(index) => {

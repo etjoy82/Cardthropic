@@ -157,6 +157,25 @@ flatpak run io.codeberg.emviolet.cardthropic
 sha256sum cardthropic.flatpak > SHA256SUMS
 ```
 
+## 10) Post-Release Verification (One Command)
+
+Run this after pushing release commits/tags to verify both source remotes and
+the optional Flatpak Pages checkout are in sync:
+
+```bash
+scripts/release/post-release-check.sh --version X.Y.Z[-PRERELEASE]
+```
+
+Useful flags:
+
+```bash
+# Use cached remote refs only (no network calls)
+scripts/release/post-release-check.sh --version X.Y.Z[-PRERELEASE] --offline
+
+# Skip Cardthropic-flatpak checkout verification
+scripts/release/post-release-check.sh --version X.Y.Z[-PRERELEASE] --skip-flatpak-checkout
+```
+
 ## One-Command Path (Automated)
 
 After version/changelog updates are done, run:

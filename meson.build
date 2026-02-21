@@ -1,5 +1,5 @@
 project('cardthropic', 'rust',
-          version: '0.9.5-beta',
+          version: '0.10.0-beta',
     meson_version: '>= 1.0.0',
   default_options: [ 'warning_level=2', 'werror=false', ],
 )

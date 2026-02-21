@@ -61,6 +61,13 @@
     <content_attribute id="social-location">none</content_attribute>
   </content_rating>
   <releases>
+    <release version="0.10.0-beta" date="2026-02-20">
+      <description>
+        <p>Added Atomic Chess (preview) variant wiring and ruleset scaffolding.</p>
+        <p>Migrated card rendering from SVG/PNG assets to CSS + Unicode symbols for lower memory and smoother ludicrous robot pacing.</p>
+        <p>Hardened Flatpak/AppStream release metadata flow and bundle metadata wiring.</p>
+      </description>
+    </release>
     <release version="0.9.5-beta" date="2026-02-18">
       <description>
         <p>Documentation and maintainer release tooling continue to be refined for the beta testbed workflow.</p>

@@ -24,6 +24,14 @@ Project documentation and working notes.
 - [AI_BENCHMARK_TUNING.md](AI_BENCHMARK_TUNING.md)
 - [TOOLING_WORKFLOW.md](TOOLING_WORKFLOW.md)
 
+## Rendering + Performance
+
+- [SVG_TO_CSS_UNICODE_TRANSITION.md](SVG_TO_CSS_UNICODE_TRANSITION.md)
+
+## Release Handoffs
+
+- [HANDOFF_0.9.5_BETA_TO_0.10.0_BETA_PRE.md](HANDOFF_0.9.5_BETA_TO_0.10.0_BETA_PRE.md)
+
 ## Product Notes
 
 - [NOTES_DIFFERENTIATORS_DRAFT.md](NOTES_DIFFERENTIATORS_DRAFT.md)

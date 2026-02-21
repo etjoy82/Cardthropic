@@ -112,13 +112,14 @@ impl CardthropicWindow {
             .map(|x| self.freecell_slot_index_from_waste_x(x))
             .or_else(|| imp.selected_freecell.get())
             .unwrap_or(0)
-            .clamp(0, 3);
+            .min(self.current_freecell_cell_count().saturating_sub(1) as usize);
         self.activate_freecell_slot(idx, n_press);
     }
 
     pub(super) fn activate_freecell_slot(&self, idx: usize, n_press: i32) {
         let imp = self.imp();
-        let idx = idx.clamp(0, 3);
+        let max_idx = self.current_freecell_cell_count().saturating_sub(1) as usize;
+        let idx = idx.min(max_idx);
 
         let selected_run = { *imp.selected_run.borrow() };
         if let Some(selected) = selected_run {

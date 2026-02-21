@@ -1,7 +1,13 @@
 use super::*;
 use sourceview5::prelude::*;
 
-const USERSTYLE_PRESET_NAMES: [&str; 19] = [
+enum UserstyleDiagnosticsState {
+    Valid,
+    Warning(String),
+    Error(String),
+}
+
+const USERSTYLE_PRESET_NAMES: [&str; 20] = [
     "Custom",
     "System",
     "Cardthropic",
@@ -21,6 +27,7 @@ const USERSTYLE_PRESET_NAMES: [&str; 19] = [
     "Turquoise (December, Cyan Blue)",
     "Moonstone (June, Milky White)",
     "Citrine (November, Amber Yellow)",
+    "Chess Monochrome (Current)",
 ];
 
 const USERSTYLE_TEMPLATE_SYSTEM: &str = r#"/* System
@@ -755,14 +762,12 @@ button {
     border-radius: 10px;
     border: 1px solid #ff0000;
     box-shadow: 0 4px 15px rgba(255, 0, 0, 0.5);
-    transition: all 200ms ease-in-out;
 }
 
 button:hover {
     background: #ff0000;
     color: #ffffff;
     box-shadow: 0 0 20px #ff4500;
-    transform: translateY(-2px);
 }
 
 .tableau-selected-card {
@@ -779,7 +784,7 @@ button:hover {
 
 /* Testing texture/opacity churn */
 .slot-emoji { 
-    filter: drop-shadow(0 0 10px #ff4500);
+    text-shadow: 0 0 10px #ff4500;
     opacity: 0.6;
 }
 
@@ -1031,6 +1036,74 @@ button { color: #f4ffff; background-image: linear-gradient(180deg, #2f9ea3, #237
 .status-line { color: #c5f6f1; }
 "#;
 
+const USERSTYLE_TEMPLATE_CHESS_MONO: &str = r#"/* Chess Monochrome (Current)
+Current chess-specific selectors mirrored from in-app chess CSS.
+Paste into Custom CSS or import this preset to keep chess visuals consistent.
+*/
+.chess-square {
+  border-radius: 6px;
+  border: 2px solid rgba(0, 0, 0, 0.42);
+  font-size: 56px;
+  font-weight: 700;
+}
+.chess-square-light {
+  background-color: #7a7a7a;
+}
+.chess-square-dark {
+  background-color: #121212;
+}
+.chess-square.chess-square-last-origin {
+  border-color: #ffe3a0;
+  box-shadow:
+    inset 0 0 0 2px #fff3d5,
+    inset 0 0 0 5px #f3b958,
+    0 0 0 1px rgba(255, 227, 160, 0.72),
+    0 0 20px rgba(243, 185, 88, 0.52);
+}
+.chess-square.chess-square-last-destination {
+  border-color: #b8f2ff;
+  box-shadow:
+    inset 0 0 0 2px #f0fdff,
+    inset 0 0 0 5px #63ddff,
+    0 0 0 1px rgba(184, 242, 255, 0.78),
+    0 0 24px rgba(99, 221, 255, 0.62);
+}
+.chess-square-selected {
+  box-shadow: inset 0 0 0 4px #ffffff;
+}
+.chess-square-target {
+  box-shadow: inset 0 0 0 4px #101010;
+}
+.chess-square-in-check {
+  box-shadow: inset 0 0 0 3px #111111, inset 0 0 0 7px #f5f5f5;
+}
+.chess-piece-white {
+  color: #ffffff;
+  text-shadow: none;
+}
+.chess-piece-black {
+  color: #000000 !important;
+  font-weight: 900;
+  text-shadow: 0 0 2px #ffffff;
+}
+.chess-drag-icon {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  font-size: 56px;
+  font-weight: 700;
+}
+.chess-frame-no-label > border > label,
+.chess-frame-no-label > label {
+  opacity: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+}
+"#;
+
 macro_rules! deep_theme_template {
     (
         $name:literal,
@@ -1064,7 +1137,7 @@ macro_rules! deep_theme_template {
             "  6) Empty-slot chrome: .card-slot, .card-slot:drop(active), .tableau-drop-target:drop(active)\n",
             "  7) Motion accents: .hint-invert, .motion-fly-card\n",
             "  8) Seed check fields: entry.seed-winnable / entry.seed-unwinnable\n",
-            "Note: actual face card artwork is SVG texture-based and not recolored by CSS.\n",
+            "Note: face card symbols are Unicode glyphs rendered at runtime and not recolored by CSS.\n",
             "*/\n",
             "window,\nwindow background,\nbox,\nlabel {\n  color: ", $text, ";\n}\n\n",
             "headerbar,\npopover,\nmenu,\nframe {\n  background: ", $header_bg, ";\n}\n\n",
@@ -1137,7 +1210,6 @@ macro_rules! deep_theme_template {
             "}\n\n",
             ".slot-emoji {\n  opacity: 0.78;\n}\n\n",
             ".hint-invert {\n",
-            "  filter: invert(1);\n",
             "  color: ", $accent, ";\n",
             "  background-color: alpha(", $accent, ", 0.12);\n",
             "}\n\n",
@@ -1228,7 +1300,7 @@ entry, combobox, dropdown, popover entry {
 }
 .slot-emoji { opacity: 0.86; }
 
-.hint-invert { filter: invert(1); color: #6fe7ff; background-color: rgba(111, 231, 255, 0.10); }
+.hint-invert { color: #6fe7ff; background-color: rgba(111, 231, 255, 0.10); }
 .motion-fly-card { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(246, 120, 255, 0.32); }
 
 entry.seed-winnable { background-color: rgba(46, 204, 113, 0.22); border-color: rgba(46, 204, 113, 0.85); }
@@ -1352,7 +1424,6 @@ entry, combobox, dropdown, popover entry {
 }
 
 .hint-invert {
-  filter: invert(1);
   color: #16ff86;
   background-color: rgba(16, 255, 134, 0.10);
 }
@@ -1406,14 +1477,12 @@ button {
     border-radius: 10px;
     border: 1px solid #ff0000;
     box-shadow: 0 4px 15px rgba(255, 0, 0, 0.5);
-    transition: all 200ms ease-in-out;
 }
 
 button:hover {
     background: #ff0000;
     color: #ffffff;
     box-shadow: 0 0 20px #ff4500;
-    transform: translateY(-2px);
 }
 
 button:active {
@@ -1475,7 +1544,7 @@ entry, combobox, dropdown, popover entry {
 
 /* Testing texture/opacity churn */
 .slot-emoji {
-    filter: drop-shadow(0 0 10px #ff4500);
+    text-shadow: 0 0 10px #ff4500;
     opacity: 0.6;
 }
 
@@ -1491,7 +1560,6 @@ label.status-line,
 }
 
 .hint-invert {
-    filter: invert(1);
     color: #ffb463;
     background-color: rgba(255, 140, 0, 0.14);
 }
@@ -1802,6 +1870,7 @@ impl CardthropicWindow {
             16 => Some(THEME_PRESET_TURQUOISE),
             17 => Some(THEME_PRESET_MOONSTONE),
             18 => Some(THEME_PRESET_CITRINE),
+            19 => Some(USERSTYLE_TEMPLATE_CHESS_MONO),
             _ => None,
         }
     }
@@ -1852,6 +1921,8 @@ impl CardthropicWindow {
             17
         } else if css == THEME_PRESET_CITRINE || css == USERSTYLE_TEMPLATE_CITRINE {
             18
+        } else if css == USERSTYLE_TEMPLATE_CHESS_MONO {
+            19
         } else {
             0
         }
@@ -1885,10 +1956,14 @@ impl CardthropicWindow {
             had_error,
             #[strong]
             first_error,
-            move |_, _, error| {
+            move |_, section, error| {
                 had_error.set(true);
                 if first_error.borrow().is_none() {
-                    *first_error.borrow_mut() = Some(error.to_string());
+                    let location = section.start_location();
+                    let line = location.lines().saturating_add(1);
+                    let column = location.line_chars().saturating_add(1);
+                    *first_error.borrow_mut() =
+                        Some(format!("line {line}, column {column}: {error}"));
                 }
             }
         ));
@@ -1902,6 +1977,139 @@ impl CardthropicWindow {
         } else {
             Ok(())
         }
+    }
+
+    fn validate_userstyle_css_stable(css: &str) -> Result<(), String> {
+        match Self::validate_userstyle_css(css) {
+            Ok(()) => Ok(()),
+            Err(first_error) => match Self::validate_userstyle_css(css) {
+                Ok(()) => Ok(()),
+                Err(_) => Err(first_error),
+            },
+        }
+    }
+
+    fn is_non_fatal_userstyle_warning(message: &str) -> bool {
+        message.to_ascii_lowercase().contains("no property named")
+    }
+
+    fn classify_userstyle_diagnostics(css: &str) -> UserstyleDiagnosticsState {
+        match Self::validate_userstyle_css_stable(css) {
+            Ok(()) => UserstyleDiagnosticsState::Valid,
+            Err(err) => {
+                if Self::is_non_fatal_userstyle_warning(&err) {
+                    UserstyleDiagnosticsState::Warning(err)
+                } else {
+                    UserstyleDiagnosticsState::Error(err)
+                }
+            }
+        }
+    }
+
+    fn set_userstyle_diagnostics_label(diagnostics: &gtk::Label, css: &str) {
+        match Self::classify_userstyle_diagnostics(css) {
+            UserstyleDiagnosticsState::Valid => {
+                diagnostics.set_label("CSS diagnostics: Looks valid.");
+                diagnostics.remove_css_class("error");
+            }
+            UserstyleDiagnosticsState::Warning(err) => {
+                diagnostics.set_label(&format!(
+                    "CSS diagnostics: Warning: {err} (GTK ignores unsupported properties)."
+                ));
+                diagnostics.remove_css_class("error");
+            }
+            UserstyleDiagnosticsState::Error(err) => {
+                diagnostics.set_label(&format!("CSS diagnostics: {err}"));
+                diagnostics.add_css_class("error");
+            }
+        }
+    }
+
+    fn gtk_css_version_label() -> String {
+        format!(
+            "GTK CSS {}.{}.{}",
+            gtk::major_version(),
+            gtk::minor_version(),
+            gtk::micro_version()
+        )
+    }
+
+    fn userstyle_find_match_offsets(haystack: &str, query: &str) -> Vec<(i32, i32)> {
+        let trimmed_query = query.trim();
+        if trimmed_query.is_empty() {
+            return Vec::new();
+        }
+
+        let haystack_lower = haystack.to_ascii_lowercase();
+        let query_lower = trimmed_query.to_ascii_lowercase();
+        if query_lower.is_empty() {
+            return Vec::new();
+        }
+
+        let mut out = Vec::new();
+        let mut search_start = 0usize;
+        while search_start <= haystack_lower.len() {
+            let Some(found_rel) = haystack_lower[search_start..].find(&query_lower) else {
+                break;
+            };
+            let byte_start = search_start + found_rel;
+            let byte_end = byte_start.saturating_add(query_lower.len());
+            let start_chars = haystack_lower[..byte_start].chars().count() as i32;
+            let end_chars = haystack_lower[..byte_end].chars().count() as i32;
+            out.push((start_chars, end_chars));
+            search_start = byte_start.saturating_add(query_lower.len().max(1));
+        }
+
+        out
+    }
+
+    fn apply_userstyle_find_selection(
+        buffer: &sourceview5::Buffer,
+        text_view: &sourceview5::View,
+        matches: &[(i32, i32)],
+        current_index: Option<usize>,
+        counter: &gtk::Label,
+        found_at: &gtk::Label,
+    ) {
+        if matches.is_empty() {
+            counter.set_label("0/0");
+            found_at.set_label("Ln -, Ch -");
+            return;
+        }
+
+        let index = current_index
+            .unwrap_or(0)
+            .min(matches.len().saturating_sub(1));
+        let (start_offset, end_offset) = matches[index];
+        let mut start_iter = buffer.iter_at_offset(start_offset);
+        let end_iter = buffer.iter_at_offset(end_offset);
+        buffer.select_range(&start_iter, &end_iter);
+        let _ = text_view.scroll_to_iter(&mut start_iter, 0.2, false, 0.0, 0.0);
+        let line = start_iter.line().saturating_add(1);
+        let column = start_iter.line_offset().saturating_add(1);
+        counter.set_label(&format!("{}/{}", index.saturating_add(1), matches.len()));
+        found_at.set_label(&format!("Ln {line}, Ch {column}"));
+    }
+
+    fn with_chess_piece_color_fallback(css: &str) -> String {
+        let has_white_rule = css.contains(".chess-piece-white");
+        let has_black_rule = css.contains(".chess-piece-black");
+        if has_white_rule && has_black_rule {
+            return css.to_string();
+        }
+
+        let mut effective_css = String::with_capacity(css.len().saturating_add(192));
+        effective_css.push_str(css);
+        effective_css
+            .push_str("\n\n/* Preserve chess side colors when presets style generic labels. */\n");
+        if !has_white_rule {
+            effective_css.push_str(".chess-piece-white {\n  color: #e8f8ff;\n}\n\n");
+        }
+        if !has_black_rule {
+            effective_css
+                .push_str(".chess-piece-black {\n  color: #1a1a2e;\n  font-weight: 900;\n}\n");
+        }
+        effective_css
     }
 
     pub(super) fn apply_custom_userstyle(&self, css: &str, persist: bool) {
@@ -1928,7 +2136,8 @@ impl CardthropicWindow {
             provider
         };
 
-        provider.load_from_string(css);
+        let effective_css = Self::with_chess_piece_color_fallback(css);
+        provider.load_from_string(&effective_css);
         *imp.custom_userstyle_css.borrow_mut() = css.to_string();
         if !is_preset_css {
             *imp.saved_custom_userstyle_css.borrow_mut() = css.to_string();
@@ -1964,10 +2173,40 @@ impl CardthropicWindow {
             .default_width(760)
             .default_height(645)
             .build();
+        let initial_editor_css = {
+            let saved_from_settings = {
+                let settings = self.imp().settings.borrow().clone();
+                settings
+                    .as_ref()
+                    .map(|settings| {
+                        settings
+                            .string(SETTINGS_KEY_SAVED_CUSTOM_USERSTYLE_CSS)
+                            .to_string()
+                    })
+                    .unwrap_or_default()
+            };
+            if !saved_from_settings.trim().is_empty() {
+                *self.imp().saved_custom_userstyle_css.borrow_mut() = saved_from_settings.clone();
+            }
+
+            let saved = if !saved_from_settings.trim().is_empty() {
+                saved_from_settings
+            } else {
+                self.imp().saved_custom_userstyle_css.borrow().clone()
+            };
+            if !saved.trim().is_empty() {
+                saved
+            } else {
+                let active = self.imp().custom_userstyle_css.borrow().clone();
+                if !active.trim().is_empty() && Self::userstyle_preset_for_css(&active) == 0 {
+                    active
+                } else {
+                    String::new()
+                }
+            }
+        };
         let allow_close = Rc::new(Cell::new(false));
-        let committed_css = Rc::new(RefCell::new(
-            self.imp().saved_custom_userstyle_css.borrow().clone(),
-        ));
+        let committed_css = Rc::new(RefCell::new(initial_editor_css.clone()));
         dialog.set_transient_for(Some(self));
         dialog.set_hide_on_close(false);
         dialog.set_destroy_with_parent(true);
@@ -2031,6 +2270,7 @@ impl CardthropicWindow {
         // Keep import unset initially so the field is visually blank until user chooses a preset.
         presets_dropdown.set_selected(gtk::INVALID_LIST_POSITION);
         presets_dropdown.set_hexpand(true);
+        let preset_import_ready = Rc::new(Cell::new(false));
 
         let font_sizes: [u32; 10] = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20];
         let font_size_label = gtk::Label::new(Some("IDE Font Size"));
@@ -2046,6 +2286,33 @@ impl CardthropicWindow {
         presets_row.append(&font_size_label);
         presets_row.append(&font_size_dropdown);
         root.append(&presets_row);
+
+        let find_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let find_label = gtk::Label::new(Some("Find"));
+        find_label.set_xalign(0.0);
+        find_label.add_css_class("dim-label");
+        let find_entry = gtk::SearchEntry::new();
+        find_entry.set_hexpand(true);
+        find_entry.set_placeholder_text(Some("Find in CSS editor..."));
+        let find_prev = gtk::Button::with_label("Prev");
+        find_prev.add_css_class("flat");
+        let find_next = gtk::Button::with_label("Next");
+        find_next.add_css_class("flat");
+        let find_counter = gtk::Label::new(Some("0/0"));
+        find_counter.add_css_class("dim-label");
+        find_counter.set_xalign(1.0);
+        find_counter.set_width_chars(8);
+        let find_position = gtk::Label::new(Some("Ln -, Ch -"));
+        find_position.add_css_class("dim-label");
+        find_position.set_xalign(1.0);
+        find_position.set_width_chars(13);
+        find_row.append(&find_label);
+        find_row.append(&find_entry);
+        find_row.append(&find_prev);
+        find_row.append(&find_next);
+        find_row.append(&find_counter);
+        find_row.append(&find_position);
+        root.append(&find_row);
 
         let scrolled = gtk::ScrolledWindow::builder()
             .hexpand(true)
@@ -2088,9 +2355,14 @@ impl CardthropicWindow {
         });
         text_view.add_css_class("code");
         text_view.add_css_class("userstyle-editor-view");
-        buffer.set_text(&self.imp().saved_custom_userstyle_css.borrow());
+        buffer.set_text(&initial_editor_css);
         scrolled.set_child(Some(&text_view));
         root.append(&scrolled);
+
+        let find_matches = Rc::new(RefCell::new(Vec::<(i32, i32)>::new()));
+        let find_match_index = Rc::new(Cell::new(None::<usize>));
+        let diagnostics_refresh_timer = Rc::new(RefCell::new(None::<glib::SourceId>));
+        let diagnostics_revision = Rc::new(Cell::new(0u64));
 
         let editor_font_provider = gtk::CssProvider::new();
         gtk::style_context_add_provider_for_display(
@@ -2121,25 +2393,53 @@ impl CardthropicWindow {
         controls.append(&status);
         root.append(&controls);
 
+        let diagnostics_row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        diagnostics_row.set_hexpand(true);
+        diagnostics_row.set_halign(gtk::Align::Fill);
+        let diagnostics_recheck = gtk::Button::with_label("Recheck");
+        diagnostics_recheck.add_css_class("flat");
+        diagnostics_row.append(&diagnostics_recheck);
         let diagnostics = gtk::Label::new(Some("CSS diagnostics: Ready"));
         diagnostics.set_xalign(0.0);
         diagnostics.add_css_class("dim-label");
-        root.append(&diagnostics);
+        diagnostics.set_hexpand(true);
+        diagnostics.set_wrap(true);
+        diagnostics.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+        diagnostics_row.append(&diagnostics);
+        let gtk_css_version = gtk::Label::new(Some(&Self::gtk_css_version_label()));
+        gtk_css_version.set_xalign(1.0);
+        gtk_css_version.set_valign(gtk::Align::Start);
+        gtk_css_version.add_css_class("dim-label");
+        diagnostics_row.append(&gtk_css_version);
+        root.append(&diagnostics_row);
 
-        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        actions.set_halign(gtk::Align::End);
+        let actions = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        actions.set_halign(gtk::Align::Fill);
+        actions.set_hexpand(true);
+        let actions_top = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        actions_top.set_halign(gtk::Align::End);
+        let actions_bottom = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        actions_bottom.set_halign(gtk::Align::End);
         let import_css = gtk::Button::with_label("Import CSS...");
         import_css.add_css_class("flat");
         let export_css = gtk::Button::with_label("Export CSS...");
         export_css.add_css_class("flat");
+        let copy_all = gtk::Button::with_label("Copy All");
+        copy_all.add_css_class("flat");
+        let replace_all_from_clipboard = gtk::Button::with_label("Replace All from Clipboard");
+        replace_all_from_clipboard.add_css_class("flat");
         let save = gtk::Button::with_label("Save Changes");
         save.add_css_class("suggested-action");
         let close = gtk::Button::with_label("Discard Changes");
         close.add_css_class("flat");
-        actions.append(&import_css);
-        actions.append(&export_css);
-        actions.append(&save);
-        actions.append(&close);
+        actions_top.append(&import_css);
+        actions_top.append(&export_css);
+        actions_top.append(&copy_all);
+        actions_top.append(&replace_all_from_clipboard);
+        actions_bottom.append(&close);
+        actions_bottom.append(&save);
+        actions.append(&actions_top);
+        actions.append(&actions_bottom);
         root.append(&actions);
 
         font_size_dropdown.connect_selected_notify(glib::clone!(
@@ -2311,6 +2611,65 @@ impl CardthropicWindow {
             }
         ));
 
+        copy_all.connect_clicked(glib::clone!(
+            #[weak]
+            buffer,
+            #[weak]
+            status,
+            #[weak(rename_to = window)]
+            self,
+            move |_| {
+                let text = buffer
+                    .text(&buffer.start_iter(), &buffer.end_iter(), true)
+                    .to_string();
+                window.clipboard().set_text(&text);
+                status.set_label("Copied all CSS to clipboard.");
+            }
+        ));
+
+        replace_all_from_clipboard.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[weak]
+            buffer,
+            #[weak]
+            status,
+            move |button| {
+                button.set_sensitive(false);
+                button.set_label("Replacing...");
+                let clipboard = window.clipboard();
+                clipboard.read_text_async(
+                    None::<&gio::Cancellable>,
+                    glib::clone!(
+                        #[weak]
+                        button,
+                        #[weak]
+                        buffer,
+                        #[weak]
+                        status,
+                        move |result| {
+                            button.set_sensitive(true);
+                            button.set_label("Replace All from Clipboard");
+                            match result {
+                                Ok(Some(text)) => {
+                                    buffer.set_text(text.as_str());
+                                    status.set_label("Replaced editor contents from clipboard.");
+                                }
+                                Ok(None) => {
+                                    status.set_label("Replace failed: clipboard is empty.");
+                                }
+                                Err(err) => {
+                                    status.set_label(&format!(
+                                        "Replace failed: clipboard read error ({err})."
+                                    ));
+                                }
+                            }
+                        }
+                    ),
+                );
+            }
+        ));
+
         presets_dropdown.connect_selected_notify(glib::clone!(
             #[weak(rename_to = window)]
             self,
@@ -2322,9 +2681,18 @@ impl CardthropicWindow {
             live_preview,
             #[strong]
             import_preset_names,
+            #[strong]
+            preset_import_ready,
             move |dropdown| {
-                let import_idx = dropdown.selected() as usize;
-                let preset_idx = dropdown.selected() + 1;
+                if !preset_import_ready.get() {
+                    return;
+                }
+                let selected = dropdown.selected();
+                if selected == gtk::INVALID_LIST_POSITION {
+                    return;
+                }
+                let import_idx = selected as usize;
+                let preset_idx = selected + 1;
                 if let Some(css) = Self::userstyle_css_for_preset(preset_idx) {
                     buffer.set_text(css);
                     if live_preview.is_active() {
@@ -2335,6 +2703,146 @@ impl CardthropicWindow {
                         status.set_label(&format!("Imported {name} into Custom CSS"));
                     }
                 }
+            }
+        ));
+
+        find_entry.connect_search_changed(glib::clone!(
+            #[weak]
+            buffer,
+            #[weak]
+            text_view,
+            #[weak]
+            find_counter,
+            #[weak]
+            find_position,
+            #[strong]
+            find_matches,
+            #[strong]
+            find_match_index,
+            move |entry| {
+                let query = entry.text().to_string();
+                let haystack = buffer
+                    .text(&buffer.start_iter(), &buffer.end_iter(), true)
+                    .to_string();
+                let matches = Self::userstyle_find_match_offsets(&haystack, &query);
+                let next_index = if matches.is_empty() { None } else { Some(0) };
+                *find_matches.borrow_mut() = matches;
+                find_match_index.set(next_index);
+                let matches_ref = find_matches.borrow();
+                Self::apply_userstyle_find_selection(
+                    &buffer,
+                    &text_view,
+                    matches_ref.as_slice(),
+                    find_match_index.get(),
+                    &find_counter,
+                    &find_position,
+                );
+            }
+        ));
+
+        find_next.connect_clicked(glib::clone!(
+            #[weak]
+            buffer,
+            #[weak]
+            text_view,
+            #[weak]
+            find_counter,
+            #[weak]
+            find_position,
+            #[strong]
+            find_matches,
+            #[strong]
+            find_match_index,
+            move |_| {
+                let len = find_matches.borrow().len();
+                let next = if len == 0 {
+                    None
+                } else {
+                    Some(
+                        find_match_index
+                            .get()
+                            .map(|index| (index + 1) % len)
+                            .unwrap_or(0),
+                    )
+                };
+                find_match_index.set(next);
+                let matches_ref = find_matches.borrow();
+                Self::apply_userstyle_find_selection(
+                    &buffer,
+                    &text_view,
+                    matches_ref.as_slice(),
+                    find_match_index.get(),
+                    &find_counter,
+                    &find_position,
+                );
+            }
+        ));
+
+        find_prev.connect_clicked(glib::clone!(
+            #[weak]
+            buffer,
+            #[weak]
+            text_view,
+            #[weak]
+            find_counter,
+            #[weak]
+            find_position,
+            #[strong]
+            find_matches,
+            #[strong]
+            find_match_index,
+            move |_| {
+                let len = find_matches.borrow().len();
+                let previous = if len == 0 {
+                    None
+                } else {
+                    Some(
+                        find_match_index
+                            .get()
+                            .map(|index| {
+                                if index == 0 {
+                                    len.saturating_sub(1)
+                                } else {
+                                    index.saturating_sub(1)
+                                }
+                            })
+                            .unwrap_or(0),
+                    )
+                };
+                find_match_index.set(previous);
+                let matches_ref = find_matches.borrow();
+                Self::apply_userstyle_find_selection(
+                    &buffer,
+                    &text_view,
+                    matches_ref.as_slice(),
+                    find_match_index.get(),
+                    &find_counter,
+                    &find_position,
+                );
+            }
+        ));
+
+        find_entry.connect_activate(glib::clone!(
+            #[weak]
+            find_next,
+            move |_| {
+                find_next.emit_clicked();
+            }
+        ));
+
+        diagnostics_recheck.connect_clicked(glib::clone!(
+            #[weak]
+            buffer,
+            #[weak]
+            diagnostics,
+            #[weak]
+            status,
+            move |_| {
+                let text = buffer
+                    .text(&buffer.start_iter(), &buffer.end_iter(), true)
+                    .to_string();
+                Self::set_userstyle_diagnostics_label(&diagnostics, &text);
+                status.set_label("CSS diagnostics rechecked.");
             }
         ));
 
@@ -2349,24 +2857,93 @@ impl CardthropicWindow {
             diagnostics,
             #[weak]
             unsaved_badge,
+            #[weak]
+            find_entry,
+            #[weak]
+            text_view,
+            #[weak]
+            find_counter,
+            #[weak]
+            find_position,
             #[strong]
             committed_css,
+            #[strong]
+            find_matches,
+            #[strong]
+            find_match_index,
+            #[strong]
+            diagnostics_refresh_timer,
+            #[strong]
+            diagnostics_revision,
             move |buf| {
                 let text = buf
                     .text(&buf.start_iter(), &buf.end_iter(), true)
                     .to_string();
                 let dirty = text != *committed_css.borrow();
                 unsaved_badge.set_visible(dirty);
-                match Self::validate_userstyle_css(&text) {
-                    Ok(_) => {
-                        diagnostics.set_label("CSS diagnostics: Looks valid.");
-                        diagnostics.remove_css_class("error");
-                    }
-                    Err(err) => {
-                        diagnostics.set_label(&format!("CSS diagnostics: {err}"));
-                        diagnostics.add_css_class("error");
-                    }
+
+                Self::set_userstyle_diagnostics_label(&diagnostics, &text);
+                let revision = diagnostics_revision.get().wrapping_add(1);
+                diagnostics_revision.set(revision);
+                if let Some(timer) = diagnostics_refresh_timer.borrow_mut().take() {
+                    timer.remove();
                 }
+                let buffer_for_timer = buf.clone();
+                let refresh_id = glib::timeout_add_local(
+                    Duration::from_millis(90),
+                    glib::clone!(
+                        #[weak]
+                        diagnostics,
+                        #[strong]
+                        buffer_for_timer,
+                        #[strong]
+                        diagnostics_refresh_timer,
+                        #[strong]
+                        diagnostics_revision,
+                        #[upgrade_or]
+                        glib::ControlFlow::Break,
+                        move || {
+                            if diagnostics_revision.get() != revision {
+                                return glib::ControlFlow::Break;
+                            }
+                            let current_css = buffer_for_timer
+                                .text(
+                                    &buffer_for_timer.start_iter(),
+                                    &buffer_for_timer.end_iter(),
+                                    true,
+                                )
+                                .to_string();
+                            Self::set_userstyle_diagnostics_label(&diagnostics, &current_css);
+                            diagnostics_refresh_timer.borrow_mut().take();
+                            glib::ControlFlow::Break
+                        }
+                    ),
+                );
+                *diagnostics_refresh_timer.borrow_mut() = Some(refresh_id);
+
+                let query = find_entry.text().to_string();
+                let matches = Self::userstyle_find_match_offsets(&text, &query);
+                let next_index = if matches.is_empty() {
+                    None
+                } else {
+                    Some(
+                        find_match_index
+                            .get()
+                            .unwrap_or(0)
+                            .min(matches.len().saturating_sub(1)),
+                    )
+                };
+                *find_matches.borrow_mut() = matches;
+                find_match_index.set(next_index);
+                let matches_ref = find_matches.borrow();
+                Self::apply_userstyle_find_selection(
+                    buf,
+                    &text_view,
+                    matches_ref.as_slice(),
+                    find_match_index.get(),
+                    &find_counter,
+                    &find_position,
+                );
 
                 if live_preview.is_active() {
                     window.apply_custom_userstyle(&text, false);
@@ -2398,16 +2975,7 @@ impl CardthropicWindow {
                 *committed_css.borrow_mut() = text.clone();
                 unsaved_badge.set_visible(false);
                 status.set_label("Changes saved");
-                match Self::validate_userstyle_css(&text) {
-                    Ok(_) => {
-                        diagnostics.set_label("CSS diagnostics: Looks valid.");
-                        diagnostics.remove_css_class("error");
-                    }
-                    Err(err) => {
-                        diagnostics.set_label(&format!("CSS diagnostics: {err}"));
-                        diagnostics.add_css_class("error");
-                    }
-                }
+                Self::set_userstyle_diagnostics_label(&diagnostics, &text);
                 dialog.close();
             }
         ));
@@ -2560,7 +3128,21 @@ impl CardthropicWindow {
         ));
 
         dialog.set_child(Some(&root));
+        let initial_css = buffer
+            .text(&buffer.start_iter(), &buffer.end_iter(), true)
+            .to_string();
+        Self::set_userstyle_diagnostics_label(&diagnostics, &initial_css);
         *self.imp().custom_userstyle_dialog.borrow_mut() = Some(dialog.clone());
         dialog.present();
+        glib::idle_add_local_once(glib::clone!(
+            #[weak]
+            presets_dropdown,
+            #[strong]
+            preset_import_ready,
+            move || {
+                presets_dropdown.set_selected(gtk::INVALID_LIST_POSITION);
+                preset_import_ready.set(true);
+            }
+        ));
     }
 }

@@ -5,6 +5,11 @@ use std::collections::HashMap;
 
 use super::{Card, Suit};
 
+pub const FREECELL_MIN_CELL_COUNT: u8 = 1;
+pub const FREECELL_DEFAULT_CELL_COUNT: u8 = 4;
+pub const FREECELL_MAX_CELL_COUNT: u8 = 6;
+const FREECELL_MAX_CELL_COUNT_USIZE: usize = FREECELL_MAX_CELL_COUNT as usize;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FreecellCardCountMode {
     TwentySix,
@@ -16,16 +21,33 @@ pub enum FreecellCardCountMode {
 pub struct FreecellGame {
     card_count_mode: FreecellCardCountMode,
     foundations: [Vec<Card>; 4],
-    freecells: [Option<Card>; 4],
+    freecell_count: u8,
+    freecells: [Option<Card>; FREECELL_MAX_CELL_COUNT_USIZE],
     tableau: [Vec<Card>; 8],
 }
 
 impl FreecellGame {
     pub fn new_with_seed(seed: u64) -> Self {
-        Self::new_with_seed_and_card_count(seed, FreecellCardCountMode::FiftyTwo)
+        Self::new_with_seed_and_card_count_and_cells(
+            seed,
+            FreecellCardCountMode::FiftyTwo,
+            FREECELL_DEFAULT_CELL_COUNT,
+        )
     }
 
     pub fn new_with_seed_and_card_count(seed: u64, card_count_mode: FreecellCardCountMode) -> Self {
+        Self::new_with_seed_and_card_count_and_cells(
+            seed,
+            card_count_mode,
+            FREECELL_DEFAULT_CELL_COUNT,
+        )
+    }
+
+    pub fn new_with_seed_and_card_count_and_cells(
+        seed: u64,
+        card_count_mode: FreecellCardCountMode,
+        freecell_count: u8,
+    ) -> Self {
         let mut deck = freecell_deck(card_count_mode);
         let mut rng = StdRng::seed_from_u64(seed);
         deck.shuffle(&mut rng);
@@ -33,7 +55,8 @@ impl FreecellGame {
         let mut game = Self {
             card_count_mode,
             foundations: std::array::from_fn(|_| Vec::new()),
-            freecells: [None; 4],
+            freecell_count: Self::normalize_freecell_cell_count(freecell_count),
+            freecells: [None; FREECELL_MAX_CELL_COUNT_USIZE],
             tableau: std::array::from_fn(|_| Vec::new()),
         };
 
@@ -49,7 +72,56 @@ impl FreecellGame {
         &self.foundations
     }
 
-    pub fn freecells(&self) -> &[Option<Card>; 4] {
+    pub fn freecell_count(&self) -> usize {
+        usize::from(self.freecell_count)
+    }
+
+    pub fn occupied_freecell_cells(&self) -> usize {
+        self.freecells()
+            .iter()
+            .filter(|slot| slot.is_some())
+            .count()
+    }
+
+    pub fn try_set_freecell_count(&mut self, freecell_count: u8) -> Result<(), usize> {
+        let normalized = Self::normalize_freecell_cell_count(freecell_count);
+        if normalized == self.freecell_count {
+            return Ok(());
+        }
+
+        let occupied = self.occupied_freecell_cells();
+        if usize::from(normalized) < occupied {
+            return Err(occupied);
+        }
+
+        let old_count = self.freecell_count();
+        let new_count = usize::from(normalized);
+        if new_count < old_count {
+            let mut overflow_cards = Vec::new();
+            for idx in new_count..old_count {
+                if let Some(card) = self.freecells[idx].take() {
+                    overflow_cards.push(card);
+                }
+            }
+            for card in overflow_cards {
+                if let Some(empty_idx) = (0..new_count).find(|&idx| self.freecells[idx].is_none()) {
+                    self.freecells[empty_idx] = Some(card);
+                }
+            }
+            for idx in new_count..FREECELL_MAX_CELL_COUNT_USIZE {
+                self.freecells[idx] = None;
+            }
+        }
+
+        self.freecell_count = normalized;
+        Ok(())
+    }
+
+    pub fn freecells(&self) -> &[Option<Card>] {
+        &self.freecells[..self.freecell_count()]
+    }
+
+    pub fn freecells_storage(&self) -> &[Option<Card>; FREECELL_MAX_CELL_COUNT_USIZE] {
         &self.freecells
     }
 
@@ -69,6 +141,9 @@ impl FreecellGame {
     }
 
     pub fn freecell_card(&self, cell: usize) -> Option<Card> {
+        if cell >= self.freecell_count() {
+            return None;
+        }
         self.freecells.get(cell).and_then(|slot| *slot)
     }
 
@@ -86,7 +161,7 @@ impl FreecellGame {
             return false;
         }
 
-        for cell in 0..4 {
+        for cell in 0..self.freecell_count() {
             if self.can_move_freecell_to_foundation(cell) {
                 return true;
             }
@@ -101,7 +176,7 @@ impl FreecellGame {
             if self.can_move_tableau_top_to_foundation(src) {
                 return true;
             }
-            for cell in 0..4 {
+            for cell in 0..self.freecell_count() {
                 if self.can_move_tableau_top_to_freecell(src, cell) {
                     return true;
                 }
@@ -161,7 +236,7 @@ impl FreecellGame {
     }
 
     pub fn can_move_tableau_top_to_freecell(&self, src: usize, cell: usize) -> bool {
-        if cell >= self.freecells.len() || src >= self.tableau.len() {
+        if cell >= self.freecell_count() || src >= self.tableau.len() {
             return false;
         }
         self.freecells[cell].is_none() && !self.tableau[src].is_empty()
@@ -275,24 +350,23 @@ impl FreecellGame {
     }
 
     pub fn encode_for_session(&self) -> String {
-        let parts = [
-            format!("c0={}", encode_slot(self.freecells[0])),
-            format!("c1={}", encode_slot(self.freecells[1])),
-            format!("c2={}", encode_slot(self.freecells[2])),
-            format!("c3={}", encode_slot(self.freecells[3])),
-            format!("f0={}", encode_pile(&self.foundations[0])),
-            format!("f1={}", encode_pile(&self.foundations[1])),
-            format!("f2={}", encode_pile(&self.foundations[2])),
-            format!("f3={}", encode_pile(&self.foundations[3])),
-            format!("t0={}", encode_pile(&self.tableau[0])),
-            format!("t1={}", encode_pile(&self.tableau[1])),
-            format!("t2={}", encode_pile(&self.tableau[2])),
-            format!("t3={}", encode_pile(&self.tableau[3])),
-            format!("t4={}", encode_pile(&self.tableau[4])),
-            format!("t5={}", encode_pile(&self.tableau[5])),
-            format!("t6={}", encode_pile(&self.tableau[6])),
-            format!("t7={}", encode_pile(&self.tableau[7])),
-        ];
+        let mut parts = Vec::with_capacity(17 + FREECELL_MAX_CELL_COUNT_USIZE);
+        parts.push(format!("fc={}", self.freecell_count));
+        for idx in 0..FREECELL_MAX_CELL_COUNT_USIZE {
+            parts.push(format!("c{idx}={}", encode_slot(self.freecells[idx])));
+        }
+        parts.push(format!("f0={}", encode_pile(&self.foundations[0])));
+        parts.push(format!("f1={}", encode_pile(&self.foundations[1])));
+        parts.push(format!("f2={}", encode_pile(&self.foundations[2])));
+        parts.push(format!("f3={}", encode_pile(&self.foundations[3])));
+        parts.push(format!("t0={}", encode_pile(&self.tableau[0])));
+        parts.push(format!("t1={}", encode_pile(&self.tableau[1])));
+        parts.push(format!("t2={}", encode_pile(&self.tableau[2])));
+        parts.push(format!("t3={}", encode_pile(&self.tableau[3])));
+        parts.push(format!("t4={}", encode_pile(&self.tableau[4])));
+        parts.push(format!("t5={}", encode_pile(&self.tableau[5])));
+        parts.push(format!("t6={}", encode_pile(&self.tableau[6])));
+        parts.push(format!("t7={}", encode_pile(&self.tableau[7])));
         parts.join(";")
     }
 
@@ -303,12 +377,30 @@ impl FreecellGame {
             fields.insert(key, value);
         }
 
-        let freecells = [
-            decode_slot(fields.get("c0")?)?,
-            decode_slot(fields.get("c1")?)?,
-            decode_slot(fields.get("c2")?)?,
-            decode_slot(fields.get("c3")?)?,
-        ];
+        let mut freecells = [None; FREECELL_MAX_CELL_COUNT_USIZE];
+        for (idx, slot) in freecells.iter_mut().enumerate() {
+            let key = format!("c{idx}");
+            if let Some(raw) = fields.get(key.as_str()) {
+                *slot = decode_slot(raw)?;
+            } else if idx < usize::from(FREECELL_DEFAULT_CELL_COUNT) {
+                return None;
+            }
+        }
+
+        let mut freecell_count = fields
+            .get("fc")
+            .and_then(|raw| raw.parse::<u8>().ok())
+            .map(Self::normalize_freecell_cell_count)
+            .unwrap_or(FREECELL_DEFAULT_CELL_COUNT);
+        let highest_occupied = freecells
+            .iter()
+            .rposition(|slot| slot.is_some())
+            .map(|idx| idx + 1)
+            .unwrap_or(0);
+        if highest_occupied > usize::from(freecell_count) {
+            freecell_count = highest_occupied.min(FREECELL_MAX_CELL_COUNT_USIZE) as u8;
+        }
+
         let foundations = [
             decode_pile(fields.get("f0")?)?,
             decode_pile(fields.get("f1")?)?,
@@ -326,10 +418,10 @@ impl FreecellGame {
             decode_pile(fields.get("t7")?)?,
         ];
 
-        let freecell_count = freecells.iter().filter(|card| card.is_some()).count();
+        let freecell_cards = freecells.iter().filter(|card| card.is_some()).count();
         let foundations_count: usize = foundations.iter().map(Vec::len).sum();
         let tableau_count: usize = tableau.iter().map(Vec::len).sum();
-        let total_cards = freecell_count + foundations_count + tableau_count;
+        let total_cards = freecell_cards + foundations_count + tableau_count;
         let Some(card_count_mode) = FreecellCardCountMode::from_card_count(total_cards as u8)
         else {
             return None;
@@ -337,6 +429,7 @@ impl FreecellGame {
 
         Some(Self {
             card_count_mode,
+            freecell_count,
             foundations,
             freecells,
             tableau,
@@ -344,7 +437,11 @@ impl FreecellGame {
     }
 
     fn max_movable_cards(&self, dst: usize) -> usize {
-        let free_empty = self.freecells.iter().filter(|slot| slot.is_none()).count();
+        let free_empty = self
+            .freecells()
+            .iter()
+            .filter(|slot| slot.is_none())
+            .count();
         let mut empty_tableau = self.tableau.iter().filter(|pile| pile.is_empty()).count();
         if self.tableau.get(dst).is_some_and(|pile| pile.is_empty()) {
             empty_tableau = empty_tableau.saturating_sub(1);
@@ -367,17 +464,27 @@ impl FreecellGame {
         }
     }
 
-    pub(crate) fn from_parts_unchecked(
+    pub(crate) fn from_parts_unchecked_with_cell_count(
         card_count_mode: FreecellCardCountMode,
         foundations: [Vec<Card>; 4],
-        freecells: [Option<Card>; 4],
+        freecell_count: u8,
+        freecells: [Option<Card>; FREECELL_MAX_CELL_COUNT_USIZE],
         tableau: [Vec<Card>; 8],
     ) -> Self {
         Self {
             card_count_mode,
+            freecell_count: Self::normalize_freecell_cell_count(freecell_count),
             foundations,
             freecells,
             tableau,
+        }
+    }
+
+    fn normalize_freecell_cell_count(value: u8) -> u8 {
+        if (FREECELL_MIN_CELL_COUNT..=FREECELL_MAX_CELL_COUNT).contains(&value) {
+            value
+        } else {
+            FREECELL_DEFAULT_CELL_COUNT
         }
     }
 }
@@ -389,8 +496,9 @@ impl FreecellGame {
         freecells: [Option<Card>; 4],
         tableau: [Vec<Card>; 8],
     ) -> Self {
-        Self::debug_new_with_mode(
+        Self::debug_new_with_mode_and_cells(
             FreecellCardCountMode::FiftyTwo,
+            FREECELL_DEFAULT_CELL_COUNT,
             foundations,
             freecells,
             tableau,
@@ -403,10 +511,29 @@ impl FreecellGame {
         freecells: [Option<Card>; 4],
         tableau: [Vec<Card>; 8],
     ) -> Self {
-        Self {
+        Self::debug_new_with_mode_and_cells(
             card_count_mode,
+            FREECELL_DEFAULT_CELL_COUNT,
             foundations,
             freecells,
+            tableau,
+        )
+    }
+
+    pub(crate) fn debug_new_with_mode_and_cells(
+        card_count_mode: FreecellCardCountMode,
+        freecell_count: u8,
+        foundations: [Vec<Card>; 4],
+        freecells: [Option<Card>; 4],
+        tableau: [Vec<Card>; 8],
+    ) -> Self {
+        let mut freecells_storage = [None; FREECELL_MAX_CELL_COUNT_USIZE];
+        freecells_storage[..4].copy_from_slice(&freecells);
+        Self {
+            card_count_mode,
+            freecell_count: Self::normalize_freecell_cell_count(freecell_count),
+            foundations,
+            freecells: freecells_storage,
             tableau,
         }
     }

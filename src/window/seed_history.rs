@@ -19,6 +19,18 @@ impl CardthropicWindow {
         *self.imp().seed_history.borrow_mut() = data;
     }
 
+    pub(super) fn clear_seed_history(&self) {
+        let imp = self.imp();
+        if let Some(source_id) = imp.seed_history_flush_timer.borrow_mut().take() {
+            Self::remove_source_if_present(source_id);
+        }
+        *imp.seed_history.borrow_mut() = SeedHistoryStore::default();
+        imp.seed_history_dirty.set(true);
+        imp.seed_history_dropdown_dirty.set(false);
+        self.flush_seed_history_now();
+        self.refresh_seed_history_dropdown_immediate();
+    }
+
     fn should_defer_seed_history_dropdown_refresh(&self) -> bool {
         let imp = self.imp();
         imp.robot_mode_running.get()

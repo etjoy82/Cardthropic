@@ -2,6 +2,7 @@ pub mod automation;
 pub mod autoplay;
 pub mod autoplay_search;
 pub mod boundary;
+pub mod chess;
 pub mod commands;
 pub mod foundation_safety;
 pub mod freecell_planner;

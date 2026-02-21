@@ -5,7 +5,7 @@ icon_names = [application_id, legacy_icon_name]
 scalable_dir = 'hicolor' / 'scalable' / 'apps'
 foreach icon_name : icon_names
   install_data(
-    scalable_dir / ('@0@.svg').format(icon_name),
+    scalable_dir / ('@0@.png').format(icon_name),
     install_dir: get_option('datadir') / 'icons' / scalable_dir
   )
 endforeach
@@ -13,7 +13,7 @@ endforeach
 symbolic_dir = 'hicolor' / 'symbolic' / 'apps'
 foreach icon_name : icon_names
   install_data(
-    symbolic_dir / ('@0@-symbolic.svg').format(icon_name),
+    symbolic_dir / ('@0@-symbolic.png').format(icon_name),
     install_dir: get_option('datadir') / 'icons' / symbolic_dir
   )
 endforeach

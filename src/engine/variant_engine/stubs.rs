@@ -140,9 +140,11 @@ impl VariantEngine for FreecellEngine {
         _draw_mode: DrawMode,
     ) -> bool {
         let card_count_mode = state.freecell().card_count_mode();
-        state.set_freecell(FreecellGame::new_with_seed_and_card_count(
+        let freecell_count = state.freecell().freecell_count() as u8;
+        state.set_freecell(FreecellGame::new_with_seed_and_card_count_and_cells(
             seed,
             card_count_mode,
+            freecell_count,
         ));
         true
     }

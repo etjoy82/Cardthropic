@@ -1,3 +1,5 @@
+#[path = "game/chess/mod.rs"]
+mod chess;
 #[path = "game/freecell.rs"]
 mod freecell;
 #[path = "game/klondike_moves.rs"]
@@ -12,6 +14,7 @@ mod solver;
 mod spider;
 #[path = "game/types.rs"]
 mod types;
+pub use chess::*;
 pub use freecell::*;
 pub use spider::*;
 pub use types::*;

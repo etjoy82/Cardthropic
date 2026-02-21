@@ -42,22 +42,7 @@ impl CardthropicWindow {
     }
 
     fn command_shortcut_label_for_action(&self, detailed_action: &str) -> Option<String> {
-        let app = self.application()?;
-        let labels: Vec<String> = app
-            .accels_for_action(detailed_action)
-            .into_iter()
-            .filter_map(|accel| {
-                let accel = accel.to_string();
-                if accel.trim().is_empty() {
-                    return None;
-                }
-                if let Some((key, mods)) = gtk::accelerator_parse(&accel) {
-                    Some(gtk::accelerator_get_label(key, mods).to_string())
-                } else {
-                    Some(accel)
-                }
-            })
-            .collect();
+        let labels = self.shortcut_labels_for_action(detailed_action);
 
         if labels.is_empty() {
             None

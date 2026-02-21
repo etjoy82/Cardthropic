@@ -90,8 +90,9 @@ fi
 
 echo "Inspecting appstream metadata (${APPSTREAM_REF}) in ${REPO_DIR}..."
 tmp_xml="$(mktemp)"
+tmp_meta="$(mktemp)"
 cleanup() {
-  rm -f "${tmp_xml}"
+  rm -f "${tmp_xml}" "${tmp_meta}"
 }
 trap cleanup EXIT
 
@@ -111,10 +112,28 @@ if ! "${SEARCH_BIN}" "${SEARCH_QUIET_OPTS[@]}" "screenshot|image type=\"source\"
   missing=1
 fi
 
+app_ref="$(ostree --repo="${REPO_DIR}" refs | grep "^app/.*/${ARCH}/" | head -n1 || true)"
+if [[ -z "${app_ref}" ]]; then
+  echo "No app/*/${ARCH}/* ref found in ${REPO_DIR} to verify release entries." >&2
+  missing=1
+else
+  IFS='/' read -r _ app_id _ _ <<<"${app_ref}"
+  if ! ostree --repo="${REPO_DIR}" cat \
+    "${app_ref}" \
+    "/files/share/metainfo/${app_id}.metainfo.xml" >"${tmp_meta}" 2>/dev/null; then
+    echo "Missing metainfo file in ${app_ref}" >&2
+    missing=1
+  elif ! "${SEARCH_BIN}" "${SEARCH_QUIET_OPTS[@]}" "<release version=\"" "${tmp_meta}"; then
+    echo "Missing release entries in ${app_ref} metainfo" >&2
+    missing=1
+  fi
+fi
+
 echo
 echo "Expected:"
 echo "- project_license should be present"
 echo "- screenshot/image URL should be present"
+echo "- at least one release entry should be present in the app metainfo"
 
 if [[ "${missing}" -ne 0 ]]; then
   exit 1

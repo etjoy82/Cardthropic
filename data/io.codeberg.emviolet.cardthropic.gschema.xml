@@ -21,7 +21,67 @@
 				<summary>FreeCell card count</summary>
 				<description>Number of cards for FreeCell deals (26, 39, or 52).</description>
 			</key>
-			<key name="saved-session" type="s">
+			<key name="freecell-cell-count" type="i">
+				<default>4</default>
+				<summary>FreeCell free cell count</summary>
+				<description>Number of free cells shown at the top in FreeCell (1-6).</description>
+			</key>
+				<key name="chess-board-rotation-degrees" type="i">
+					<default>0</default>
+					<summary>Chess board rotation in degrees</summary>
+					<description>Visual board rotation angle used in chess modes. Valid values: 0,45,180,270.</description>
+				</key>
+				<key name="chess-ai-strength" type="s">
+					<default>'balanced'</default>
+					<summary>Chess auto-response AI strength profile</summary>
+					<description>Search profile for chess auto-response moves. Valid values: fast, balanced, strong, ultra, ludicrous, omega, extra-dimensional, international, grandeur.</description>
+				</key>
+					<key name="chess-wand-ai-strength" type="s">
+						<default>'balanced'</default>
+						<summary>Chess wand AI strength profile</summary>
+						<description>Search profile for your manual Wand Wave clicks in chess. Valid values: fast, balanced, strong, ultra, ludicrous, omega, extra-dimensional, international, grandeur.</description>
+					</key>
+					<key name="chess-w-question-ai-strength" type="s">
+						<default>'balanced'</default>
+						<summary>Chess W? AI strength profile</summary>
+						<description>Search profile for W? chess analysis. Valid values: fast, balanced, strong, ultra, ludicrous, omega, extra-dimensional, international, grandeur.</description>
+					</key>
+					<key name="chess-robot-white-ai-strength" type="s">
+						<default>'balanced'</default>
+						<summary>Chess robot white AI strength profile</summary>
+					<description>Search profile used when Robot controls White in chess. Valid values: fast, balanced, strong, ultra, ludicrous, omega, extra-dimensional, international, grandeur.</description>
+				</key>
+				<key name="chess-robot-black-ai-strength" type="s">
+					<default>'balanced'</default>
+					<summary>Chess robot black AI strength profile</summary>
+					<description>Search profile used when Robot controls Black in chess. Valid values: fast, balanced, strong, ultra, ludicrous, omega, extra-dimensional, international, grandeur.</description>
+				</key>
+				<key name="chess-wand-ai-opponent-auto-response" type="b">
+				<default>true</default>
+				<summary>Chess Wand AI opponent auto-response</summary>
+				<description>When enabled, after your chess move the opponent side auto-plays one Wand AI move.</description>
+			</key>
+				<key name="chess-auto-response-plays-white" type="b">
+					<default>false</default>
+					<summary>Chess auto-response plays White</summary>
+					<description>When enabled, Wand auto-response only triggers when White is the responding side.</description>
+				</key>
+				<key name="chess-auto-flip-board-each-move" type="b">
+					<default>false</default>
+					<summary>Chess auto-flip board each move</summary>
+					<description>When enabled, chess board orientation auto-flips to the side to move after each move.</description>
+				</key>
+				<key name="chess-show-board-coordinates" type="b">
+					<default>true</default>
+					<summary>Show chess board coordinates</summary>
+					<description>When enabled, A-H and 1-8 coordinate markers are shown on the outer edge of the chess board.</description>
+				</key>
+				<key name="chess-system-sounds-enabled" type="b">
+					<default>false</default>
+					<summary>Enable chess system sounds</summary>
+					<description>When enabled, chess moves trigger a system alert bell with built-in rate limiting.</description>
+				</key>
+				<key name="saved-session" type="s">
 			<default>''</default>
 			<summary>Saved game session state</summary>
 			<description>Serialized game/session state used for crash-safe resume on next launch.</description>
@@ -41,11 +101,6 @@
 			<summary>Custom userstyle editor word wrap</summary>
 			<description>Whether the Custom CSS editor wraps long lines.</description>
 		</key>
-			<key name="custom-card-svg" type="s">
-				<default>''</default>
-				<summary>Custom card sheet SVG</summary>
-				<description>Optional SVG card sheet pasted by the user and persisted in settings.</description>
-			</key>
 			<key name="enable-hud" type="b">
 				<default>true</default>
 				<summary>Enable HUD</summary>
@@ -126,6 +181,11 @@
 				<summary>Status history maximized</summary>
 				<description>Whether the status history window was maximized when last closed.</description>
 			</key>
+			<key name="status-history-retention-lines" type="i">
+				<default>1000</default>
+				<summary>Status history retention lines</summary>
+				<description>Maximum number of status history lines retained in memory.</description>
+			</key>
 			<key name="theme-presets-width" type="i">
 				<default>620</default>
 				<summary>Theme presets window width</summary>
@@ -166,16 +226,21 @@
 				<summary>Help window height</summary>
 				<description>Last remembered height for the help window.</description>
 			</key>
-			<key name="help-maximized" type="b">
-				<default>false</default>
-				<summary>Help maximized</summary>
-				<description>Whether the help window was maximized when last closed.</description>
-			</key>
-			<key name="memory-guard-enabled" type="b">
-				<default>false</default>
-				<summary>Enable memory guard</summary>
-				<description>When enabled, Cardthropic monitors process memory and applies soft/hard guard actions.</description>
-			</key>
+				<key name="help-maximized" type="b">
+					<default>false</default>
+					<summary>Help maximized</summary>
+					<description>Whether the help window was maximized when last closed.</description>
+				</key>
+				<key name="first-launch-intro-shown" type="b">
+					<default>false</default>
+					<summary>First launch intro shown</summary>
+					<description>Whether Cardthropic already showed the first-launch welcome help introduction.</description>
+				</key>
+				<key name="memory-guard-enabled" type="b">
+					<default>false</default>
+					<summary>Enable memory guard</summary>
+					<description>When enabled, Cardthropic monitors process memory and applies soft/hard guard actions.</description>
+				</key>
 			<key name="memory-guard-soft-limit-mib" type="i">
 				<default>1536</default>
 				<summary>Memory guard soft limit (MiB)</summary>

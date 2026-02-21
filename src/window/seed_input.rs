@@ -2,6 +2,29 @@ use super::*;
 use crate::engine::seed_ops;
 
 impl CardthropicWindow {
+    pub(super) fn is_seed_box_focused(&self) -> bool {
+        let imp = self.imp();
+        if let Some(entry) = self.seed_text_entry() {
+            if entry.has_focus() || entry.has_visible_focus() {
+                return true;
+            }
+        }
+        if imp.seed_combo.has_focus() || imp.seed_combo.has_visible_focus() {
+            return true;
+        }
+        let Some(focus) = gtk::prelude::GtkWindowExt::focus(self) else {
+            return false;
+        };
+        if let Some(entry) = self.seed_text_entry() {
+            let entry_widget: gtk::Widget = entry.clone().upcast();
+            if focus == entry_widget || focus.is_ancestor(&entry) {
+                return true;
+            }
+        }
+        let seed_combo_widget: gtk::Widget = imp.seed_combo.get().upcast();
+        focus == seed_combo_widget || focus.is_ancestor(&seed_combo_widget)
+    }
+
     #[allow(deprecated)]
     pub(super) fn seed_text_entry(&self) -> Option<gtk::Entry> {
         self.imp()
@@ -44,6 +67,46 @@ impl CardthropicWindow {
     }
 
     pub(super) fn start_new_game_from_seed_controls(&self) {
+        if self.imp().chess_mode_active.get() {
+            if self.imp().seed_search_in_progress.get() {
+                *self.imp().status_override.borrow_mut() =
+                    Some(seed_ops::msg_seed_search_still_running());
+                self.render();
+                return;
+            }
+
+            self.cancel_seed_winnable_check(None);
+            self.clear_seed_entry_feedback();
+            let original_seed_label = self.seed_input_text().trim().to_string();
+            let seed = match self.seed_from_controls_or_random() {
+                Ok(seed) => seed,
+                Err(message) => {
+                    if let Some(entry) = self.seed_text_entry() {
+                        entry.add_css_class("error");
+                    }
+                    *self.imp().status_override.borrow_mut() = Some(message);
+                    self.render();
+                    return;
+                }
+            };
+            let status = if !original_seed_label.is_empty()
+                && !original_seed_label.replace('_', "").is_empty()
+                && original_seed_label
+                    .replace('_', "")
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphabetic())
+            {
+                format!("Started a new game. Seed {seed}, [{original_seed_label}]")
+            } else {
+                seed_ops::msg_started_seed(seed)
+            };
+            self.start_new_chess_game_with_seed(seed, status);
+            if !original_seed_label.is_empty() {
+                self.set_seed_input_text(&original_seed_label);
+            }
+            return;
+        }
+
         if !self.guard_mode_engine("Starting a new deal") {
             return;
         }
@@ -68,7 +131,6 @@ impl CardthropicWindow {
                 return;
             }
         };
-
         let status = if !original_seed_label.is_empty()
             && !original_seed_label.replace('_', "").is_empty()
             && original_seed_label
@@ -87,6 +149,21 @@ impl CardthropicWindow {
     }
 
     pub(super) fn start_random_seed_game(&self) {
+        if self.imp().chess_mode_active.get() {
+            if self.imp().seed_search_in_progress.get() {
+                *self.imp().status_override.borrow_mut() =
+                    Some(seed_ops::msg_seed_search_still_running());
+                self.render();
+                return;
+            }
+
+            self.cancel_seed_winnable_check(None);
+            self.clear_seed_entry_feedback();
+            let seed = seed_ops::random_seed();
+            self.start_new_chess_game_with_seed(seed, seed_ops::msg_started_seed(seed));
+            return;
+        }
+
         if !self.guard_mode_engine("Starting a random deal") {
             return;
         }
@@ -104,6 +181,22 @@ impl CardthropicWindow {
     }
 
     pub(super) fn repeat_current_seed_game(&self) {
+        if self.imp().chess_mode_active.get() {
+            if self.imp().seed_search_in_progress.get() {
+                *self.imp().status_override.borrow_mut() =
+                    Some(seed_ops::msg_seed_search_still_running());
+                self.render();
+                return;
+            }
+
+            self.cancel_seed_winnable_check(None);
+            self.clear_seed_entry_feedback();
+            let seed = self.imp().current_seed.get();
+            self.set_seed_input_text(&seed.to_string());
+            self.start_new_chess_game_with_seed(seed, seed_ops::msg_repeated_seed(seed));
+            return;
+        }
+
         if !self.guard_mode_engine("Repeating current seed") {
             return;
         }

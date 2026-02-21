@@ -42,6 +42,7 @@ This project uses local Rust and system tooling to keep quality and performance 
 - `just size`: binary size report.
 - `just msrv`: verify minimum supported Rust version.
 - `just perf-freecell` / `just perf-record`: CPU profile tools.
+- `just perf-gate`: prints current Unicode render regression guardrails from baseline.
 - `just ci-artifacts`: generate report bundle at `reports/ci-bundle.tgz`.
 
 ## Artifact Upload Config
