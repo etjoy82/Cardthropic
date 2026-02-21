@@ -33,17 +33,15 @@
   </requires>
   <description>
     <p>
-      Cardthropic is a modern GNOME solitaire game built with Rust and
-      Libadwaita, featuring polished Klondike and Spider gameplay with 1 to 4
-      suit modes. Play seeded deals, run winnability analysis, use smart
-      moves, and choose flexible click behavior for faster strategy.
+      Cardthropic is a GNOME card game app built with Rust and Libadwaita.
+      It includes Klondike, Spider (1 to 4 suits), and FreeCell, plus preview
+      chess modes for Standard Chess, Chess960, and Atomic Chess.
     </p>
     <p>
-      Automation includes Wand hints and Robot mode with detailed move
-      reporting. Customize visuals with CSS userstyles, monitor progress in
-      the HUD, and keep persistent game history across sessions. Cardthropic
-      is tuned for desktop and mobile window sizes, with clear interactions
-      and reliable flow through long runs and replayable deals.
+      Seeded deals, winnability checks, Smart Move, Wand hints, and Robot mode
+      are available across supported modes. Cardthropic also supports custom
+      CSS themes, session persistence, and adaptive layouts for desktop and
+      mobile window sizes.
     </p>
   </description>
   <screenshots>
