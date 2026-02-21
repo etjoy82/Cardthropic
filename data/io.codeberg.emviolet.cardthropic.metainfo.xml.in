@@ -11,6 +11,11 @@
   <url type="homepage">https://codeberg.org/emviolet/Cardthropic</url>
   <url type="vcs-browser">https://codeberg.org/emviolet/Cardthropic</url>
   <url type="bugtracker">https://codeberg.org/emviolet/Cardthropic/issues</url>
+  <url type="help">https://codeberg.org/emviolet/Cardthropic/src/branch/main/README.md</url>
+  <url type="faq">https://codeberg.org/emviolet/Cardthropic/src/branch/main/README.md#project-docs</url>
+  <url type="contribute">https://codeberg.org/emviolet/Cardthropic</url>
+  <url type="contact">https://codeberg.org/emviolet/Cardthropic/issues</url>
+  <update_contact>entropicmelody_AT_proton.me</update_contact>
   <translation type="gettext">cardthropic</translation>
   <launchable type="desktop-id">io.codeberg.emviolet.cardthropic.desktop</launchable>
   <icon type="stock">io.codeberg.emviolet.cardthropic</icon>
@@ -18,6 +23,14 @@
     <category>Game</category>
     <category>CardGame</category>
   </categories>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <requires>
+    <display_length compare="ge" side="shortest">360</display_length>
+  </requires>
   <description>
     <p>
       Cardthropic is a modern GNOME solitaire game built with Rust and
@@ -29,8 +42,8 @@
       Automation includes Wand hints and Robot mode with detailed move
       reporting. Customize visuals with CSS userstyles, monitor progress in
       the HUD, and keep persistent game history across sessions. Cardthropic
-      is tuned for desktop comfort, with clear interactions and reliable flow
-      through long runs and challenging, replayable deals every day.
+      is tuned for desktop and mobile window sizes, with clear interactions
+      and reliable flow through long runs and replayable deals.
     </p>
   </description>
   <screenshots>
@@ -68,6 +81,15 @@
         <p>Switched card rendering from SVG/PNG assets to a CSS + Unicode pipeline.</p>
         <p>Improved release and Flatpak/AppStream verification tooling.</p>
       </description>
+      <url type="details">https://codeberg.org/emviolet/Cardthropic/src/branch/main/CHANGELOG.md#0100-beta---2026-02-20</url>
+    </release>
+    <release version="0.10.0" date="2026-02-20">
+      <description>
+        <p>Added preview chess variants: Standard, Chess960, and Atomic.</p>
+        <p>Switched card rendering from SVG/PNG assets to a CSS + Unicode pipeline.</p>
+        <p>Improved release and Flatpak/AppStream verification tooling.</p>
+      </description>
+      <url type="details">https://codeberg.org/emviolet/Cardthropic/src/branch/main/CHANGELOG.md#0100-beta---2026-02-20</url>
     </release>
     <release version="0.9.5-beta" date="2026-02-18">
       <description>
