@@ -1,6 +1,6 @@
 # Cardthropic
 
-Cardthropic is a GNOME card game app built with Rust, GTK4, and Libadwaita.
+Cardthropic is a Linux card game app built with Rust, GTK4, and Libadwaita.
 
 Current version: `0.10.0-beta` (beta channel)
 License: `GPL-3.0-or-later`
